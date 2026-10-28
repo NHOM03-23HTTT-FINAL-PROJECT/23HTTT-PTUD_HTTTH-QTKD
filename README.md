@@ -2,25 +2,24 @@
 
 ## Bộ khung Sprint 1
 
-Repo khởi đầu cho đề tài Quản trị kinh doanh trong doanh nghiệp logistics. Phạm vi bàn giao: thư mục FE, BE, DB và tài liệu hướng dẫn agent theo Sprint 1. Chưa có ứng dụng, schema, migration hay CI để chạy.
+Repo khởi đầu cho đề tài Quản trị kinh doanh trong doanh nghiệp logistics. Phạm vi bàn giao: cấu trúc thư mục FE, BE, DB, docs theo module và tài liệu hướng dẫn agent theo Sprint 1. Chưa có ứng dụng, schema, migration hay CI để chạy.
 
 ```text
 23HTTT-PTUD_HTTTH--QTKD/
-  FE/.gitkeep
-  BE/.gitkeep
-  DB/.gitkeep
+  FE/        React + TypeScript + Vite, chia theo feature       (FE/README.md)
+  BE/        .NET Api / Application / Domain / Infrastructure   (BE/README.md)
+  DB/        ERD, seed, script, từ điển dữ liệu                 (DB/README.md)
+  docs/
+    sources/        QTKD_DATH (1).pdf, SprintPlan_QTKD.xlsx
+    architecture/   STRUCTURE.md: bản đồ module toàn dự án
+    decisions/      Quyết định kỹ thuật cần chốt
+    specs/, diagrams/, ui/, testing/
+  context/   PROJECT.md, SPRINT-1.md, BUSINESS-RULES.md
   .agents/skills/qtkd-sprint1/SKILL.md
   AGENTS.md
-  context/
-    PROJECT.md
-    SPRINT-1.md
-    BUSINESS-RULES.md
-  docs/sources/
-    QTKD_DATH (1).pdf
-    SprintPlan_QTKD.xlsx
 ```
 
-Ba thư mục FE, BE, DB chỉ chứa `.gitkeep` vì Git không lưu thư mục rỗng.
+Bản đồ module, sprint và cách thêm module mới: [docs/architecture/STRUCTURE.md](docs/architecture/STRUCTURE.md). Thư mục lá chứa `.gitkeep` vì Git không lưu thư mục rỗng; module Sprint 2/3 đã có thư mục giữ chỗ nhưng chưa triển khai.
 
 ## Dành cho thành viên
 
