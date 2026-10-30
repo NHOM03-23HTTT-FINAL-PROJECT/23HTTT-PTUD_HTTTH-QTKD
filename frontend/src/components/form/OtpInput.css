@@ -1,0 +1,47 @@
+.otp {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.otp__label {
+  padding: 0;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.otp__boxes {
+  display: flex;
+  gap: 10px;
+}
+
+.otp__digit {
+  flex: 1;
+  min-width: 0;
+  height: 56px;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  background: var(--bg-surface);
+  font-size: 22px;
+  font-weight: 600;
+  text-align: center;
+  outline: 0;
+  caret-color: var(--accent);
+}
+
+/* Ô đang nhập trên Figma: viền 2px màu accent. */
+.otp__digit:focus {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.otp__digit:disabled {
+  background: var(--bg-subtle);
+  color: var(--text-secondary);
+  cursor: not-allowed;
+}

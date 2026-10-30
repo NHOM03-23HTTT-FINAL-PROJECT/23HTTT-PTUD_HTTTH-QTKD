@@ -1,0 +1,41 @@
+.placeholder-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 720px;
+}
+
+.placeholder-page__eyebrow {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.66px;
+  color: var(--accent-strong);
+  text-transform: uppercase;
+}
+
+.placeholder-page__title {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.placeholder-probe {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px dashed var(--border-default);
+  border-radius: 12px;
+  background: var(--bg-surface);
+}
+
+.placeholder-probe__title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.placeholder-page__subtitle {
+  margin-top: -8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}

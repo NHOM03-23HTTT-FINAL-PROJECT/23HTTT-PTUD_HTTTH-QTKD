@@ -1,0 +1,19 @@
+.icon {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  overflow: visible;
+}
+
+.icon__group {
+  position: absolute;
+}
+
+.icon__glyph {
+  position: absolute;
+  background-color: currentColor;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+}

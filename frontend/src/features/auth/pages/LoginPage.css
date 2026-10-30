@@ -1,0 +1,34 @@
+.login-options {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.login-options__forgot {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--accent-strong);
+}
+
+.login-options__forgot:hover {
+  text-decoration: underline;
+}
+
+.login-countdown {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--bg-subtle);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.login-submit--busy {
+  opacity: 0.6;
+}
+
+.login-submit--locked {
+  opacity: 0.4;
+}

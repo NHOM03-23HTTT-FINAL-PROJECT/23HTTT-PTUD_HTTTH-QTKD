@@ -9,7 +9,7 @@ description: Thực hiện hoặc review công việc Sprint 1 của dự án QT
 
 Đọc `AGENTS.md` ở gốc repo. Chỉ tạo/sửa code hoặc tài liệu khi yêu cầu người dùng cho phép việc đó; một câu hỏi phân tích không tự cho phép chỉnh sửa.
 
-Các đường dẫn bên dưới tính từ gốc repo, là thư mục chứa `AGENTS.md` và `FE/`, `BE/`, `DB/`:
+Các đường dẫn bên dưới tính từ gốc repo, là thư mục chứa `AGENTS.md` và `frontend/`, `BE/`, `DB/`:
 
 - Đọc `context/PROJECT.md` để biết nguồn và quyết định còn thiếu.
 - Đọc `context/SPRINT-1.md` để đối chiếu TASK/PB/US, chủ trì và phạm vi.

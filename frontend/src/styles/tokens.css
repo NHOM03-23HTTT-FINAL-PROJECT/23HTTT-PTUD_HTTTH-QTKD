@@ -1,0 +1,72 @@
+/* Token lấy từ Figma "PTUD ERP – App shell & Dashboard theo vai trò" (collection Base + Phân hệ). */
+:root {
+  --brand-primary: #0ea5e9;
+  --brand-primary-soft: #e0f2fe;
+
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --text-on-color: #ffffff;
+
+  --bg-surface: #ffffff;
+  --bg-subtle: #f8fafc;
+  --bg-workspace: #f0f9ff;
+  --border-default: #e2e8f0;
+
+  --status-success: #15803d;
+  --status-success-soft: #dcfce7;
+  --status-warning: #b45309;
+  --status-warning-soft: #fef3c7;
+  --status-info: #0369a1;
+  --status-info-soft: #e0f2fe;
+  --status-danger: #dc2626;
+  --status-danger-soft: #fee2e2;
+  --status-neutral: #475569;
+  --status-neutral-soft: #f1f5f9;
+
+  --dept-kinh-doanh: #3b82f6;
+  --dept-khai-thac: #f97316;
+  --dept-ke-toan: #10b981;
+  --dept-phap-che: #a855f7;
+  --dept-bgd: #6366f1;
+
+  /* Màu nhấn mặc định (phân hệ Kinh doanh) – dùng cho màn đăng nhập. */
+  --accent: #3b82f6;
+  --accent-strong: #1d4ed8;
+  --accent-soft: #eff6ff;
+
+  --shadow-toast: 0 8px 24px rgba(15, 23, 41, 0.14);
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Collection "Phân hệ": mỗi phòng ban có bộ màu nhấn riêng. */
+[data-accent='kinh-doanh'] {
+  --accent: #3b82f6;
+  --accent-strong: #1d4ed8;
+  --accent-soft: #eff6ff;
+}
+[data-accent='khai-thac'] {
+  --accent: #f97316;
+  --accent-strong: #c2410c;
+  --accent-soft: #fff7ed;
+}
+[data-accent='ke-toan'] {
+  --accent: #10b981;
+  --accent-strong: #047857;
+  --accent-soft: #ecfdf5;
+}
+[data-accent='phap-che'] {
+  --accent: #a855f7;
+  --accent-strong: #7e22ce;
+  --accent-soft: #faf5ff;
+}
+[data-accent='bgd'] {
+  --accent: #6366f1;
+  --accent-strong: #4338ca;
+  --accent-soft: #eef2ff;
+}
+[data-accent='quan-tri'] {
+  --accent: #06b6d4;
+  --accent-strong: #0e7490;
+  --accent-soft: #ecfeff;
+}

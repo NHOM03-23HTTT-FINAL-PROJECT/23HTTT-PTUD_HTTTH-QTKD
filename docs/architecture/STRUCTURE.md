@@ -50,7 +50,7 @@ Phụ lục hợp đồng (CTR-09..15) dùng chung vòng đời với hợp đ�
   BE/                              .NET Web API (xem BE/README.md)
     src/QTKD.Api | QTKD.Application | QTKD.Domain | QTKD.Infrastructure
     tests/QTKD.UnitTests | QTKD.IntegrationTests
-  FE/                              React + TypeScript + Vite (xem FE/README.md)
+  frontend/                        React + TypeScript + Vite (xem frontend/README.md)
     public/, src/{app,layouts,components,lib,features,...}, tests/
   DB/                              ERD, seed, script, từ điển dữ liệu (xem DB/README.md)
 ```

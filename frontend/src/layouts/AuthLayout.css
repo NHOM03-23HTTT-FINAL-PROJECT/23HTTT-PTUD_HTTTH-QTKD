@@ -1,0 +1,130 @@
+.auth-layout {
+  display: flex;
+  min-height: 100%;
+  background: var(--bg-surface);
+}
+
+.auth-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  flex-shrink: 0;
+  width: 600px;
+  min-height: 100vh;
+  padding: 48px 56px;
+  background: var(--brand-primary-soft);
+}
+
+.auth-brand__logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.auth-brand__mark {
+  display: flex;
+  padding: 9px;
+  border-radius: 10px;
+  background: var(--brand-primary);
+  color: var(--text-on-color);
+}
+
+.auth-brand__name {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.auth-brand__product {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.auth-brand__spacer {
+  flex: 1;
+}
+
+.auth-brand__headline {
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.auth-brand__lead {
+  font-size: 15px;
+  color: var(--text-secondary);
+}
+
+.auth-brand__features {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.auth-brand__feature {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.auth-brand__feature-icon {
+  display: flex;
+  padding: 8px;
+  border-radius: 8px;
+  background: var(--bg-surface);
+  color: var(--status-info);
+}
+
+.auth-brand__footer {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.auth-panel {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 400px;
+  max-width: 100%;
+}
+
+.auth-form__heading {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.auth-form__title {
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.auth-form__subtitle {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.auth-form__footnote {
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+@media (max-width: 1024px) {
+  .auth-brand {
+    display: none;
+  }
+}

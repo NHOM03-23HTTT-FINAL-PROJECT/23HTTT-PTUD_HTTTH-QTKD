@@ -1,0 +1,110 @@
+.account-menu {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.account-menu .topbar__user {
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  text-align: left;
+}
+
+.account-menu .topbar__user:hover,
+.account-menu .topbar__user[aria-expanded='true'] {
+  background: var(--bg-subtle);
+}
+
+.account-menu .topbar__user:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.topbar__chevron--open {
+  transform: rotate(180deg);
+}
+
+/* Menu/Tài khoản (Figma 73:2104): rộng 300px, cách Topbar 4px, canh phải. */
+.account-menu__panel {
+  position: absolute;
+  top: calc(100% + 14px);
+  right: -6px;
+  /* Nằm trên toast (z-index 50) khi mở menu ngay sau đăng nhập. */
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 300px;
+  padding: 6px;
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-toast);
+}
+
+.account-menu__account {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+}
+
+.account-menu__identity {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.account-menu__name {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.account-menu__role {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.account-menu__signed-in {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.account-menu__divider {
+  width: 100%;
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--border-default);
+}
+
+.account-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  text-align: left;
+}
+
+.account-menu__item .icon {
+  color: var(--text-secondary);
+}
+
+.account-menu__item:hover,
+.account-menu__item:focus-visible {
+  outline: 0;
+  background: var(--bg-subtle);
+}
+
+.account-menu__item--danger,
+.account-menu__item--danger .icon {
+  color: var(--status-danger);
+}

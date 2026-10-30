@@ -6,7 +6,7 @@ Repo khởi đầu cho đề tài Quản trị kinh doanh trong doanh nghiệp l
 
 ```text
 23HTTT-PTUD_HTTTH--QTKD/
-  FE/        React + TypeScript + Vite, chia theo feature       (FE/README.md)
+  frontend/  React + TypeScript + Vite, chia theo feature       (frontend/README.md)
   BE/        .NET Api / Application / Domain / Infrastructure   (BE/README.md)
   DB/        ERD, seed, script, từ điển dữ liệu                 (DB/README.md)
   docs/
@@ -35,3 +35,12 @@ Bản đồ module, sprint và cách thêm module mới: [docs/architecture/STRU
 Ví dụ yêu cầu tiếp theo khi muốn triển khai: “Hãy thực hiện TASK-049 trong BE theo Sprint 1”. Việc nhận bộ khung này không tự cho phép agent triển khai các task khác.
 
 Hai tài liệu nguồn được giữ nguyên trong [docs/sources](docs/sources/). Tài liệu context là bản tổng hợp để làm việc, không thay thế các AC và đặc tả chi tiết còn thiếu.
+
+## dữ liệu test
+
+mật khẩu chung là Abc@12345
+an.nv (mk riêng là 234567rfghnjmhgfds12@D), son.vt (Xu123456789@), ha.bt, duc.pm, bao.tq, lan.nt Trang của 6 vai trò
+quan.tm Tài khoản đang bị khóa sẵn
+tuan.lv Tài khoản bị vô hiệu hóa
+thao.nt Tài khoản chưa được phân quyền
+test.loi Lỗi hệ thống khi đăng nhập

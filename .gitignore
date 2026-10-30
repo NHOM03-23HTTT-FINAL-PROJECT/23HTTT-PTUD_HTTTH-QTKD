@@ -13,6 +13,7 @@ appsettings.*.local.json
 # Frontend and .NET generated files
 node_modules/
 dist/
+*.tsbuildinfo
 bin/
 obj/
 .vs/
