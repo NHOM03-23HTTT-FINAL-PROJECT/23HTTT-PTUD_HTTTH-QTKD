@@ -125,7 +125,7 @@ export function CustomerCreatePage() {
         </span>
       </nav>
 
-      <div className="page-header">
+      <div className="page-header page-header--customer">
         <div className="page-header__title">
           <h1>Tạo khách hàng</h1>
           <p>Trường có dấu * là bắt buộc. Cần ít nhất một phương thức liên hệ: điện thoại hoặc email.</p>

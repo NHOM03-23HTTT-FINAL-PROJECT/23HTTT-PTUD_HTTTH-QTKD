@@ -197,7 +197,7 @@ function SuspendFlow({ customer }: { customer: Customer }) {
         </span>
       </nav>
 
-      <div className="page-header">
+      <div className="page-header page-header--customer">
         <div className="page-header__title">
           <div className="customer-title">
             <h1>Tạm ngưng khách hàng</h1>
@@ -356,8 +356,16 @@ function SuspendFlow({ customer }: { customer: Customer }) {
                   không tự hủy hoặc dừng các mục này.
                 </p>
               </div>
-              <div className="impact-table__wrap">
-                <table className="impact-table">
+              {(affectedCount > 0 || reviewFailed) && (
+                <p className="impact-table__hint">Cuộn ngang nếu cần để xem đầy đủ các cột.</p>
+              )}
+              <div
+                className="impact-table__wrap"
+                role="region"
+                aria-label={`Hồ sơ và công việc bị ảnh hưởng${affectedCount > 0 || reviewFailed ? ', có thể cuộn ngang' : ''}`}
+                tabIndex={affectedCount > 0 || reviewFailed ? 0 : undefined}
+              >
+                <table className={affectedCount === 0 && !reviewFailed ? 'impact-table impact-table--empty' : 'impact-table'}>
                   <thead>
                     <tr>
                       <th scope="col">Loại</th>

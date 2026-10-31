@@ -145,6 +145,22 @@
   opacity: 0.6;
 }
 
+.customer-results__table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.customer-results__scroll-hint {
+  display: none;
+  padding: 0 20px 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.customer-results__table-wrap .data-table {
+  min-width: 860px;
+}
+
 .customer-results__header {
   display: flex;
   flex-direction: column;
@@ -229,4 +245,10 @@
   align-items: center;
   gap: 12px;
   margin-top: 8px;
+}
+
+@media (max-width: 1165px) {
+  .customer-results__scroll-hint {
+    display: block;
+  }
 }

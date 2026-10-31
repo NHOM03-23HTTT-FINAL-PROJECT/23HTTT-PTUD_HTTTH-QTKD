@@ -127,8 +127,14 @@
 
 .record-table {
   width: 100%;
+  min-width: 700px;
   border-collapse: collapse;
   font-size: 13px;
+}
+
+.record-table__wrap {
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 .record-table th,

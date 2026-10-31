@@ -339,6 +339,21 @@
   }
 }
 
+@media (min-width: 721px) and (max-width: 1000px) {
+  .page-header--customer {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .page-header--customer .page-header__title {
+    flex-basis: 100%;
+  }
+
+  .page-header--customer .customer-title {
+    flex-wrap: wrap;
+  }
+}
+
 @media (max-width: 720px) {
   .customer-form__grid,
   .customer-detail__grid {

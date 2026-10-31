@@ -210,7 +210,7 @@ function ReactivateFlow({ customer }: { customer: Customer }) {
         </span>
       </nav>
 
-      <div className="page-header">
+      <div className="page-header page-header--customer">
         <div className="page-header__title">
           <div className="customer-title">
             <h1>Kích hoạt lại khách hàng</h1>

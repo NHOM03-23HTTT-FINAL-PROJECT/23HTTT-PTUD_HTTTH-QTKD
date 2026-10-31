@@ -230,7 +230,8 @@
   color: var(--accent-strong);
 }
 
-.impact-card {
+.customer-card.impact-card {
+  flex: none;
   gap: 0;
   padding: 0;
   overflow: hidden;
@@ -241,13 +242,30 @@
 }
 
 .impact-table__wrap {
+  max-width: 100%;
   overflow-x: auto;
+}
+
+.impact-table__hint {
+  display: none;
+  padding: 0 18px 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 
 .impact-table {
   width: 100%;
+  min-width: 760px;
   border-collapse: collapse;
   font-size: 13px;
+}
+
+.impact-table--empty {
+  min-width: 0;
+}
+
+.impact-table--empty thead {
+  display: none;
 }
 
 .impact-table th,
@@ -402,6 +420,12 @@
 
 .customer-detail__grid--single {
   grid-template-columns: minmax(0, 1fr);
+}
+
+@media (max-width: 1065px) {
+  .impact-table__hint {
+    display: block;
+  }
 }
 
 @media (max-width: 900px) {

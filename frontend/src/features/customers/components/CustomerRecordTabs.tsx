@@ -90,6 +90,17 @@ function CardHeader({ title, subtitle, action }: { title: string; subtitle?: str
   );
 }
 
+function TableScroll({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <>
+      <p className="customer-results__scroll-hint">Cuộn ngang nếu cần để xem đầy đủ các cột.</p>
+      <div className="record-table__wrap" role="region" aria-label={`${label}, có thể cuộn ngang`} tabIndex={0}>
+        {children}
+      </div>
+    </>
+  );
+}
+
 function Loading({ label }: { label: string }) {
   return <p className="record-loading">Đang tải {label}…</p>;
 }
@@ -170,45 +181,47 @@ export function ContractsTab({ state, onRetry }: { state: GroupState<ContractRec
         <div className="customer-layout">
           <section className="customer-results customer-layout__main">
             <CardHeader title={`${rows.length} hợp đồng của khách hàng`} subtitle={`Trong phạm vi quyền · đối chiếu tại ${formatDate(date)}`} />
-            <table className="record-table">
-              <thead>
-                <tr>
-                  <th scope="col">Mã hợp đồng</th>
-                  <th scope="col">Dịch vụ</th>
-                  <th scope="col">Thời hạn</th>
-                  <th scope="col">Trạng thái</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((contract) => {
-                  const badge = contractBadge(contract, date);
-                  return (
-                    <tr key={contract.code} className={contract === current ? 'record-table__row--selected' : undefined}>
-                      <td>
-                        <button
-                          type="button"
-                          className="record-table__code"
-                          aria-pressed={contract === current}
-                          onClick={() => setSelected(contract.code)}
-                        >
-                          {contract.code}
-                        </button>
-                      </td>
-                      <td>
-                        <span className="record-table__main">{contract.service}</span>
-                        <span className="record-table__sub">{contract.note}</span>
-                      </td>
-                      <td>
-                        {formatDate(contract.start)} – {formatDate(contract.end)}
-                      </td>
-                      <td>
-                        <StatusBadge label={badge.label} tone={badge.tone} />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <TableScroll label="Hợp đồng của khách hàng">
+              <table className="record-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Mã hợp đồng</th>
+                    <th scope="col">Dịch vụ</th>
+                    <th scope="col">Thời hạn</th>
+                    <th scope="col">Trạng thái</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((contract) => {
+                    const badge = contractBadge(contract, date);
+                    return (
+                      <tr key={contract.code} className={contract === current ? 'record-table__row--selected' : undefined}>
+                        <td>
+                          <button
+                            type="button"
+                            className="record-table__code"
+                            aria-pressed={contract === current}
+                            onClick={() => setSelected(contract.code)}
+                          >
+                            {contract.code}
+                          </button>
+                        </td>
+                        <td>
+                          <span className="record-table__main">{contract.service}</span>
+                          <span className="record-table__sub">{contract.note}</span>
+                        </td>
+                        <td>
+                          {formatDate(contract.start)} – {formatDate(contract.end)}
+                        </td>
+                        <td>
+                          <StatusBadge label={badge.label} tone={badge.tone} />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </TableScroll>
           </section>
           {current && (
             <aside className="customer-layout__side">
@@ -344,39 +357,41 @@ export function PriceListsTab({
           title={conflict ? 'Bảng giá trùng hiệu lực và phạm vi' : 'Bảng giá theo thời điểm'}
           subtitle={conflict ? 'Cần làm rõ trước khi sử dụng' : 'Chỉ gồm bảng giá gắn với hợp đồng của khách hàng và đúng phạm vi dịch vụ'}
         />
-        <table className="record-table">
-          <thead>
-            <tr>
-              <th scope="col">Mã bảng giá</th>
-              <th scope="col">Phiên bản</th>
-              <th scope="col">Hiệu lực</th>
-              <th scope="col">Phạm vi áp dụng</th>
-              <th scope="col">Trạng thái</th>
-            </tr>
-          </thead>
-          <tbody>
-            {shown.map((version) => {
-              const status: PriceStatus = conflict ? 'conflict' : priceStatus(version, date, today);
-              const rowClass = conflict ? 'record-table__row--warning' : version === chosen ? 'record-table__row--selected' : undefined;
-              return (
-                <tr key={version.id} className={rowClass}>
-                  <td className="record-table__code-text">{version.code}</td>
-                  <td>v{version.version}</td>
-                  <td>{rangeText(version.from, version.to)}</td>
-                  <td>
-                    <span className="record-table__main">{version.service}</span>
-                    <span className="record-table__sub">
-                      {version.contractCode ? `Gắn ${version.contractCode}` : 'Bảng giá riêng của khách hàng'}
-                    </span>
-                  </td>
-                  <td>
-                    <StatusBadge label={PRICE_BADGE[status].label(date)} tone={PRICE_BADGE[status].tone} />
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <TableScroll label="Bảng giá theo thời điểm">
+          <table className="record-table">
+            <thead>
+              <tr>
+                <th scope="col">Mã bảng giá</th>
+                <th scope="col">Phiên bản</th>
+                <th scope="col">Hiệu lực</th>
+                <th scope="col">Phạm vi áp dụng</th>
+                <th scope="col">Trạng thái</th>
+              </tr>
+            </thead>
+            <tbody>
+              {shown.map((version) => {
+                const status: PriceStatus = conflict ? 'conflict' : priceStatus(version, date, today);
+                const rowClass = conflict ? 'record-table__row--warning' : version === chosen ? 'record-table__row--selected' : undefined;
+                return (
+                  <tr key={version.id} className={rowClass}>
+                    <td className="record-table__code-text">{version.code}</td>
+                    <td>v{version.version}</td>
+                    <td>{rangeText(version.from, version.to)}</td>
+                    <td>
+                      <span className="record-table__main">{version.service}</span>
+                      <span className="record-table__sub">
+                        {version.contractCode ? `Gắn ${version.contractCode}` : 'Bảng giá riêng của khách hàng'}
+                      </span>
+                    </td>
+                    <td>
+                      <StatusBadge label={PRICE_BADGE[status].label(date)} tone={PRICE_BADGE[status].tone} />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </TableScroll>
       </section>
 
       {conflict && (
@@ -424,24 +439,26 @@ export function PriceListsTab({
               title={`Đơn giá – ${chosen.code} phiên bản ${chosen.version}`}
               subtitle={`${historical ? 'Giá lịch sử' : 'Giá hiện hành'} · hiển thị theo bản đã duyệt và lưu`}
             />
-            <table className="record-table">
-              <thead>
-                <tr>
-                  <th scope="col">Hạng mục</th>
-                  <th scope="col">Đơn vị tính</th>
-                  <th scope="col">Đơn giá</th>
-                </tr>
-              </thead>
-              <tbody>
-                {chosen.items.map((item) => (
-                  <tr key={item.name}>
-                    <td>{item.name}</td>
-                    <td>{item.unit}</td>
-                    <td>{formatMoney(item.price)}</td>
+            <TableScroll label="Đơn giá">
+              <table className="record-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Hạng mục</th>
+                    <th scope="col">Đơn vị tính</th>
+                    <th scope="col">Đơn giá</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {chosen.items.map((item) => (
+                    <tr key={item.name}>
+                      <td>{item.name}</td>
+                      <td>{item.unit}</td>
+                      <td>{formatMoney(item.price)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableScroll>
           </section>
           <aside className="customer-layout__side">
             <section className="side-card">
@@ -559,36 +576,38 @@ export function PaymentsTab({ state, customer, onRetry }: { state: GroupState<Pa
             Điều chỉnh kỳ, hợp đồng hoặc trạng thái để tra cứu lại.
           </EmptyRecords>
         ) : (
-          <table className="record-table">
-            <thead>
-              <tr>
-                <th scope="col">Mã bảng TT</th>
-                <th scope="col">Kỳ</th>
-                <th scope="col">Hợp đồng</th>
-                <th scope="col">Tổng tiền</th>
-                <th scope="col">Ngày lập</th>
-                <th scope="col">Trạng thái</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((payment) => (
-                <tr key={payment.code} className={payment === current ? 'record-table__row--selected' : undefined}>
-                  <td>
-                    <button type="button" className="record-table__code" aria-pressed={payment === current} onClick={() => setSelected(payment.code)}>
-                      {payment.code}
-                    </button>
-                  </td>
-                  <td>{payment.period}</td>
-                  <td>{payment.contractCode}</td>
-                  <td>{formatMoney(payment.total)}</td>
-                  <td>{formatDate(payment.issuedAt)}</td>
-                  <td>
-                    <StatusBadge label={PAYMENT_STATE[payment.state].label} tone={PAYMENT_STATE[payment.state].tone} />
-                  </td>
+          <TableScroll label="Bảng thanh toán">
+            <table className="record-table">
+              <thead>
+                <tr>
+                  <th scope="col">Mã bảng TT</th>
+                  <th scope="col">Kỳ</th>
+                  <th scope="col">Hợp đồng</th>
+                  <th scope="col">Tổng tiền</th>
+                  <th scope="col">Ngày lập</th>
+                  <th scope="col">Trạng thái</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {rows.map((payment) => (
+                  <tr key={payment.code} className={payment === current ? 'record-table__row--selected' : undefined}>
+                    <td>
+                      <button type="button" className="record-table__code" aria-pressed={payment === current} onClick={() => setSelected(payment.code)}>
+                        {payment.code}
+                      </button>
+                    </td>
+                    <td>{payment.period}</td>
+                    <td>{payment.contractCode}</td>
+                    <td>{formatMoney(payment.total)}</td>
+                    <td>{formatDate(payment.issuedAt)}</td>
+                    <td>
+                      <StatusBadge label={PAYMENT_STATE[payment.state].label} tone={PAYMENT_STATE[payment.state].tone} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableScroll>
         )}
       </section>
 
@@ -608,34 +627,36 @@ export function PaymentsTab({ state, customer, onRetry }: { state: GroupState<Pa
               </div>
             }
           />
-          <table className="record-table">
-            <thead>
-              <tr>
-                <th scope="col">Trường</th>
-                <th scope="col">Trên bảng thanh toán (lập {formatDate(current.issuedAt)})</th>
-                <th scope="col">Hồ sơ khách hàng hiện tại (phiên bản {customer.version})</th>
-              </tr>
-            </thead>
-            <tbody>
-              {SNAPSHOT_FIELDS.map((field) => {
-                const different = current.snapshot[field] !== customer[field];
-                const changedAt = different ? lastChangedAt(field) : undefined;
-                return (
-                  <tr key={field} className={different ? 'record-table__row--warning' : undefined}>
-                    <th scope="row">{CUSTOMER_FIELD_LABELS[field]}</th>
-                    <td>
-                      <span className="record-table__main">{current.snapshot[field]}</span>
-                      {different && <span className="record-table__sub">Lưu tại thời điểm lập</span>}
-                    </td>
-                    <td>
-                      <span className="record-table__main">{customer[field]}</span>
-                      {different && <span className="record-table__sub">{changedAt ? `Cập nhật ${formatDate(changedAt)}` : 'Theo hồ sơ hiện tại'}</span>}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <TableScroll label="Đối chiếu thông tin khách hàng">
+            <table className="record-table">
+              <thead>
+                <tr>
+                  <th scope="col">Trường</th>
+                  <th scope="col">Trên bảng thanh toán (lập {formatDate(current.issuedAt)})</th>
+                  <th scope="col">Hồ sơ khách hàng hiện tại (phiên bản {customer.version})</th>
+                </tr>
+              </thead>
+              <tbody>
+                {SNAPSHOT_FIELDS.map((field) => {
+                  const different = current.snapshot[field] !== customer[field];
+                  const changedAt = different ? lastChangedAt(field) : undefined;
+                  return (
+                    <tr key={field} className={different ? 'record-table__row--warning' : undefined}>
+                      <th scope="row">{CUSTOMER_FIELD_LABELS[field]}</th>
+                      <td>
+                        <span className="record-table__main">{current.snapshot[field]}</span>
+                        {different && <span className="record-table__sub">Lưu tại thời điểm lập</span>}
+                      </td>
+                      <td>
+                        <span className="record-table__main">{customer[field]}</span>
+                        {different && <span className="record-table__sub">{changedAt ? `Cập nhật ${formatDate(changedAt)}` : 'Theo hồ sơ hiện tại'}</span>}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </TableScroll>
         </section>
       )}
 

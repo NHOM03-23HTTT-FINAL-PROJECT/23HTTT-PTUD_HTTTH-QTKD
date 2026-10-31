@@ -166,7 +166,7 @@ export function CustomerListPage() {
         </span>
       </nav>
 
-      <div className="page-header">
+      <div className="page-header page-header--customer">
         <div className="page-header__title">
           <h1>Danh sách khách hàng</h1>
           <p>Tìm theo mã, tên hoặc mã số thuế trong phạm vi được phân công.</p>
@@ -331,7 +331,12 @@ export function CustomerListPage() {
           )}
 
           {shown && state.kind !== 'error' && state.kind !== 'forbidden' && shown.total > 0 && (
-            <DataTable columns={COLUMNS} rows={shown.items} rowKey={(row) => row.code} />
+            <>
+              <p className="customer-results__scroll-hint">Cuộn ngang nếu cần để xem đầy đủ các cột.</p>
+              <div className="customer-results__table-wrap" role="region" aria-label="Danh sách khách hàng, có thể cuộn ngang" tabIndex={0}>
+                <DataTable columns={COLUMNS} rows={shown.items} rowKey={(row) => row.code} />
+              </div>
+            </>
           )}
         </section>
       )}
