@@ -89,7 +89,12 @@ function Sidebar({ user }: { user: CurrentUser }) {
         <div key={group.title} className="sidebar__section">
           <p className="sidebar__group">{group.title}</p>
           {group.items.map((item) => (
-            <SidebarLink key={item.path} item={item} activeForAreaRecord={item.path === areaRecordNavPath} />
+            <SidebarLink
+              key={item.path}
+              item={item}
+              activeForAreaRecord={item.path === areaRecordNavPath}
+              activeForContractRecord={item.path === ROUTES.contracts}
+            />
           ))}
         </div>
       ))}
@@ -101,19 +106,30 @@ function Sidebar({ user }: { user: CurrentUser }) {
  * Khớp chính xác các màn menu để "/khu-vuc" không sáng ở "/khu-vuc/so-do"; riêng hồ sơ động giữ sáng mục đã dẫn
  * người dùng tới hồ sơ (Danh sách với Phòng Khai thác, Tra cứu với các phòng chỉ xem).
  */
-function SidebarLink({ item, activeForAreaRecord = false }: { item: NavItem; activeForAreaRecord?: boolean }) {
+function SidebarLink({
+  item,
+  activeForAreaRecord = false,
+  activeForContractRecord = false,
+}: {
+  item: NavItem;
+  activeForAreaRecord?: boolean;
+  activeForContractRecord?: boolean;
+}) {
   const { pathname } = useLocation();
   const reservedAreaPaths = new Set<string>([ROUTES.areaCreate, ROUTES.areaHierarchy, ROUTES.areaLookup]);
   const isAreaRecord =
     activeForAreaRecord &&
     !reservedAreaPaths.has(pathname) &&
     /^\/khu-vuc\/[^/]+(?:\/chinh-sua)?$/.test(pathname);
+  const isContractRecord = activeForContractRecord && /^\/hop-dong\/HD-\d{4}-\d{3,}$/.test(pathname);
 
   return (
     <NavLink
       to={item.path}
       end
-      className={({ isActive }) => (isActive || isAreaRecord ? 'sidebar__item sidebar__item--active' : 'sidebar__item')}
+      className={({ isActive }) =>
+        isActive || isAreaRecord || isContractRecord ? 'sidebar__item sidebar__item--active' : 'sidebar__item'
+      }
     >
       <Icon name={item.icon} />
       <span className="sidebar__label">{item.label}</span>

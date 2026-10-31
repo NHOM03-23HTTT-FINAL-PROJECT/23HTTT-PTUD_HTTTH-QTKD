@@ -16,6 +16,8 @@ export const ROUTES = {
   areaLookup: '/khu-vuc/tra-cuu',
   areaDetail: (code: string) => `/khu-vuc/${code}`,
   areaEdit: (code: string) => `/khu-vuc/${code}/chinh-sua`,
+  contracts: '/hop-dong',
+  contractCreate: '/hop-dong/tao-moi',
   contractDetail: (code: string) => `/hop-dong/${code}`,
   paymentDetail: (code: string) => `/bang-thanh-toan/${code}`,
 } as const;

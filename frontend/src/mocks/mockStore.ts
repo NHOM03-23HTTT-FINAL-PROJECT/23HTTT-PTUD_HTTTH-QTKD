@@ -1,6 +1,7 @@
 import type { Area, AreaService, AreaStaff } from '@/features/areas/types/area';
 import type { LoginTrace } from '@/features/auth/types/auth';
 import type { Customer } from '@/features/customers/types/customer';
+import type { Contract } from '@/features/contracts/types/contract';
 import { SEED_ACCOUNTS } from './seed/users';
 
 /*
@@ -66,7 +67,11 @@ export type AuditEvent = {
     | 'AREA_STAFF_ENDED'
     | 'AREA_SERVICES_UPDATED'
     | 'AREA_STATUS_CHANGED'
-    | 'AREA_OPERATION_REJECTED';
+    | 'AREA_OPERATION_REJECTED'
+    | 'CONTRACT_CREATED'
+    | 'CONTRACT_CREATE_REJECTED'
+    | 'CONTRACT_CREATE_ERROR'
+    | 'CONTRACT_ATTACHMENTS_UPDATED';
   username: string;
   detail: string;
 };
@@ -94,6 +99,10 @@ type MockState = {
   areaRequests: Record<string, string>;
   /** Danh sách dịch vụ/nhân sự đã đổi trong prototype theo AreaId; thay cho bản trong `seed/areaRecords`. */
   areaRecordOverrides: Record<string, { services?: AreaService[]; staff?: AreaStaff[] }>;
+  /** Hợp đồng nháp tạo trong prototype SYS-CTR-01. */
+  contracts: Contract[];
+  /** Idempotency-Key của yêu cầu tạo hợp đồng → mã hợp đồng. */
+  contractRequests: Record<string, string>;
 };
 
 const MAX_AUDIT_EVENTS = 200;
@@ -114,6 +123,8 @@ function createInitialState(): MockState {
     areas: [],
     areaRequests: {},
     areaRecordOverrides: {},
+    contracts: [],
+    contractRequests: {},
   };
   for (const account of SEED_ACCOUNTS) {
     if (account.lastLogin) state.lastLogins[account.id] = account.lastLogin;
@@ -257,6 +268,21 @@ export const mockStore = {
     update((s) => ({
       areaRecordOverrides: { ...s.areaRecordOverrides, [areaId]: { ...s.areaRecordOverrides[areaId], ...patch } },
       areas: area ? [...s.areas.filter((a) => a.id !== area.id), area] : s.areas,
+    }));
+  },
+  getStoredContracts(): Contract[] {
+    return readState().contracts;
+  },
+  getContractCodeByRequest(idempotencyKey: string): string | undefined {
+    return readState().contractRequests[idempotencyKey];
+  },
+  /** Lưu hồ sơ và khóa yêu cầu trong cùng một lần ghi giả lập. */
+  saveContract(contract: Contract, idempotencyKey?: string) {
+    update((s) => ({
+      contracts: [...s.contracts.filter((item) => item.code !== contract.code), contract],
+      contractRequests: idempotencyKey
+        ? { ...s.contractRequests, [idempotencyKey]: contract.code }
+        : s.contractRequests,
     }));
   },
   audit(event: Omit<AuditEvent, 'at'>) {

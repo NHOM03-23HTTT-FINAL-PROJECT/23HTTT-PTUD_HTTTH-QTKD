@@ -40,6 +40,11 @@ function allCustomers(): Customer[] {
   return [...SEED_CUSTOMERS.filter((c) => !storedCodes.has(c.code)), ...stored];
 }
 
+/** Danh mục khách hàng hiện hành cho các phân hệ liên kết; nơi gọi vẫn phải tự lọc trạng thái theo nghiệp vụ. */
+export function mockGetCustomerOptions(): Customer[] {
+  return allCustomers();
+}
+
 /** Mã khách hàng tăng dần dạng KH-000312, không dùng lại mã đã cấp. */
 function nextCustomerCode(): string {
   const max = Math.max(0, ...allCustomers().map((c) => Number(c.code.slice(3))));

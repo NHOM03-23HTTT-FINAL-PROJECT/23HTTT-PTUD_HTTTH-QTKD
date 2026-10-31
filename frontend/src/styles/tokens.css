@@ -12,6 +12,7 @@
   --bg-subtle: #f8fafc;
   --bg-workspace: #f0f9ff;
   --border-default: #e2e8f0;
+  --border-strong: #94a3b8;
 
   --status-success: #15803d;
   --status-success-soft: #dcfce7;
@@ -21,6 +22,8 @@
   --status-info-soft: #e0f2fe;
   --status-danger: #dc2626;
   --status-danger-soft: #fee2e2;
+  --danger: var(--status-danger);
+  --danger-soft: var(--status-danger-soft);
   --status-neutral: #475569;
   --status-neutral-soft: #f1f5f9;
 
@@ -36,6 +39,7 @@
   --accent-soft: #eff6ff;
 
   --shadow-toast: 0 8px 24px rgba(15, 23, 41, 0.14);
+  --shadow-popover: var(--shadow-toast);
   --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
 

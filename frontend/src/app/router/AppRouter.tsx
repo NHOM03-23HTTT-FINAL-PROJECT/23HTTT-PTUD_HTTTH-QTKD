@@ -15,6 +15,7 @@ import { CustomerEditPage } from '@/features/customers/pages/CustomerEditPage';
 import { CustomerListPage } from '@/features/customers/pages/CustomerListPage';
 import { CustomerReactivatePage } from '@/features/customers/pages/CustomerReactivatePage';
 import { CustomerSuspendPage } from '@/features/customers/pages/CustomerSuspendPage';
+import { ContractCreatePage, ContractDraftDetailPage } from '@/features/contracts/pages/ContractCreatePage';
 import { DashboardPage } from '@/features/dashboard/pages/DashboardPage';
 import { MainLayout } from '@/layouts/MainLayout';
 import { PublicOnly, RequireAuth, RequirePermission } from './guards';
@@ -29,6 +30,7 @@ const IMPLEMENTED_PATHS = new Set<string>([
   ROUTES.areaCreate,
   ROUTES.areaLookup,
   ROUTES.areaHierarchy,
+  ROUTES.contractCreate,
 ]);
 
 /**
@@ -151,7 +153,22 @@ export function AppRouter() {
                 </RequirePermission>
               }
             />
-            <Route path="/hop-dong/:code" element={<RecordPlaceholderPage kind="contract" />} />
+            <Route
+              path={ROUTES.contractCreate}
+              element={
+                <RequirePermission permission="contracts.create" label="Tạo hợp đồng">
+                  <ContractCreatePage />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="/hop-dong/:code"
+              element={
+                <RequirePermission permission="contracts.view" label="Hồ sơ hợp đồng">
+                  <ContractDraftDetailPage />
+                </RequirePermission>
+              }
+            />
             <Route path="/bang-thanh-toan/:code" element={<RecordPlaceholderPage kind="payment" />} />
             {NAV_PATHS.map((path) => (
               <Route key={path} path={path} element={<NavPlaceholderPage />} />
