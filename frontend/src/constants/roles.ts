@@ -31,6 +31,11 @@ export type Permission =
   | 'approvals.review-legal'
   | 'approvals.approve'
   | 'areas.view'
+  /** Tạo mới khu vực (UC-ARE-01) – Trưởng phòng và Nhân viên Khai thác được phân quyền. */
+  | 'areas.create'
+  /** Cập nhật thông tin, điều chỉnh phân cấp (UC-ARE-04 / UC-ARE-02) – Trưởng phòng và Nhân viên Khai thác được giao quyền. */
+  | 'areas.update'
+  /** Phân công nhân sự, gán dịch vụ, tạm ngưng/mở lại khu vực – chỉ Trưởng phòng Khai thác (13.1 / 13.3 / 13.4). */
   | 'areas.manage'
   | 'payments.view'
   | 'users.manage'
@@ -39,7 +44,7 @@ export type Permission =
   | 'audit.view'
   | 'catalogs.manage';
 
-export type RoleCode = 'NV_KD' | 'TP_KD' | 'TP_KT' | 'NV_KTOAN' | 'NV_PC' | 'GD' | 'QTHT';
+export type RoleCode = 'NV_KD' | 'TP_KD' | 'TP_KT' | 'NV_KT' | 'NV_KTOAN' | 'NV_PC' | 'GD' | 'QTHT';
 
 export type Role = {
   code: RoleCode;
@@ -77,7 +82,14 @@ export const ROLES: Record<RoleCode, Role> = {
     code: 'TP_KT',
     name: 'Trưởng phòng Khai thác',
     department: 'KT',
-    permissions: ['areas.view', 'areas.manage'],
+    permissions: ['areas.view', 'areas.create', 'areas.update', 'areas.manage'],
+  },
+  NV_KT: {
+    code: 'NV_KT',
+    name: 'Nhân viên Khai thác',
+    department: 'KT',
+    // Tác nhân "Nhân viên Khai thác được phân quyền" của UC-ARE-01/02/04; không có thao tác chỉ dành cho Trưởng phòng.
+    permissions: ['areas.view', 'areas.create', 'areas.update'],
   },
   NV_KTOAN: {
     code: 'NV_KTOAN',

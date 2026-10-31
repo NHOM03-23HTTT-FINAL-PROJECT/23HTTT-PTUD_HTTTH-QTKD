@@ -1,3 +1,4 @@
+import type { Area, AreaService, AreaStaff } from '@/features/areas/types/area';
 import type { LoginTrace } from '@/features/auth/types/auth';
 import type { Customer } from '@/features/customers/types/customer';
 import { SEED_ACCOUNTS } from './seed/users';
@@ -52,7 +53,20 @@ export type AuditEvent = {
     | 'CUSTOMER_SUSPENDED'
     | 'CUSTOMER_REACTIVATED'
     | 'CUSTOMER_STATUS_ERROR'
-    | 'PAYMENT_DISCREPANCY_REPORTED';
+    | 'PAYMENT_DISCREPANCY_REPORTED'
+    | 'AREA_CREATED'
+    | 'AREA_CREATE_REJECTED'
+    | 'AREA_CREATE_ERROR'
+    | 'AREA_HIERARCHY_UPDATED'
+    | 'AREA_HIERARCHY_REJECTED'
+    | 'AREA_UPDATED'
+    | 'AREA_UPDATE_REJECTED'
+    | 'AREA_PROFILE_EXPORTED'
+    | 'AREA_STAFF_ASSIGNED'
+    | 'AREA_STAFF_ENDED'
+    | 'AREA_SERVICES_UPDATED'
+    | 'AREA_STATUS_CHANGED'
+    | 'AREA_OPERATION_REJECTED';
   username: string;
   detail: string;
 };
@@ -74,6 +88,12 @@ type MockState = {
   customers: Customer[];
   /** Idempotency-Key của yêu cầu tạo/cập nhật khách hàng → mã khách hàng. */
   customerRequests: Record<string, string>;
+  /** Khu vực tạo hoặc đã cập nhật trong prototype; bản ở đây thay cho bản trong `seed/areas`. */
+  areas: Area[];
+  /** Idempotency-Key của yêu cầu tạo/đổi cấp cha khu vực → mã khu vực. */
+  areaRequests: Record<string, string>;
+  /** Danh sách dịch vụ/nhân sự đã đổi trong prototype theo AreaId; thay cho bản trong `seed/areaRecords`. */
+  areaRecordOverrides: Record<string, { services?: AreaService[]; staff?: AreaStaff[] }>;
 };
 
 const MAX_AUDIT_EVENTS = 200;
@@ -91,6 +111,9 @@ function createInitialState(): MockState {
     audit: [],
     customers: [],
     customerRequests: {},
+    areas: [],
+    areaRequests: {},
+    areaRecordOverrides: {},
   };
   for (const account of SEED_ACCOUNTS) {
     if (account.lastLogin) state.lastLogins[account.id] = account.lastLogin;
@@ -180,6 +203,10 @@ export const mockStore = {
   findRecoveryByToken(token: string): [string, RecoveryState] | undefined {
     return Object.entries(readState().recovery).find(([, r]) => r.resetToken === token);
   },
+  /** Lỗi/sự kiện giả lập với khóa này đã xảy ra chưa. */
+  hasTaken(key: string): boolean {
+    return Boolean(readState().simulatedOnce[key]);
+  },
   /** Trả về true đúng một lần cho mỗi khóa – dùng cho lỗi giả lập chỉ xảy ra lần đầu. */
   takeOnce(key: string): boolean {
     if (readState().simulatedOnce[key]) return false;
@@ -202,6 +229,34 @@ export const mockStore = {
       customerRequests: idempotencyKey
         ? { ...s.customerRequests, [idempotencyKey]: customer.code }
         : s.customerRequests,
+    }));
+  },
+  getStoredAreas(): Area[] {
+    return readState().areas;
+  },
+  getAreaCodeByRequest(idempotencyKey: string): string | undefined {
+    return readState().areaRequests[idempotencyKey];
+  },
+  /**
+   * Lưu một hoặc nhiều khu vực (khu vực được tạo/sửa cùng các phân khu con được đồng bộ đường dẫn) và khóa yêu cầu
+   * trong một lần ghi – tương ứng một giao dịch ở BE.
+   */
+  saveAreas(areas: Area[], request?: { idempotencyKey: string; code: string }) {
+    // Theo AreaId: đổi mã khu vực (04.8) thay đúng bản ghi cũ, không tạo bản thứ hai.
+    const ids = new Set(areas.map((a) => a.id));
+    update((s) => ({
+      areas: [...s.areas.filter((a) => !ids.has(a.id)), ...areas],
+      areaRequests: request ? { ...s.areaRequests, [request.idempotencyKey]: request.code } : s.areaRequests,
+    }));
+  },
+  getAreaRecordOverride(areaId: string): { services?: AreaService[]; staff?: AreaStaff[] } {
+    return readState().areaRecordOverrides[areaId] ?? {};
+  },
+  /** Lưu danh sách dịch vụ/nhân sự mới cùng hồ sơ khu vực (mục lịch sử) trong một lần ghi. */
+  saveAreaRecords(areaId: string, patch: { services?: AreaService[]; staff?: AreaStaff[] }, area?: Area) {
+    update((s) => ({
+      areaRecordOverrides: { ...s.areaRecordOverrides, [areaId]: { ...s.areaRecordOverrides[areaId], ...patch } },
+      areas: area ? [...s.areas.filter((a) => a.id !== area.id), area] : s.areas,
     }));
   },
   audit(event: Omit<AuditEvent, 'at'>) {

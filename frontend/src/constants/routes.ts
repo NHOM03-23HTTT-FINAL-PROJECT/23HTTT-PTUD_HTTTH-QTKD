@@ -10,6 +10,12 @@ export const ROUTES = {
   customerEdit: (code: string) => `/khach-hang/${code}/chinh-sua`,
   customerSuspend: (code: string) => `/khach-hang/${code}/tam-ngung`,
   customerReactivate: (code: string) => `/khach-hang/${code}/kich-hoat-lai`,
+  areas: '/khu-vuc',
+  areaCreate: '/khu-vuc/tao-moi',
+  areaHierarchy: '/khu-vuc/so-do',
+  areaLookup: '/khu-vuc/tra-cuu',
+  areaDetail: (code: string) => `/khu-vuc/${code}`,
+  areaEdit: (code: string) => `/khu-vuc/${code}/chinh-sua`,
   contractDetail: (code: string) => `/hop-dong/${code}`,
   paymentDetail: (code: string) => `/bang-thanh-toan/${code}`,
 } as const;

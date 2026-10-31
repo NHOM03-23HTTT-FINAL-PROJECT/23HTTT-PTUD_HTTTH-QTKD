@@ -39,9 +39,15 @@ Hai tài liệu nguồn được giữ nguyên trong [docs/sources](docs/sources
 ## dữ liệu test
 
 mật khẩu chung là Abc@12345
-an.nv (mk riêng là 234567rfghnjmhgfds12@D), son.vt (Xu123456789@), ha.bt, duc.pm, bao.tq, lan.nt Trang của 6 vai trò
+an.nv (nhân viên kinh doanh)
+hong.lt trang của trưởng phòng kinh doanh
+tam.lm trang của nhân viên khai thác
+son.vt (trưởng phòng khai thác)
+ha.bt (nhân viên kế toán)
+duc.pm (thành viên phòng pháp chế)
+bao.tq (thành viên ban giám đốc)
+lan.nt (thành viên quản trị hệ thống)
 quan.tm Tài khoản đang bị khóa sẵn
 tuan.lv Tài khoản bị vô hiệu hóa
 thao.nt Tài khoản chưa được phân quyền
 test.loi Lỗi hệ thống khi đăng nhập
-hong.lt trang của trưởng phòng kinh doanh

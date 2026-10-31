@@ -63,6 +63,18 @@ export const SEED_ACCOUNTS: SeedAccount[] = [
     note: 'Trưởng phòng Khai thác – màn 05.2',
   },
   {
+    id: 'u-tam-lm',
+    username: 'tam.lm',
+    email: 'tam.lm@abc.vn',
+    fullName: 'Lê Minh Tâm',
+    department: 'KT',
+    roles: ['NV_KT'],
+    password: SEED_PASSWORD,
+    status: 'active',
+    lastLogin: { at: '2026-10-21T15:05:00+07:00', client: 'Chrome trên Windows' },
+    note: 'Nhân viên Khai thác được phân quyền tạo/cập nhật khu vực – UC-ARE-01/02/04 (không có thao tác chỉ dành cho Trưởng phòng)',
+  },
+  {
     id: 'u-ha-bt',
     username: 'ha.bt',
     email: 'ha.bt@abc.vn',

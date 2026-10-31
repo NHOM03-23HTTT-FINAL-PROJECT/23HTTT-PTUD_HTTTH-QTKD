@@ -75,7 +75,7 @@ export const WORKSPACE_NAV: Record<WorkspaceKey, NavGroup[]> = {
       title: 'KHU VỰC KHAI THÁC',
       items: [
         { label: 'Danh sách khu vực', path: '/khu-vuc', icon: 'list', permission: 'areas.view', module: 'Khu vực (ARE)' },
-        { label: 'Tạo khu vực', path: '/khu-vuc/tao-moi', icon: 'map-pin', permission: 'areas.manage', module: 'Khu vực (ARE)' },
+        { label: 'Tạo khu vực', path: '/khu-vuc/tao-moi', icon: 'map-pin', permission: 'areas.create', module: 'Khu vực (ARE)' },
         { label: 'Sơ đồ phân cấp', path: '/khu-vuc/so-do', icon: 'layers', permission: 'areas.view', module: 'Khu vực (ARE)' },
         { ...AREA_LOOKUP, icon: 'search' },
       ],

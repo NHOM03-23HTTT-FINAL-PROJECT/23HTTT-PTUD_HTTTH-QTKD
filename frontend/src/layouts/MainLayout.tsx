@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth, type CurrentUser } from '@/app/providers/AuthProvider';
 import { SessionProvider } from '@/app/providers/SessionProvider';
 import { Icon } from '@/components/icon/Icon';
@@ -72,6 +72,7 @@ function Topbar({ user }: { user: CurrentUser }) {
 
 /** "Đổi mật khẩu" và "Đăng xuất" nằm trong menu tài khoản trên Topbar, không lặp lại ở Sidebar. */
 function Sidebar({ user }: { user: CurrentUser }) {
+  const areaRecordNavPath = user.departmentInfo.workspace === 'khai-thac' ? ROUTES.areas : ROUTES.areaLookup;
   const groups = WORKSPACE_NAV[user.departmentInfo.workspace]
     .map((group) => ({
       ...group,
@@ -88,7 +89,7 @@ function Sidebar({ user }: { user: CurrentUser }) {
         <div key={group.title} className="sidebar__section">
           <p className="sidebar__group">{group.title}</p>
           {group.items.map((item) => (
-            <SidebarLink key={item.path} item={item} />
+            <SidebarLink key={item.path} item={item} activeForAreaRecord={item.path === areaRecordNavPath} />
           ))}
         </div>
       ))}
@@ -96,10 +97,24 @@ function Sidebar({ user }: { user: CurrentUser }) {
   );
 }
 
-/** Khớp chính xác đường dẫn: "/khu-vuc" không sáng khi đang ở "/khu-vuc/so-do". */
-function SidebarLink({ item }: { item: NavItem }) {
+/**
+ * Khớp chính xác các màn menu để "/khu-vuc" không sáng ở "/khu-vuc/so-do"; riêng hồ sơ động giữ sáng mục đã dẫn
+ * người dùng tới hồ sơ (Danh sách với Phòng Khai thác, Tra cứu với các phòng chỉ xem).
+ */
+function SidebarLink({ item, activeForAreaRecord = false }: { item: NavItem; activeForAreaRecord?: boolean }) {
+  const { pathname } = useLocation();
+  const reservedAreaPaths = new Set<string>([ROUTES.areaCreate, ROUTES.areaHierarchy, ROUTES.areaLookup]);
+  const isAreaRecord =
+    activeForAreaRecord &&
+    !reservedAreaPaths.has(pathname) &&
+    /^\/khu-vuc\/[^/]+(?:\/chinh-sua)?$/.test(pathname);
+
   return (
-    <NavLink to={item.path} end className={({ isActive }) => (isActive ? 'sidebar__item sidebar__item--active' : 'sidebar__item')}>
+    <NavLink
+      to={item.path}
+      end
+      className={({ isActive }) => (isActive || isAreaRecord ? 'sidebar__item sidebar__item--active' : 'sidebar__item')}
+    >
       <Icon name={item.icon} />
       <span className="sidebar__label">{item.label}</span>
       {item.badge ? <span className="sidebar__badge">{item.badge}</span> : null}

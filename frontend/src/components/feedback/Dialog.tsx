@@ -68,8 +68,11 @@ export function Dialog({
     // Chỉ chạy khi mở/đóng hộp thoại.
   }, []);
 
+  // Portal nằm ngoài app shell nên lấy lại màu nhấn của phân hệ đang mở (ví dụ cam của Khai thác).
+  const accent = document.querySelector('.app-shell[data-accent]')?.getAttribute('data-accent') ?? undefined;
+
   return createPortal(
-    <div className="dialog-layer">
+    <div className="dialog-layer" data-accent={accent}>
       <div className="dialog-overlay" onClick={onClose} />
       <div ref={panelRef} className="dialog" role="alertdialog" aria-modal="true" aria-labelledby={titleId} style={{ width }}>
         <div className="dialog__header">
