@@ -41,3 +41,30 @@ export function initials(fullName: string): string {
   if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
   return (words[0][0] + words[words.length - 1][0]).toUpperCase();
 }
+
+/** Định dạng giờ "11:05" theo giờ Việt Nam. */
+export function formatTime(value: string | number | Date): string {
+  const p = parts(value);
+  return `${p.hour}:${p.minute}`;
+}
+
+/** Ngày "28/10/2026" từ chuỗi "YYYY-MM-DD" (không đổi múi giờ) hoặc thời điểm ISO. */
+export function formatDate(value: string | number | Date): string {
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [y, m, d] = value.split('-');
+    return `${d}/${m}/${y}`;
+  }
+  const p = parts(value);
+  return `${p.day}/${p.month}/${p.year}`;
+}
+
+/** Ngày hôm nay theo giờ Việt Nam, dạng "YYYY-MM-DD". */
+export function todayIso(): string {
+  const p = parts(Date.now());
+  return `${p.year}-${p.month}-${p.day}`;
+}
+
+/** Số tiền "1.312.800.000 ₫". */
+export function formatMoney(value: number): string {
+  return `${new Intl.NumberFormat('vi-VN').format(value)} ₫`;
+}

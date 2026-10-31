@@ -44,3 +44,4 @@ quan.tm Tài khoản đang bị khóa sẵn
 tuan.lv Tài khoản bị vô hiệu hóa
 thao.nt Tài khoản chưa được phân quyền
 test.loi Lỗi hệ thống khi đăng nhập
+hong.lt trang của trưởng phòng kinh doanh

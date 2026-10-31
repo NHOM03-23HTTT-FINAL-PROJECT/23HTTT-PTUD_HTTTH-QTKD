@@ -1,0 +1,119 @@
+/* Khối dùng chung của các trang trong vùng làm việc: breadcrumb, tiêu đề trang, thẻ bên phải. */
+
+.breadcrumb {
+  display: flex;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.breadcrumb a:hover {
+  color: var(--text-primary);
+}
+
+.breadcrumb__separator {
+  color: var(--text-muted);
+}
+
+.breadcrumb__current {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.page-header__title {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.page-header__title h1 {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.page-header__title p {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.page-header__actions {
+  display: flex;
+  gap: 10px;
+}
+
+.is-busy {
+  opacity: 0.6;
+}
+
+.side-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+  background: var(--bg-surface);
+}
+
+.side-card__title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.side-card__subtitle {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.side-card__item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.side-card__label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.side-card__value {
+  font-size: 13px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.side-card__notes {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.side-card__notes li {
+  position: relative;
+  padding-left: 14px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.side-card__notes li::before {
+  content: '';
+  position: absolute;
+  top: 7px;
+  left: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}

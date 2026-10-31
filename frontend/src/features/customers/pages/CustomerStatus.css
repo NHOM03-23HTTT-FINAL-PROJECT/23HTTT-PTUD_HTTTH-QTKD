@@ -1,0 +1,423 @@
+/* Trạng thái hợp tác: menu thao tác, tạm ngưng (03.x), kích hoạt lại (04.x), thẻ quyết định trên hồ sơ. */
+
+.history-timeline__item--warning::before {
+  background: var(--status-warning);
+}
+
+.history-timeline__item--success::before {
+  background: var(--status-success);
+}
+
+/* ---------- Nút "Chỉnh sửa thông tin ▾" (03.0 / 04.0) ---------- */
+
+.split-button {
+  position: relative;
+  display: flex;
+}
+
+.split-button__main {
+  border-radius: 8px 0 0 8px;
+}
+
+.split-button__toggle {
+  padding: 9px 10px;
+  border-left: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 0 8px 8px 0;
+}
+
+.action-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 300px;
+  padding: 6px;
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-toast);
+}
+
+.action-menu__group {
+  margin-top: 4px;
+  padding: 8px 10px 4px;
+  border-top: 1px solid var(--border-default);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  color: var(--text-muted);
+}
+
+.action-menu__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: var(--text-primary);
+}
+
+.action-menu__item:hover {
+  background: var(--bg-subtle);
+}
+
+.action-menu__item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.action-menu__item > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.action-menu__icon {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.action-menu__label {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.action-menu__hint {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.action-menu__item--danger .action-menu__label,
+.action-menu__item--danger .action-menu__icon {
+  color: var(--status-danger);
+}
+
+.action-menu__item--success .action-menu__icon {
+  color: var(--status-success);
+}
+
+.action-menu__item--disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.action-menu__item--disabled:hover {
+  background: transparent;
+}
+
+/* ---------- Thanh bước (03.1 / 03.2) ---------- */
+
+.step-progress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  padding: 14px 18px;
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+  background: var(--bg-surface);
+  list-style: none;
+}
+
+.step-progress__step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.step-progress__step:not(:last-child) {
+  flex: 1;
+}
+
+.step-progress__step:not(:last-child)::after {
+  content: '';
+  flex: 1;
+  height: 2px;
+  margin-left: 2px;
+  border-radius: 1px;
+  background: var(--border-default);
+}
+
+.step-progress__circle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--bg-subtle);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.step-progress__step--current {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.step-progress__step--current .step-progress__circle {
+  background: var(--accent);
+  color: var(--text-on-color);
+}
+
+.step-progress__step--done {
+  color: var(--text-primary);
+}
+
+.step-progress__step--done .step-progress__circle {
+  background: var(--status-success);
+  color: var(--text-on-color);
+}
+
+.step-progress__step.step-progress__step--done::after {
+  background: var(--status-success);
+}
+
+/* ---------- Rà soát ảnh hưởng (03.2 / 03.4) ---------- */
+
+.impact-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.impact-stat {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 16px 18px;
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+  background: var(--bg-surface);
+}
+
+.impact-stat > div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.impact-stat__label {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.impact-stat__value {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.impact-stat__sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.impact-stat__icon {
+  display: flex;
+  align-self: flex-start;
+  padding: 8px;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.impact-card {
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.impact-card > .customer-card__heading {
+  padding: 20px 18px 14px;
+}
+
+.impact-table__wrap {
+  overflow-x: auto;
+}
+
+.impact-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.impact-table th,
+.impact-table td {
+  padding: 10px 12px;
+  border-top: 1px solid var(--border-default);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.impact-table th:first-child,
+.impact-table td:first-child {
+  padding-left: 18px;
+}
+
+.impact-table thead th {
+  background: var(--bg-subtle);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.impact-table__main {
+  display: block;
+  font-weight: 500;
+}
+
+.impact-table__sub {
+  display: block;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.impact-table__select {
+  width: 100%;
+  min-width: 220px;
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  background: var(--bg-surface);
+  font-size: 13px;
+}
+
+.impact-table__select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.impact-table td.impact-table__empty {
+  padding: 18px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+/* ---------- Danh sách có biểu tượng: điều kiện, phương án, thông báo ---------- */
+
+.check-list,
+.notice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.check-list__item,
+.notice-list__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.check-list__text,
+.notice-list__text {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.check-list__label,
+.notice-list__name {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.check-list__detail,
+.notice-list__meta {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.icon-tone--success,
+.notice-list__icon--sent {
+  flex-shrink: 0;
+  color: var(--status-success);
+}
+
+.icon-tone--danger {
+  flex-shrink: 0;
+  color: var(--status-danger);
+}
+
+.icon-tone--warning,
+.notice-list__icon--retry {
+  flex-shrink: 0;
+  color: var(--status-warning);
+}
+
+.icon-tone--info {
+  flex-shrink: 0;
+  color: var(--status-info);
+}
+
+.icon-tone--neutral {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.confirm-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+}
+
+.confirm-list li {
+  display: flex;
+  gap: 10px;
+}
+
+.link-button {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-strong);
+  text-decoration: underline;
+}
+
+.link-button:disabled {
+  opacity: 0.6;
+}
+
+.customer-detail__grid--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (max-width: 900px) {
+  .impact-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .step-progress__label {
+    white-space: normal;
+  }
+}
+
+.customer-layout__main {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 16px;
+}

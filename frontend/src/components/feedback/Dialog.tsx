@@ -5,7 +5,8 @@ import './Dialog.css';
 
 type DialogProps = {
   title: string;
-  icon: IconName;
+  /** Bỏ trống khi frame không có biểu tượng tròn (ví dụ 01.5 Rời biểu mẫu tạo khách hàng). */
+  icon?: IconName;
   tone?: 'warning' | 'danger' | 'info';
   width?: number;
   /** Nút được focus khi mở: hộp thoại có hành động phá hủy nên focus nút an toàn (đầu tiên). */
@@ -72,9 +73,11 @@ export function Dialog({
       <div className="dialog-overlay" onClick={onClose} />
       <div ref={panelRef} className="dialog" role="alertdialog" aria-modal="true" aria-labelledby={titleId} style={{ width }}>
         <div className="dialog__header">
-          <span className={`dialog__icon dialog__icon--${tone}`}>
-            <Icon name={icon} />
-          </span>
+          {icon && (
+            <span className={`dialog__icon dialog__icon--${tone}`}>
+              <Icon name={icon} />
+            </span>
+          )}
           <h2 id={titleId} className="dialog__title">
             {title}
           </h2>

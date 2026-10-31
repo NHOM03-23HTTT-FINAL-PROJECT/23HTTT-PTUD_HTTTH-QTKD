@@ -1,0 +1,351 @@
+/* Bố cục chung của biểu mẫu tạo (01.1–01.6) và hồ sơ khách hàng (01.7): thẻ chính + cột 320px bên phải. */
+
+.customer-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.customer-layout__side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex-shrink: 0;
+  width: 320px;
+}
+
+.customer-card {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+  background: var(--bg-surface);
+}
+
+.customer-card__heading {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.customer-card__heading h2 {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.customer-card__heading p {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.customer-card__divider {
+  width: 100%;
+  height: 1px;
+  margin: 0;
+  border: 0;
+  background: var(--border-default);
+}
+
+.customer-form__section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.customer-form__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+/* Ô nhập trên biểu mẫu nghiệp vụ cao 40px (component Field 9:1003), thấp hơn màn đăng nhập. */
+.customer-form .field__box {
+  height: 40px;
+}
+
+.customer-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.customer-title h1 {
+  overflow-wrap: anywhere;
+}
+
+.customer-detail__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 0;
+}
+
+.customer-detail__item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.customer-detail__item dt {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.customer-detail__item dd {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.customer-form__stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Ô chọn nhiều trên form nghiệp vụ cao tối thiểu 40px nhưng giãn khi chip xuống dòng. */
+.customer-form .multi-select__box {
+  height: auto;
+  min-height: 40px;
+}
+
+.customer-form .field__box--multiline {
+  height: 88px;
+}
+
+/* ---------- Thẻ phụ của biểu mẫu chỉnh sửa (02.1) ---------- */
+
+.locked-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.locked-notes li {
+  display: flex;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.locked-notes .icon {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.change-diff {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.change-diff__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.change-diff__before {
+  font-size: 13px;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.change-diff__after {
+  display: flex;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--accent-strong);
+  overflow-wrap: anywhere;
+}
+
+.change-diff__after .icon {
+  flex-shrink: 0;
+}
+
+/* ---------- Hộp thoại xung đột phiên bản (02.4) ---------- */
+
+.conflict-table__wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border-default);
+  border-radius: 10px;
+}
+
+.conflict-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.conflict-table th,
+.conflict-table td {
+  padding: 10px 16px;
+  border-top: 1px solid var(--border-default);
+  text-align: left;
+  vertical-align: top;
+}
+
+.conflict-table thead th {
+  border-top: 0;
+  background: var(--bg-subtle);
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.conflict-table tbody th {
+  width: 170px;
+  font-weight: 500;
+}
+
+.conflict-table__value {
+  display: block;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+}
+
+.conflict-table__value--mine {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.conflict-table__value--theirs {
+  border-color: var(--status-warning);
+  background: var(--status-warning-soft);
+}
+
+.conflict-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.conflict-legend__swatch {
+  width: 12px;
+  height: 12px;
+  border: 1px solid;
+  border-radius: 3px;
+}
+
+.conflict-legend__swatch--mine {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.conflict-legend__swatch--theirs {
+  margin-left: 12px;
+  border-color: var(--status-warning);
+  background: var(--status-warning-soft);
+}
+
+/* ---------- Hồ sơ sau cập nhật (02.9) ---------- */
+
+.recent-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--accent-strong);
+}
+
+.recent-tag::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.history-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.history-timeline__item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 18px;
+}
+
+.history-timeline__item::before {
+  content: '';
+  position: absolute;
+  top: 5px;
+  left: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border-default);
+}
+
+.history-timeline__item--latest::before {
+  background: var(--accent);
+}
+
+.history-timeline__title {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.history-timeline__meta {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.history-timeline__detail {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--bg-subtle);
+  font-size: 12px;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1100px) {
+  .customer-layout {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .customer-layout__side {
+    width: auto;
+  }
+}
+
+@media (max-width: 720px) {
+  .customer-form__grid,
+  .customer-detail__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .page-header {
+    flex-wrap: wrap;
+  }
+}

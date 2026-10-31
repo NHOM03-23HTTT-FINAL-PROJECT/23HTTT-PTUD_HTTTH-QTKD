@@ -1,4 +1,5 @@
 import type { LoginTrace } from '@/features/auth/types/auth';
+import type { Customer } from '@/features/customers/types/customer';
 import { SEED_ACCOUNTS } from './seed/users';
 
 /*
@@ -41,7 +42,17 @@ export type AuditEvent = {
     | 'SESSION_EXPIRED'
     | 'PASSWORD_CHANGED'
     | 'PASSWORD_CHANGE_FAILED'
-    | 'PASSWORD_CHANGE_ERROR';
+    | 'PASSWORD_CHANGE_ERROR'
+    | 'CUSTOMER_CREATED'
+    | 'CUSTOMER_CREATE_REJECTED'
+    | 'CUSTOMER_CREATE_ERROR'
+    | 'CUSTOMER_UPDATED'
+    | 'CUSTOMER_UPDATE_REJECTED'
+    | 'CUSTOMER_UPDATE_ERROR'
+    | 'CUSTOMER_SUSPENDED'
+    | 'CUSTOMER_REACTIVATED'
+    | 'CUSTOMER_STATUS_ERROR'
+    | 'PAYMENT_DISCREPANCY_REPORTED';
   username: string;
   detail: string;
 };
@@ -59,6 +70,10 @@ type MockState = {
   /** Các lỗi giả lập chỉ xảy ra một lần (ví dụ email lỗi ở lần gửi đầu). */
   simulatedOnce: Record<string, boolean>;
   audit: AuditEvent[];
+  /** Khách hàng tạo hoặc đã cập nhật trong prototype; bản ở đây thay cho bản trong `seed/customers`. */
+  customers: Customer[];
+  /** Idempotency-Key của yêu cầu tạo/cập nhật khách hàng → mã khách hàng. */
+  customerRequests: Record<string, string>;
 };
 
 const MAX_AUDIT_EVENTS = 200;
@@ -74,6 +89,8 @@ function createInitialState(): MockState {
     recovery: {},
     simulatedOnce: {},
     audit: [],
+    customers: [],
+    customerRequests: {},
   };
   for (const account of SEED_ACCOUNTS) {
     if (account.lastLogin) state.lastLogins[account.id] = account.lastLogin;
@@ -168,6 +185,24 @@ export const mockStore = {
     if (readState().simulatedOnce[key]) return false;
     update((s) => ({ simulatedOnce: { ...s.simulatedOnce, [key]: true } }));
     return true;
+  },
+  getStoredCustomers(): Customer[] {
+    return readState().customers;
+  },
+  getCustomerCodeByRequest(idempotencyKey: string): string | undefined {
+    return readState().customerRequests[idempotencyKey];
+  },
+  /**
+   * Lưu hồ sơ (kèm lịch sử trong hồ sơ) và khóa yêu cầu trong một lần ghi – tương ứng một giao dịch ở BE.
+   * Không có `idempotencyKey` khi ghi do giả lập người dùng khác.
+   */
+  saveCustomer(customer: Customer, idempotencyKey?: string) {
+    update((s) => ({
+      customers: [...s.customers.filter((c) => c.code !== customer.code), customer],
+      customerRequests: idempotencyKey
+        ? { ...s.customerRequests, [idempotencyKey]: customer.code }
+        : s.customerRequests,
+    }));
   },
   audit(event: Omit<AuditEvent, 'at'>) {
     update((s) => ({ audit: [{ ...event, at: new Date().toISOString() }, ...s.audit].slice(0, MAX_AUDIT_EVENTS) }));

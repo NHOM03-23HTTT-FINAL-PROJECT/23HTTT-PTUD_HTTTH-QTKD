@@ -53,7 +53,7 @@ Tài khoản không tồn tại hoặc bị vô hiệu hóa vẫn nhận thông 
 | Frame Figma | Cách xem |
 | --- | --- |
 | 03.0 Menu tài khoản | Bấm avatar trên Topbar |
-| 03.1 Xác nhận khi có dữ liệu chưa lưu (A1) | Vào một trang "Tạo …" (ví dụ `/khach-hang/tao-moi`), nhập vào ô "Thử dữ liệu chưa lưu", rồi chọn Đăng xuất |
+| 03.1 Xác nhận khi có dữ liệu chưa lưu (A1) | Nhập dữ liệu vào biểu mẫu "Tạo khách hàng" (`/khach-hang/tao-moi`) hoặc ô "Thử dữ liệu chưa lưu" ở một trang "Tạo …" khác, rồi chọn Đăng xuất |
 | 03.2 Cảnh báo phiên sắp hết hạn | Không thao tác tới khi còn 2 phút |
 | 03.3 Đăng xuất thành công | Menu tài khoản → Đăng xuất |
 | 03.4 Phiên đã hết hạn (A2) | Hết thời gian không thao tác; đăng nhập lại sẽ quay về trang đang làm |
@@ -61,7 +61,7 @@ Tài khoản không tồn tại hoặc bị vô hiệu hóa vẫn nhận thông 
 
 Thời gian phiên mặc định 30 phút. Để thử nhanh, tạo `frontend/.env.local` từ `.env.example` và đặt `VITE_SESSION_IDLE_MINUTES=3` (cảnh báo hiện sau 1,5 phút), rồi chạy lại `npm run dev`. Phiên được kiểm tra lại mỗi lần chuyển trang hoặc quay lại tab, thay cho "request tiếp theo" khi chưa có API.
 
-Ô "Thử dữ liệu chưa lưu" chỉ có trong prototype; biểu mẫu thật gọi `useUnsavedChanges(mô tả | null)` từ `app/providers/SessionProvider`.
+Ô "Thử dữ liệu chưa lưu" chỉ có trong prototype trên các trang "Tạo …" chưa làm; biểu mẫu thật (ví dụ Tạo khách hàng) gọi `useUnsavedChanges(mô tả | null)` từ `app/providers/SessionProvider`.
 
 ### UC-CHUNG-04 · Đổi mật khẩu
 
@@ -79,11 +79,104 @@ Menu tài khoản → Đổi mật khẩu (`/doi-mat-khau`).
 
 Sai mật khẩu hiện tại dùng chung bộ đếm với đăng nhập (UC-CHUNG-01), nên các lần sai ở hai nơi cộng dồn.
 
+### UC-CUS-01 · Tạo hồ sơ khách hàng
+
+Page **02 · Khách hàng (CUS)** trên Figma. Đăng nhập `an.nv` (Nhân viên Kinh doanh), chọn "Tạo khách hàng" ở Sidebar (`/khach-hang/tao-moi`). Tài khoản không có quyền `customers.create` (ví dụ `hong.lt` – Trưởng phòng Kinh doanh) bị chuyển về trang làm việc kèm cảnh báo không có quyền.
+
+| Frame Figma | Cách xem |
+| --- | --- |
+| 01.1 Biểu mẫu tạo khách hàng | Mở trang; mã KH, trạng thái Hoạt động và nhân viên phụ trách (người tạo) chỉ đọc |
+| 01.2 Lỗi kiểm tra dữ liệu (A5.1/A5.2/A5.4) | Bấm "Lưu" khi tên/người đại diện chỉ có khoảng trắng, MST 9 chữ số, điện thoại `09012a4567`, email `lienhe@minhphat` |
+| 01.3 Chưa có phương thức liên hệ (A5.5) | Nhập đủ trường bắt buộc nhưng để trống cả điện thoại và email |
+| 01.4 Mã số thuế đã tồn tại (A5.3/A5.6) | MST `0312345678` (KH-000245, đang Tạm ngưng) hoặc `0301234567` (KH-000198, Hoạt động); "Mở hồ sơ hiện có" mở hồ sơ trùng |
+| 01.5 Xác nhận rời biểu mẫu (A4) | Bấm "Hủy" (hoặc "Mở hồ sơ hiện có") khi đã nhập; chưa nhập gì thì rời ngay |
+| 01.6 Tạo không thành công (A6.3) | MST bắt đầu bằng `0399` (ví dụ `0399000001`): lần lưu đầu lỗi và được hoàn tác, "Kiểm tra kết quả và thử lại" thì lưu được |
+| 01.6 Mất kết nối (A6.4) | MST bắt đầu bằng `0388`: hồ sơ đã lưu nhưng phản hồi bị mất; thử lại nhận đúng hồ sơ đã tạo, không tạo trùng |
+| 01.6 Bấm Lưu nhiều lần (A6.2) | Nút khóa khi đang lưu; mỗi biểu mẫu gửi kèm một Idempotency-Key nên server chỉ xử lý một lần |
+| 01.7 Tạo thành công | Lưu dữ liệu hợp lệ → mã tăng dần từ `KH-000312`, chuyển sang trang hồ sơ `/khach-hang/:ma` kèm thông báo và lịch sử tạo |
+
+Phiên hết hạn hoặc bị thu hồi khi bấm "Lưu" (A2) dùng chung luồng đăng xuất của UC-CHUNG-03. Khách hàng mẫu nằm ở `src/mocks/seed/customers.ts`, khách tạo mới lưu cùng localStorage key `qtkd.mock.v1`. Danh mục nhóm khách hàng/nhóm dịch vụ trong seed chỉ là dữ liệu mẫu, danh mục thật thuộc TASK-034.
+
+Sau khi lưu, hệ thống chuyển sang trang hồ sơ (UC-CUS-06).
+
+### UC-CUS-02 · Cập nhật thông tin khách hàng
+
+Mở một hồ sơ (ví dụ `/khach-hang/KH-000311`) → "Chỉnh sửa thông tin" (`/khach-hang/:ma/chinh-sua`). Quyền `customers.update` có ở Nhân viên và Trưởng phòng Kinh doanh. Mã KH, MST, trạng thái, nhân viên phụ trách chỉ đọc; trường khác bản đang lưu được gắn "Đã sửa" và tóm tắt trước → sau ở thẻ "Thay đổi chưa lưu"; lý do/căn cứ là bắt buộc.
+
+| Frame Figma | Cách xem |
+| --- | --- |
+| 02.1 Biểu mẫu chỉnh sửa | Sửa địa chỉ, điện thoại, thêm nhóm dịch vụ |
+| 02.2 Không hợp lệ (A5.1) | Xóa người đại diện, email `kehoach@@pvphuongnam.vn`, để trống lý do rồi lưu |
+| 02.3 Không còn phương thức liên hệ (A5.2) | Nhập lý do, xóa cả điện thoại và email |
+| 02.4 Người khác đã cập nhật (A5.3) | Sửa `KH-000198` rồi lưu: "Trần Minh Quân" lưu phiên bản 2 ngay trước đó (chỉ một lần). "Tải lại bản mới nhất và đối chiếu" giữ thay đổi của bạn ở trường người khác không sửa, trường cả hai cùng sửa lấy theo bản mới; phải bấm lưu lại. Cũng thử được bằng hai tab cùng sửa một hồ sơ |
+| 02.5 Xác nhận hủy (A3.5) | Bấm "Hủy" khi đã sửa; chưa sửa gì thì về hồ sơ ngay |
+| 02.6 Không có thay đổi (A6.1) | Bấm "Lưu thay đổi" khi chưa sửa; không tăng phiên bản, không ghi lịch sử |
+| 02.7 Khách đang Tạm ngưng | Sửa `KH-000245`; trạng thái Tạm ngưng giữ nguyên |
+| 02.8 Lỗi lưu (A6.2) | Sửa `KH-000289`: lần lưu đầu của biểu mẫu lỗi và hoàn tác, "Kiểm tra kết quả và thử lại" thì lưu được |
+| 02.8 Mất kết nối (A6.3) | Sửa `KH-000301`: đã ghi nhưng mất phản hồi; thử lại nhận đúng kết quả cũ, không ghi lịch sử trùng |
+| 02.9 Cập nhật thành công | Về trang hồ sơ: phiên bản tăng, trường vừa sửa có nhãn "Mới cập nhật", lịch sử thay đổi ghi trường, giá trị trước/sau, lý do, người và thời điểm |
+
+Server giả lập kiểm tra lại phiên bản đang sửa, quyền, trường chỉ đọc (A5.4) và dữ liệu trước khi ghi. Phạm vi khách hàng theo người phụ trách (A5.5) chưa có quy tắc trong đặc tả nên prototype chưa giới hạn.
+
+### UC-CUS-03 · Tạm ngưng / UC-CUS-04 · Kích hoạt lại khách hàng
+
+Chỉ Trưởng phòng Kinh doanh (`hong.lt`, quyền `customers.change-status`). Trên trang hồ sơ, bấm mũi tên của nút "Chỉnh sửa thông tin ▾" (03.0 / 04.0); Nhân viên KD vẫn có menu này nhưng chỉ có mục "Cập nhật thông tin". Tệp căn cứ chỉ lưu tên và dung lượng, chưa tải lên máy chủ.
+
+| Frame Figma | Cách xem |
+| --- | --- |
+| 03.1 → 03.2 → 03.5 → 03.6 | `KH-000276` (Vận tải Hoàng Long): nhập lý do → "Tiếp tục rà soát" → chọn hướng xử lý cho 4 hồ sơ → "Xác nhận tạm ngưng". Thông báo Pháp chế gửi lỗi, hiển thị "Chờ gửi lại" (A9) |
+| 03.3 Thiếu lý do (A3) | Bấm "Tiếp tục rà soát" khi chưa chọn nhóm lý do/nhập nội dung |
+| 03.4 Không tải đủ dữ liệu rà soát (A4.4) | `KH-000310`: danh sách công việc từ Khai thác lỗi ở lần rà soát đầu, nút xác nhận bị khóa tới khi "Tải lại kết quả rà soát" |
+| 03.7 Đã Tạm ngưng (A2) | Mở `/khach-hang/KH-000245/tam-ngung` khi khách đang Tạm ngưng: về hồ sơ kèm thông báo, không ghi thêm lịch sử |
+| 03.8 Không thành công (A8.1 / A8.2) | `KH-000305`: lần xác nhận đầu lỗi lưu và hoàn tác; `KH-000311`: đã ghi nhưng mất phản hồi. "Kiểm tra kết quả và thử lại" không ghi trùng |
+| 03.8 Dữ liệu đã đổi (A7.1) | Mở thao tác ở hai tab; sửa hồ sơ ở tab kia rồi xác nhận tạm ngưng |
+| 04.1 Đủ điều kiện | `KH-000233`: ba điều kiện đã có xác nhận; nhập lý do, tải căn cứ, xác nhận |
+| 04.2 Chưa đủ điều kiện (A4.1 / A4.2) | `KH-000245`: công nợ chưa có xác nhận của Kế toán → khóa xác nhận. Vận hành/tranh chấp chưa giải quyết không có lối ngoại lệ |
+| 04.3 Quyết định ngoại lệ (A4.3) | `KH-000245` → "Ghi nhận quyết định ngoại lệ" (số quyết định + nội dung chấp thuận) |
+| 04.4 Thiếu lý do / căn cứ (A5) | Bấm "Xác nhận kích hoạt lại" khi trống lý do hoặc chưa tải căn cứ |
+| 04.5 Kích hoạt lại thành công | Hồ sơ hiển thị quyết định, hồ sơ đã hết hiệu lực/đã hủy giữ nguyên trạng thái, thông báo các bộ phận |
+| 04.6 Không tải được thông tin tạm ngưng (A2.1) | `KH-000258`: lần mở đầu lỗi, "Tải lại" thì xem được |
+
+Khách hàng tạm ngưng trong prototype (không có xác nhận mẫu) có điều kiện ứng với nhóm lý do là "Chưa đạt": công nợ → công nợ, vi phạm/tranh chấp → tranh chấp, vận hành → vận hành; nhóm khác không chặn. Danh sách hồ sơ bị ảnh hưởng, hướng xử lý và quy tắc này chỉ là dữ liệu mẫu (`src/mocks/seed/customerStatus.ts`), cần đối chiếu đặc tả khi có BE.
+
+### UC-CUS-05 · Tìm khách hàng
+
+Sidebar → "Danh sách khách hàng" (`/khach-hang`). Từ khóa, trạng thái, sắp xếp, trang và số dòng lưu trên URL (`?q=…&trang-thai=all&sap-xep=name-asc&trang=2&so-dong=20`), nên quay lại từ hồ sơ vẫn giữ điều kiện.
+
+| Frame Figma | Cách xem |
+| --- | --- |
+| 05.1 Danh sách mặc định | Mở trang: khách Hoạt động, cập nhật gần nhất trước, 8 dòng/trang |
+| 05.2 Tìm theo từ khóa (A3.2 / A3.3) | `minh phát` + "Tất cả": khớp không dấu, hiện cảnh báo khi kết quả có khách Tạm ngưng. Một phần MST/mã (`0302`, `000245`) vẫn tìm được |
+| 05.3 Không có kết quả (A5.1) | Từ khóa không khớp, ví dụ `Hải Âu Shipping` |
+| 05.4 Lỗi tải dữ liệu (A4.2) | Từ khóa `0318`: lần tìm đầu lỗi, "Thử lại" thì có kết quả |
+| Tham số không hợp lệ (A4.1) | `/khach-hang?so-dong=1000&trang=abc`: báo điều kiện cần sửa, không chạy truy vấn |
+
+Prototype chưa giới hạn phạm vi khách hàng theo người tra cứu vì đặc tả chưa có quy tắc phân công (`isInScope` trong `src/mocks/customersServer.ts`).
+
+### UC-CUS-06 · Xem thông tin và hồ sơ khách hàng
+
+Trang hồ sơ `/khach-hang/:ma` có các tab Tổng quan / Hợp đồng / Bảng giá / Bảng thanh toán / Lịch sử (tab lưu trên URL `?tab=hop-dong`). Ba nhóm hồ sơ liên quan tải riêng, số trên tab chỉ đếm hồ sơ trong phạm vi quyền. Dữ liệu mẫu đầy đủ ở `KH-000198` (CTCP Cảng Sao Biển), xem `src/mocks/seed/customerRecords.ts`.
+
+| Frame Figma | Cách xem |
+| --- | --- |
+| 06.1 Tổng quan | `KH-000198`: nhận diện, đầu mối liên hệ, trạng thái hợp tác, tóm tắt hồ sơ liên quan, tạo & cập nhật |
+| 06.2 Tab Hợp đồng | Chọn từng hợp đồng để xem chi tiết bên phải; trạng thái tính theo thời điểm đối chiếu |
+| 06.3 Giá kỳ trước (A5.2) | Tab Bảng giá, thời điểm `15/09/2025`: phiên bản 2 gắn nhãn giá lịch sử, kèm đơn giá |
+| 06.4 Bảng giá cần làm rõ (A5.3) | Dịch vụ "Lưu bãi container" tại hôm nay: 2 bảng giá trùng hiệu lực, không hiển thị đơn giá đề xuất |
+| 06.5 Đối chiếu bảng thanh toán (A8.1) | Tab Bảng thanh toán: bảng lập trước khi đổi địa chỉ được tô vàng ở dòng khác hồ sơ hiện tại |
+| 06.6 Báo sai lệch (A8.2) | "Báo sai lệch cho Kế toán": hồ sơ và nơi nhận bị khóa, nội dung bắt buộc; ghi nhật ký, không sửa bảng thanh toán |
+| 06.7 Khách đang Tạm ngưng (A3.1) | `KH-000245` |
+| 06.8 Không có hồ sơ phù hợp (A5.1) | Tab Hợp đồng: thời điểm `01/01/2024` + "Đang hiệu lực" |
+| 06.9 Một nhóm không tải được (A5.5) | `KH-000310`: nhóm Bảng thanh toán lỗi ở lần đầu, các phần khác vẫn xem được; "Thử lại" tải riêng nhóm đó |
+| 06.10 Không thể mở hồ sơ (A2 / A8.3) | `/khach-hang/KH-999999` |
+
+Số trên tab Bảng giá đếm theo mã bảng giá (KH-000198 có 3 mã), frame Figma ghi 1 – cần nhóm chốt cách đếm. "Mở chi tiết hợp đồng" dẫn tới trang giữ chỗ của phân hệ Hợp đồng.
+
 ### Tài khoản mẫu
 
 Mọi tài khoản mẫu dùng mật khẩu kiểm thử `Abc@12345` (trừ `linh.pt` dùng mật khẩu tạm `TamThoi@2026`, và tài khoản đã đổi/đặt lại mật khẩu); có thể đăng nhập bằng tên đăng nhập hoặc email (`an.nv@abc.vn`). Danh sách đầy đủ ở `src/mocks/seed/users.ts`. Xóa key `qtkd.mock.v1` trong localStorage để khôi phục dữ liệu mẫu ban đầu (gồm cả mật khẩu đã đặt lại).
 
-"Thông tin cá nhân", "Đổi mật khẩu" và "Đăng xuất" nằm trong menu tài khoản khi bấm avatar trên Topbar (frame 03.0); Sidebar chỉ còn menu nghiệp vụ. Các mục menu thuộc UC khác (khách hàng, hợp đồng, khu vực, phê duyệt, quản trị, thông tin cá nhân) hiện là trang giữ chỗ.
+"Thông tin cá nhân", "Đổi mật khẩu" và "Đăng xuất" nằm trong menu tài khoản khi bấm avatar trên Topbar (frame 03.0); Sidebar chỉ còn menu nghiệp vụ. Các mục menu thuộc UC khác (hợp đồng, khu vực, phê duyệt, quản trị, thông tin cá nhân) hiện là trang giữ chỗ.
 
 ## Cây thư mục
 

@@ -18,7 +18,6 @@ BE/
         Interfaces/                Abstraction cho DbContext, current user, clock, file storage
         Models/                    Phân trang, kết quả, lỗi nghiệp vụ dùng chung
         Exceptions/                Lỗi nghiệp vụ, không tìm thấy, xung đột phiên bản
-        Approvals/                 IApprovableDocument và hợp đồng callback trạng thái (TASK-056)
       Features/<Module>/           Dtos / Services / Validators cho mỗi module
     QTKD.Domain/                   Entity, enum, quy tắc bất biến của từng module
       Common/                      Entity cơ sở, trường audit, concurrency token
@@ -33,7 +32,7 @@ BE/
       Storage/                     Lưu tệp đính kèm hợp đồng
       Messaging/                   Sprint 2: Outbox thông báo
       BackgroundJobs/              Sprint 2: job theo ngày (CTR-05, nhắc hạn)
-      ExternalServices/            Sprint 3: dịch vụ ký điện tử mô phỏng, retry/callback
+      ExternalServices/            Sprint 3: tích hợp dịch vụ bên ngoài, retry/callback
   tests/
     QTKD.UnitTests/<Module>/       Unit test rule theo module
     QTKD.IntegrationTests/
@@ -51,14 +50,6 @@ BE/
 | Customers | `Controllers/Customers`, `Features/Customers`, `Domain/Customers` | TASK-013..015, 018, 020 |
 | Areas | `Controllers/Areas`, `Features/Areas`, `Domain/Areas` | TASK-040..042, 045 |
 | Contracts | `Controllers/Contracts`, `Features/Contracts`, `Domain/Contracts`, `Infrastructure/Storage` | TASK-026, 060..062, 065, 067 |
-| Approvals | `Controllers/Approvals`, `Features/Approvals/{Definitions,Instances,Tasks,History}`, `Domain/Approvals`, `Common/Approvals` | TASK-035, 052..057 |
-
-Phân chia trong `Features/Approvals`:
-
-- `Definitions`: cấu hình quy trình theo loại hồ sơ, bước, thứ tự, bước cuối, kích hoạt phiên bản (US-APR-10, TASK-053).
-- `Instances`: khởi tạo lượt duyệt, snapshot cấu hình, xác định assignee, chống trình trùng (US-APR-01, TASK-054).
-- `Tasks`: approve / reject / request revision, kiểm tra assignee hiện tại, optimistic locking (US-APR-02..05, TASK-055).
-- `History`: tiến độ, người đang giữ, lịch sử các lượt, hồ sơ chờ tôi xử lý (US-APR-06, 09, TASK-035).
 
 ## Gợi ý đặt tên file khi triển khai
 

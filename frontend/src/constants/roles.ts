@@ -22,6 +22,9 @@ export const DEPARTMENTS: Record<DepartmentCode, Department> = {
 export type Permission =
   | 'customers.view'
   | 'customers.create'
+  | 'customers.update'
+  /** Tạm ngưng / kích hoạt lại khách hàng (UC-CUS-03 / 04) – chỉ Trưởng phòng Kinh doanh. */
+  | 'customers.change-status'
   | 'contracts.view'
   | 'contracts.create'
   | 'approvals.track'
@@ -54,13 +57,21 @@ export const ROLES: Record<RoleCode, Role> = {
     code: 'NV_KD',
     name: 'Nhân viên Kinh doanh',
     department: 'KD',
-    permissions: ['customers.view', 'customers.create', 'contracts.view', 'contracts.create', 'approvals.track', 'areas.view'],
+    permissions: ['customers.view', 'customers.create', 'customers.update', 'contracts.view', 'contracts.create', 'approvals.track', 'areas.view'],
   },
   TP_KD: {
     code: 'TP_KD',
     name: 'Trưởng phòng Kinh doanh',
     department: 'KD',
-    permissions: ['customers.view', 'contracts.view', 'approvals.track', 'approvals.approve', 'areas.view'],
+    permissions: [
+      'customers.view',
+      'customers.update',
+      'customers.change-status',
+      'contracts.view',
+      'approvals.track',
+      'approvals.approve',
+      'areas.view',
+    ],
   },
   TP_KT: {
     code: 'TP_KT',

@@ -1,4 +1,5 @@
 @import './tokens.css';
+@import './page.css';
 
 *,
 *::before,
@@ -30,7 +31,9 @@ h3 {
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
   color: inherit;
 }

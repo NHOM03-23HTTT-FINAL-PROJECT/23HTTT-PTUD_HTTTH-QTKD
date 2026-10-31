@@ -22,6 +22,11 @@
   background: var(--bg-workspace);
 }
 
+/* Vùng làm việc cuộn dọc: khối con giữ chiều cao nội dung, không bị co (khối có overflow sẽ co về 0 nếu cho phép). */
+.app-shell__workspace > * {
+  flex-shrink: 0;
+}
+
 /* ---------- Topbar ---------- */
 
 .topbar {

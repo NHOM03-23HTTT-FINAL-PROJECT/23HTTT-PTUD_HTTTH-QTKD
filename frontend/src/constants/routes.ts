@@ -4,6 +4,12 @@ export const ROUTES = {
   dashboard: '/',
   changePassword: '/doi-mat-khau',
   forcedPasswordChange: '/doi-mat-khau-lan-dau',
+  customers: '/khach-hang',
+  customerCreate: '/khach-hang/tao-moi',
+  customerDetail: (code: string) => `/khach-hang/${code}`,
+  customerEdit: (code: string) => `/khach-hang/${code}/chinh-sua`,
+  customerSuspend: (code: string) => `/khach-hang/${code}/tam-ngung`,
+  customerReactivate: (code: string) => `/khach-hang/${code}/kich-hoat-lai`,
   contractDetail: (code: string) => `/hop-dong/${code}`,
   paymentDetail: (code: string) => `/bang-thanh-toan/${code}`,
 } as const;
