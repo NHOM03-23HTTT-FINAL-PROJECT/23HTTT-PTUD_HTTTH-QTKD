@@ -2,6 +2,7 @@ import type { Area, AreaService, AreaStaff } from '@/features/areas/types/area';
 import type { LoginTrace } from '@/features/auth/types/auth';
 import type { Customer } from '@/features/customers/types/customer';
 import type { Contract } from '@/features/contracts/types/contract';
+import type { WorkflowConfig } from '@/features/contracts/types/workflowConfig';
 import { SEED_ACCOUNTS } from './seed/users';
 
 /*
@@ -71,7 +72,19 @@ export type AuditEvent = {
     | 'CONTRACT_CREATED'
     | 'CONTRACT_CREATE_REJECTED'
     | 'CONTRACT_CREATE_ERROR'
-    | 'CONTRACT_ATTACHMENTS_UPDATED';
+    | 'CONTRACT_ATTACHMENTS_UPDATED'
+    | 'CONTRACT_UPDATED'
+    | 'CONTRACT_UPDATE_REJECTED'
+    | 'CONTRACT_SUBMITTED'
+    | 'CONTRACT_SUBMIT_REJECTED'
+    | 'CONTRACT_CANCELLED'
+    | 'CONTRACT_CANCEL_REJECTED'
+    | 'CONTRACT_REVIEW_ACCEPTED'
+    | 'CONTRACT_DECISION'
+    | 'CONTRACT_DECISION_REJECTED'
+    | 'CONTRACT_COORDINATION'
+    | 'WORKFLOW_ACTIVATED'
+    | 'WORKFLOW_ACTIVATE_REJECTED';
   username: string;
   detail: string;
 };
@@ -99,10 +112,14 @@ type MockState = {
   areaRequests: Record<string, string>;
   /** Danh sách dịch vụ/nhân sự đã đổi trong prototype theo AreaId; thay cho bản trong `seed/areaRecords`. */
   areaRecordOverrides: Record<string, { services?: AreaService[]; staff?: AreaStaff[] }>;
-  /** Hợp đồng nháp tạo trong prototype SYS-CTR-01. */
+  /** Hợp đồng tạo hoặc đã thay đổi trong prototype; bản ở đây thay cho bản trong `seed/contracts`. */
   contracts: Contract[];
-  /** Idempotency-Key của yêu cầu tạo hợp đồng → mã hợp đồng. */
+  /** Idempotency-Key của yêu cầu tạo/trình hợp đồng → mã hợp đồng. */
   contractRequests: Record<string, string>;
+  /** Cấu hình người tham gia đã kích hoạt trong prototype; thay cho bản cùng mã trong seed. */
+  workflowConfigs: WorkflowConfig[];
+  /** Idempotency-Key của yêu cầu kích hoạt cấu hình → mã cấu hình (SYS-CTR-10 E6). */
+  workflowRequests: Record<string, string>;
 };
 
 const MAX_AUDIT_EVENTS = 200;
@@ -125,6 +142,8 @@ function createInitialState(): MockState {
     areaRecordOverrides: {},
     contracts: [],
     contractRequests: {},
+    workflowConfigs: [],
+    workflowRequests: {},
   };
   for (const account of SEED_ACCOUNTS) {
     if (account.lastLogin) state.lastLogins[account.id] = account.lastLogin;
@@ -283,6 +302,19 @@ export const mockStore = {
       contractRequests: idempotencyKey
         ? { ...s.contractRequests, [idempotencyKey]: contract.code }
         : s.contractRequests,
+    }));
+  },
+  getStoredWorkflowConfigs(): WorkflowConfig[] {
+    return readState().workflowConfigs;
+  },
+  getWorkflowCodeByRequest(idempotencyKey: string): string | undefined {
+    return readState().workflowRequests[idempotencyKey];
+  },
+  /** Lưu phiên bản cấu hình mới (kèm lịch sử) và khóa yêu cầu trong một lần ghi. */
+  saveWorkflowConfig(config: WorkflowConfig, idempotencyKey?: string) {
+    update((s) => ({
+      workflowConfigs: [...s.workflowConfigs.filter((item) => item.code !== config.code), config],
+      workflowRequests: idempotencyKey ? { ...s.workflowRequests, [idempotencyKey]: config.code } : s.workflowRequests,
     }));
   },
   audit(event: Omit<AuditEvent, 'at'>) {

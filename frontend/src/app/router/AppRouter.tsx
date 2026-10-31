@@ -15,7 +15,13 @@ import { CustomerEditPage } from '@/features/customers/pages/CustomerEditPage';
 import { CustomerListPage } from '@/features/customers/pages/CustomerListPage';
 import { CustomerReactivatePage } from '@/features/customers/pages/CustomerReactivatePage';
 import { CustomerSuspendPage } from '@/features/customers/pages/CustomerSuspendPage';
-import { ContractCreatePage, ContractDraftDetailPage } from '@/features/contracts/pages/ContractCreatePage';
+import { ApprovalInboxPage } from '@/features/contracts/pages/ApprovalInboxPage';
+import { ContractCreatePage } from '@/features/contracts/pages/ContractCreatePage';
+import { ContractDetailPage } from '@/features/contracts/pages/ContractDetailPage';
+import { ContractEditPage } from '@/features/contracts/pages/ContractEditPage';
+import { ContractListPage } from '@/features/contracts/pages/ContractListPage';
+import { ContractProgressPage } from '@/features/contracts/pages/ContractProgressPage';
+import { WorkflowConfigFormPage, WorkflowConfigListPage } from '@/features/contracts/pages/WorkflowConfigPages';
 import { DashboardPage } from '@/features/dashboard/pages/DashboardPage';
 import { MainLayout } from '@/layouts/MainLayout';
 import { PublicOnly, RequireAuth, RequirePermission } from './guards';
@@ -31,6 +37,14 @@ const IMPLEMENTED_PATHS = new Set<string>([
   ROUTES.areaLookup,
   ROUTES.areaHierarchy,
   ROUTES.contractCreate,
+  ROUTES.contracts,
+  ROUTES.contractRevision,
+  ROUTES.approvalSales,
+  ROUTES.approvalLegal,
+  ROUTES.approvalLegalDone,
+  ROUTES.approvalBoard,
+  ROUTES.approvalTracking,
+  ROUTES.workflows,
 ]);
 
 /**
@@ -162,10 +176,106 @@ export function AppRouter() {
               }
             />
             <Route
+              path={ROUTES.contracts}
+              element={
+                <RequirePermission permission="contracts.view" label="Danh sách hợp đồng">
+                  <ContractListPage key="all" />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path={ROUTES.contractRevision}
+              element={
+                <RequirePermission permission="contracts.create" label="Hợp đồng cần chỉnh sửa">
+                  <ContractListPage key="revision" variant="revision" />
+                </RequirePermission>
+              }
+            />
+            <Route
               path="/hop-dong/:code"
               element={
                 <RequirePermission permission="contracts.view" label="Hồ sơ hợp đồng">
-                  <ContractDraftDetailPage />
+                  <ContractDetailPage />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="/hop-dong/:code/chinh-sua"
+              element={
+                <RequirePermission permission="contracts.create" label="Chỉnh sửa hợp đồng">
+                  <ContractEditPage />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="/hop-dong/:code/tien-do"
+              element={
+                <RequirePermission permission="contracts.view" label="Tiến độ và lịch sử phê duyệt">
+                  <ContractProgressPage />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path={ROUTES.approvalSales}
+              element={
+                <RequirePermission permission="approvals.approve" label="Hồ sơ chờ tôi duyệt">
+                  <ApprovalInboxPage key="sales" step="sales" />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path={ROUTES.approvalLegal}
+              element={
+                <RequirePermission permission="approvals.review-legal" label="Chờ rà soát pháp lý">
+                  <ApprovalInboxPage key="legal" step="legal" />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path={ROUTES.approvalLegalDone}
+              element={
+                <RequirePermission permission="approvals.review-legal" label="Đã rà soát">
+                  <ApprovalInboxPage key="legal-done" step="legal" done />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path={ROUTES.approvalBoard}
+              element={
+                <RequirePermission permission="approvals.approve" label="Hồ sơ chờ phê duyệt">
+                  <ApprovalInboxPage key="board" step="board" />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path={ROUTES.approvalTracking}
+              element={
+                <RequirePermission permission="approvals.track" label="Theo dõi tiến độ">
+                  <ContractListPage key="tracking" variant="tracking" />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path={ROUTES.workflows}
+              element={
+                <RequirePermission permission="workflows.manage" label="Quy trình phê duyệt">
+                  <WorkflowConfigListPage />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path={ROUTES.workflowCreate}
+              element={
+                <RequirePermission permission="workflows.manage" label="Tạo cấu hình người tham gia">
+                  <WorkflowConfigFormPage key="new" />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="/quan-tri/quy-trinh/:code/cap-nhat"
+              element={
+                <RequirePermission permission="workflows.manage" label="Cập nhật cấu hình người tham gia">
+                  <WorkflowConfigFormPage key="edit" />
                 </RequirePermission>
               }
             />

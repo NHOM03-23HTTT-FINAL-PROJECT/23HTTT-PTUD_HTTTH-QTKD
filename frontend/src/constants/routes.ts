@@ -18,7 +18,18 @@ export const ROUTES = {
   areaEdit: (code: string) => `/khu-vuc/${code}/chinh-sua`,
   contracts: '/hop-dong',
   contractCreate: '/hop-dong/tao-moi',
+  contractRevision: '/hop-dong/can-chinh-sua',
   contractDetail: (code: string) => `/hop-dong/${code}`,
+  contractEdit: (code: string) => `/hop-dong/${code}/chinh-sua`,
+  contractProgress: (code: string) => `/hop-dong/${code}/tien-do`,
+  approvalSales: '/phe-duyet/cho-duyet',
+  approvalLegal: '/phe-duyet/cho-ra-soat',
+  approvalLegalDone: '/phe-duyet/da-ra-soat',
+  approvalBoard: '/phe-duyet/cho-phe-duyet',
+  approvalTracking: '/phe-duyet/tien-do',
+  workflows: '/quan-tri/quy-trinh',
+  workflowCreate: '/quan-tri/quy-trinh/tao-moi',
+  workflowEdit: (code: string) => `/quan-tri/quy-trinh/${code}/cap-nhat`,
   paymentDetail: (code: string) => `/bang-thanh-toan/${code}`,
 } as const;
 

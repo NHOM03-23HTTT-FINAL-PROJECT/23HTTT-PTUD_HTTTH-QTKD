@@ -65,6 +65,7 @@ export const WORKSPACE_NAV: Record<WorkspaceKey, NavGroup[]> = {
         { ...CONTRACT_LIST, label: 'Hợp đồng của tôi' },
         { label: 'Tạo hợp đồng', path: '/hop-dong/tao-moi', icon: 'file-plus', permission: 'contracts.create', module: 'Hợp đồng (CTR)' },
         { label: 'Cần chỉnh sửa', path: '/hop-dong/can-chinh-sua', icon: 'edit', permission: 'contracts.create', badge: 1, module: 'Hợp đồng (CTR)' },
+        { label: 'Hồ sơ chờ tôi duyệt', path: '/phe-duyet/cho-duyet', icon: 'inbox', permission: 'approvals.approve', module: 'Phê duyệt (APR)' },
       ],
     },
     { title: 'PHÊ DUYỆT', items: [TRACK_PROGRESS, APPROVAL_HISTORY] },
