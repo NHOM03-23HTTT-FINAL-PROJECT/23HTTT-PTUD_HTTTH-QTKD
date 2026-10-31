@@ -149,8 +149,8 @@ export function ContractDetailPage() {
       {breadcrumb}
       <div className="page-header">
         <div className="page-header__title contract-detail-title">
-          <div><h1>{contract.title}</h1><p>{contract.code} · {contract.customerName} · {contract.contractType}</p></div>
-          <StatusBadge label={badge.label} tone={badge.tone} />
+          <div><h1>{contract.title}</h1><StatusBadge label={badge.label} tone={badge.tone} /></div>
+          <p>{contract.code} · {contract.customerName} · {contract.contractType}</p>
         </div>
         <div className="page-header__actions">
           {editable && <ButtonLink to={ROUTES.contractEdit(code)} variant="secondary">Chỉnh sửa</ButtonLink>}

@@ -94,6 +94,7 @@ function Sidebar({ user }: { user: CurrentUser }) {
               item={item}
               activeForAreaRecord={item.path === areaRecordNavPath}
               activeForContractRecord={item.path === ROUTES.contracts}
+              activeForTrackedProgress={item.path === ROUTES.approvalTracking}
             />
           ))}
         </div>
@@ -104,31 +105,38 @@ function Sidebar({ user }: { user: CurrentUser }) {
 
 /**
  * Khớp chính xác các màn menu để "/khu-vuc" không sáng ở "/khu-vuc/so-do"; riêng hồ sơ động giữ sáng mục đã dẫn
- * người dùng tới hồ sơ (Danh sách với Phòng Khai thác, Tra cứu với các phòng chỉ xem).
+ * người dùng tới hồ sơ (Danh sách với Phòng Khai thác, Tra cứu với các phòng chỉ xem). Màn tiến độ hợp đồng mở từ
+ * "Theo dõi tiến độ" (state.backTo trỏ về danh sách đó) giữ sáng mục này; mở từ chi tiết thì giữ sáng danh sách hợp đồng.
  */
 function SidebarLink({
   item,
   activeForAreaRecord = false,
   activeForContractRecord = false,
+  activeForTrackedProgress = false,
 }: {
   item: NavItem;
   activeForAreaRecord?: boolean;
   activeForContractRecord?: boolean;
+  activeForTrackedProgress?: boolean;
 }) {
-  const { pathname } = useLocation();
+  const { pathname, state } = useLocation();
   const reservedAreaPaths = new Set<string>([ROUTES.areaCreate, ROUTES.areaHierarchy, ROUTES.areaLookup]);
   const isAreaRecord =
     activeForAreaRecord &&
     !reservedAreaPaths.has(pathname) &&
     /^\/khu-vuc\/[^/]+(?:\/chinh-sua)?$/.test(pathname);
-  const isContractRecord = activeForContractRecord && /^\/hop-dong\/HD-\d{4}-\d{3,}$/.test(pathname);
+  const isProgress = /^\/hop-dong\/HD-\d{4}-\d{3,}\/tien-do$/.test(pathname);
+  const fromTracking = isProgress && Boolean((state as { backTo?: string } | null)?.backTo?.startsWith(ROUTES.approvalTracking));
+  const isContractRecord =
+    activeForContractRecord && (/^\/hop-dong\/HD-\d{4}-\d{3,}$/.test(pathname) || (isProgress && !fromTracking));
+  const isTrackedProgress = activeForTrackedProgress && fromTracking;
 
   return (
     <NavLink
       to={item.path}
       end
       className={({ isActive }) =>
-        isActive || isAreaRecord || isContractRecord ? 'sidebar__item sidebar__item--active' : 'sidebar__item'
+        isActive || isAreaRecord || isContractRecord || isTrackedProgress ?'sidebar__item sidebar__item--active' : 'sidebar__item'
       }
     >
       <Icon name={item.icon} />

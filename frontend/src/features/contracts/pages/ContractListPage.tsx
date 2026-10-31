@@ -14,6 +14,7 @@ import { contractsApi } from '../api/contractsApi';
 import { ContractActionError, type ContractListItem, type ContractListQuery, type ContractListResult, type ContractScope, type ContractStatus } from '../types/contract';
 import { CONTRACT_STATUS_BADGE, CONTRACT_STATUS_OPTIONS } from '../utils/contractStatus';
 import type { ContractListState } from './ContractDetailPage';
+import type { ContractProgressState } from './ContractProgressPage';
 import './Contracts.css';
 
 const PAGE_SIZES = [10, 20] as const;
@@ -50,15 +51,20 @@ function toParams(query: ContractListQuery, variant: ContractListVariant): URLSe
   return params;
 }
 
-function columns(highlight?: string): Column<ContractListItem>[] {
+/** Danh sách "Theo dõi tiến độ" mở thẳng SYS-CTR-11 (A10); "Đóng" ở đó quay về đúng danh sách đang lọc. */
+function rowLink(code: string, trackingFrom?: string): { to: string; state?: ContractProgressState } {
+  return trackingFrom ? { to: ROUTES.contractProgress(code), state: { backTo: trackingFrom } } : { to: ROUTES.contractDetail(code) };
+}
+
+function columns(highlight?: string, trackingFrom?: string): Column<ContractListItem>[] {
   return [
-    { key: 'code', header: 'Mã hợp đồng', width: 130, render: (row) => <Link to={ROUTES.contractDetail(row.code)} className={row.code === highlight ? 'contract-list__code contract-list__code--highlight' : 'contract-list__code'}>{row.code}</Link> },
+    { key: 'code', header: 'Mã hợp đồng', width: 130, render: (row) => <Link {...rowLink(row.code, trackingFrom)} className={row.code === highlight ? 'contract-list__code contract-list__code--highlight' : 'contract-list__code'}>{row.code}</Link> },
     { key: 'title', header: 'Tiêu đề · loại hợp đồng', render: (row) => <span className="contract-list__stack"><span>{row.title}</span><small>{row.contractType}</small></span> },
     { key: 'customer', header: 'Khách hàng', width: 200, render: (row) => <span className="contract-list__stack"><span>{row.customerName}</span><small>{row.customerCode}</small></span> },
     { key: 'period', header: 'Hiệu lực', width: 120, render: (row) => <span className="contract-list__stack"><span>{formatDate(row.effectiveFrom)}</span><small>đến {formatDate(row.effectiveTo)}</small></span> },
     { key: 'status', header: 'Trạng thái', width: 170, render: (row) => <span className="contract-list__stack"><StatusBadge label={CONTRACT_STATUS_BADGE[row.status].label} tone={CONTRACT_STATUS_BADGE[row.status].tone} />{row.stepLabel && <small>Bước: {row.stepLabel}</small>}</span> },
     { key: 'owner', header: 'Người phụ trách', width: 140, render: (row) => row.ownerName },
-    { key: 'actions', header: '', width: 70, align: 'end', render: (row) => <Link to={ROUTES.contractDetail(row.code)} className="btn btn--ghost" aria-label={`Xem ${row.code}`}>Xem</Link> },
+    { key: 'actions', header: '', width: 70, align: 'end', render: (row) => <Link {...rowLink(row.code, trackingFrom)} className="btn btn--ghost" aria-label={trackingFrom ? `Xem tiến độ ${row.code}` : `Xem ${row.code}`}>Xem</Link> },
   ];
 }
 
@@ -123,7 +129,7 @@ export function ContractListPage({ variant = 'all' }: { variant?: ContractListVa
   const shown = state.kind === 'ok' ? state.result : state.kind === 'loading' ? lastResult.current : null;
   const scope = shown?.scope ?? 'own';
   const title = variant === 'revision' ? 'Hợp đồng cần chỉnh sửa' : variant === 'tracking' ? 'Theo dõi tiến độ' : SCOPE_COPY[scope].title;
-  const subtitle = variant === 'revision' ? 'Hồ sơ đang ở trạng thái Yêu cầu chỉnh sửa – sửa theo yêu cầu rồi trình lại.' : variant === 'tracking' ? 'Hồ sơ đã gửi trình duyệt trong phạm vi của bạn; mở hồ sơ để xem tiến độ và lịch sử phê duyệt.' : SCOPE_COPY[scope].subtitle;
+  const subtitle = variant === 'revision' ? 'Hồ sơ đang ở trạng thái Yêu cầu chỉnh sửa – sửa theo yêu cầu rồi trình lại.' : variant === 'tracking' ? 'Hồ sơ đã gửi trình duyệt trong phạm vi của bạn; chọn hồ sơ để xem tiến độ và lịch sử phê duyệt.' : SCOPE_COPY[scope].subtitle;
   const activeFilters = [
     query.keyword && { key: 'keyword', label: `Từ khóa "${query.keyword}"`, clear: () => { setDraft(''); update({ keyword: '' }); } },
     variant !== 'revision' && query.status && { key: 'status', label: `Trạng thái: ${CONTRACT_STATUS_BADGE[query.status].label}`, clear: () => update({ status: '' }) },
@@ -197,7 +203,7 @@ export function ContractListPage({ variant = 'all' }: { variant?: ContractListVa
             {activeFilters.length > 0 && <Button variant="secondary" onClick={clearFilters}>Xóa bộ lọc</Button>}
           </div>
         )}
-        {shown && state.kind !== 'error' && state.kind !== 'forbidden' && shown.total > 0 && <DataTable columns={columns(cancelled)} rows={shown.items} rowKey={(row) => row.code} />}
+        {shown && state.kind !== 'error' && state.kind !== 'forbidden' && shown.total > 0 && <DataTable columns={columns(cancelled, variant === 'tracking' ? location.pathname + location.search : undefined)}rows={shown.items} rowKey={(row) => row.code} />}
       </section>
 
       {shown && state.kind !== 'error' && shown.total > 0 && (

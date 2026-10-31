@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { useSession } from '@/app/providers/SessionProvider';
 import { Button, ButtonLink } from '@/components/button/Button';
@@ -21,9 +21,13 @@ type LogFilter = { step: ApprovalStepKey | ''; action: ApprovalAction | ''; acto
 
 const EMPTY_FILTER: LogFilter = { step: '', action: '', actor: '' };
 
+/** Mở từ danh sách "Theo dõi tiến độ" (A10): backTo là URL danh sách, kèm bộ lọc, để "Đóng" quay về. */
+export type ContractProgressState = { backTo?: string };
+
 /** SYS-CTR-11 · Theo dõi tiến độ và lịch sử phê duyệt – chỉ xem, không thay đổi dữ liệu hồ sơ. */
 export function ContractProgressPage() {
   const { code = '' } = useParams();
+  const backTo = (useLocation().state as ContractProgressState | null)?.backTo;
   const { user } = useAuth();
   const { endSession } = useSession();
   const [load, setLoad] = useState<Load>({ kind: 'loading' });
@@ -61,7 +65,7 @@ export function ContractProgressPage() {
     return Boolean(latest && latest.updatedAt !== load.contract.updatedAt);
   }, [load, code, now]);
 
-  const breadcrumb = <nav className="breadcrumb" aria-label="Đường dẫn"><Link to={ROUTES.contracts}>Hợp đồng</Link><span className="breadcrumb__separator">/</span><Link to={ROUTES.contractDetail(code)}>{code}</Link><span className="breadcrumb__separator">/</span><span className="breadcrumb__current" aria-current="page">Tiến độ và lịch sử phê duyệt</span></nav>;
+  const breadcrumb = <nav className="breadcrumb" aria-label="Đường dẫn">{backTo ? <Link to={backTo}>Theo dõi tiến độ</Link> : <Link to={ROUTES.contracts}>Hợp đồng</Link>}<span className="breadcrumb__separator">/</span><Link to={ROUTES.contractDetail(code)}>{code}</Link><span className="breadcrumb__separator">/</span><span className="breadcrumb__current" aria-current="page">Tiến độ và lịch sử phê duyệt</span></nav>;
   if (!user) return null;
   if (load.kind === 'loading') return <>{breadcrumb}<p className="contract-loading">Đang tải tiến độ…</p></>;
   if (load.kind !== 'ok') {
@@ -78,12 +82,12 @@ export function ContractProgressPage() {
       {breadcrumb}
       <div className="page-header">
         <div className="page-header__title contract-detail-title">
-          <div><h1>Tiến độ và lịch sử phê duyệt</h1><p>{contract.code} · {contract.title} · {contract.customerName}</p></div>
-          <StatusBadge label={status.label} tone={status.tone} />
+          <div><h1>Tiến độ và lịch sử phê duyệt</h1><StatusBadge label={status.label} tone={status.tone} /></div>
+          <p>{contract.code} · {contract.title} · {contract.customerName}</p>
         </div>
         <div className="page-header__actions">
           <Button variant="secondary" onClick={() => setRetry((n) => n + 1)}><Icon name="refresh" size={16} /> Tải lại</Button>
-          <ButtonLink to={ROUTES.contractDetail(code)} variant="secondary">Đóng</ButtonLink>
+          <ButtonLink to={backTo ?? ROUTES.contractDetail(code)} variant="secondary">Đóng</ButtonLink>
         </div>
       </div>
 

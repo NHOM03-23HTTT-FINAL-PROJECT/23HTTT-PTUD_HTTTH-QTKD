@@ -193,8 +193,8 @@ function EditForm({ user, contract, breadcrumb, onReload }: { user: CurrentUser;
       {breadcrumb}
       <div className="page-header">
         <div className="page-header__title contract-detail-title">
-          <div><h1>Chỉnh sửa hợp đồng</h1><p>{contract.code} · {contract.customerName}. Mã hợp đồng và trạng thái chỉ đọc; trạng thái giữ nguyên sau khi lưu.</p></div>
-          <StatusBadge label={badge.label} tone={badge.tone} />
+          <div><h1>Chỉnh sửa hợp đồng</h1><StatusBadge label={badge.label} tone={badge.tone} /></div>
+          <p>{contract.code} · {contract.customerName}. Mã hợp đồng và trạng thái chỉ đọc; trạng thái giữ nguyên sau khi lưu.</p>
         </div>
         <div className="page-header__actions">
           <Button variant="secondary" disabled={saving} onClick={cancel}>Hủy</Button>
