@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { hash } from "bcryptjs";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient } from "../generated/prisma/client.js";
+import { PrismaClient } from "../generated/prisma/client.ts";
 import { buildSeedData } from "./seed-data.js";
 import { validateSeedData } from "../scripts/validate-seed.js";
 import { requireSupabaseUrl } from "../scripts/supabase.js";
@@ -26,6 +26,9 @@ async function main() {
     await client.$transaction(async (tx) => {
       // Serialize concurrent seed invocations. No cleanup, password reset or destructive reset.
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended('qtkd-demo-seed-v1', 0))`;
+      await tx.roleDefinition.createMany({ data: data.roleDefinition, skipDuplicates: true });
+      await tx.permission.createMany({ data: data.permission, skipDuplicates: true });
+      // Initial grants are inserted by migration 0003; never restore grants removed by administrators.
       await tx.department.createMany({ data: data.department.map((row) => ({ ...row, managerId: null })), skipDuplicates: true });
       await tx.userAccount.createMany({ data: data.userAccount, skipDuplicates: true });
       for (const row of data.department) {
@@ -65,7 +68,7 @@ async function main() {
         if (!/^[a-z_]+$/.test(model.table) || !/^[a-z_]+$/.test(primary.column!)) throw new Error("Invalid internal identifier");
         const keys = records[model.delegate].map((row) => row[primary.name]);
         const rows = await tx.$queryRawUnsafe<{ count: bigint }[]>(
-          `SELECT count(*) FROM qtkd."${model.table}" WHERE "${primary.column}" = ANY($1::uuid[])`, keys);
+          `SELECT count(*) FROM qtkd."${model.table}" WHERE "${primary.column}"::text = ANY($1::text[])`, keys.map(String));
         if (Number(rows[0].count) !== keys.length) throw new Error(`Seed ID collision: ${model.name}`);
       }
     }, { timeout: 120_000, maxWait: 15_000 });
@@ -78,6 +81,11 @@ async function main() {
 main().catch((error: unknown) => {
   // Prisma connection errors can include connection details; do not echo their raw message.
   const code = error && typeof error === "object" && "code" in error ? String(error.code) : undefined;
+  if (code === "P1011") {
+    console.error("Seed failed (P1011): PostgreSQL TLS connection failed. Run npm run connection:check for a safe diagnostic. Check sslmode=verify-full and the trusted database CA (sslrootcert). No seed transaction committed.");
+    process.exitCode = 1;
+    return;
+  }
   console.error(code ? `Seed failed (${code}); transaction rolled back. Check your private DB configuration.`
     : error instanceof Error && !error.name.startsWith("Prisma") ? error.message : "Seed failed; transaction rolled back.");
   process.exitCode = 1;

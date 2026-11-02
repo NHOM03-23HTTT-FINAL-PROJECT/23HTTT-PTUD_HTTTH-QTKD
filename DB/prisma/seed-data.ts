@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import type { Prisma } from "../generated/prisma/client.js";
+import type { Prisma } from "../generated/prisma/client.ts";
+import { buildIdentitySeed } from "./identity-catalog.js";
 
 const id = (group: number, row = 1) =>
   `00000000-0000-4000-8000-${(group * 1000 + row).toString(16).padStart(12, "0")}`;
@@ -29,12 +30,12 @@ export const ids = {
 /** Synthetic fixtures; supplied passwordHash must be generated only for a real seed run. */
 export function buildSeedData(passwordHash: string) {
   const department = [
-    { departmentId: ids.sales, departmentName: "Kinh doanh", managerId: ids.salesManager },
-    { departmentId: ids.operations, departmentName: "Khai thác", managerId: ids.operationsManager },
-    { departmentId: ids.accounting, departmentName: "Kế toán", managerId: ids.accountingReviewer },
-    { departmentId: ids.legal, departmentName: "Pháp chế", managerId: ids.legalStaff },
-    { departmentId: ids.board, departmentName: "Ban Giám đốc", managerId: ids.boardMember },
-    { departmentId: ids.adminDepartment, departmentName: "Quản trị hệ thống", managerId: ids.admin },
+    { departmentId: ids.sales, code: "KD", departmentName: "Kinh doanh", managerId: ids.salesManager },
+    { departmentId: ids.operations, code: "KT", departmentName: "Khai thác", managerId: ids.operationsManager },
+    { departmentId: ids.accounting, code: "KTOAN", departmentName: "Kế toán", managerId: ids.accountingReviewer },
+    { departmentId: ids.legal, code: "PC", departmentName: "Pháp chế", managerId: ids.legalStaff },
+    { departmentId: ids.board, code: "BGD", departmentName: "Ban Giám đốc", managerId: ids.boardMember },
+    { departmentId: ids.adminDepartment, code: "QTHT", departmentName: "Quản trị hệ thống", managerId: ids.admin },
   ] satisfies Prisma.DepartmentCreateManyInput[];
 
   const userAccount = [
@@ -169,9 +170,10 @@ export function buildSeedData(passwordHash: string) {
   }));
 
   return {
+    ...buildIdentitySeed(),
     department, userAccount,
-    loginSession: [{ sessionId: id(3), userId: ids.salesStaff, refreshTokenHash: hash("revoked-demo-session"),
-      createdAt, expiresAt: at("2026-10-01T02:30:00Z"), isRevoked: true, endReason: "Expired", device: "Demo fixture; not a live session" }] satisfies Prisma.LoginSessionCreateManyInput[],
+    loginSession: [{ sessionId: id(3), userId: ids.salesStaff, refreshTokenHash: hash("revoked-demo-session"), logoutTokenHash: hash("revoked-demo-logout"),
+      createdAt, lastActivityAt: createdAt, expiresAt: at("2026-10-01T02:30:00Z"), isRevoked: true, endReason: "Expired", device: "Demo fixture; not a live session" }] satisfies Prisma.LoginSessionCreateManyInput[],
     passwordOtp: [{ otpId: id(4), userId: ids.salesStaff, otpHash: hash("consumed-demo-otp"), sentAt: createdAt,
       expiresAt: at("2026-10-01T02:05:00Z"), failedCount: 0, isUsed: true }] satisfies Prisma.PasswordOtpCreateManyInput[],
     notification: [{ notificationId: id(5), recipientId: ids.salesManager, recordType: "Contract", recordId: ids.submittedContract,

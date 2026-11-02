@@ -15,25 +15,27 @@ test("all 26 source tables and all 239 active columns are mapped", () => {
     tables: Record<string, string[]>; foreignKeys: { table: string; column: string; target: string }[];
   };
   const models = readSchema();
-  assert.deepEqual(models.map((model) => model.table).sort(), Object.keys(source.tables).sort());
+  assert.deepEqual(models.filter(model => !["role_definition", "permission", "role_permission"].includes(model.table)).map((model) => model.table).sort(), Object.keys(source.tables).sort());
   assert.equal(Object.values(source.tables).flat().length, 239);
   for (const model of models) {
+    if (!source.tables[model.table]) continue;
     const actual = model.fields.flatMap((field) => field.column ? [field.column] : []);
     for (const column of source.tables[model.table]) assert(actual.includes(column), `${model.table}.${column}`);
     const additions = actual.filter((column) => !source.tables[model.table].includes(column));
-    assert.deepEqual(additions, model.name === "Contract" ? ["updated_at"] : []);
+    const expected: Record<string, string[]> = { Contract: ["updated_at"], Department: ["code"], UserAccount: ["password_changed_at"], LoginSession: ["logout_token_hash", "last_activity_at", "remember", "revocation_reason"] };
+    assert.deepEqual(additions, expected[model.name] ?? []);
   }
   const actualFks = models.flatMap((model) => model.relations.flatMap((relation) => relation.fields.map((field) => ({
     table: model.table, column: model.fields.find((item) => item.name === field)!.column!,
     target: models.find((item) => item.name === relation.target)!.table,
   }))));
   const normalize = (items: typeof actualFks) => items.map((item) => `${item.table}.${item.column}->${item.target}`).sort();
-  assert.deepEqual(normalize(actualFks), normalize(source.foreignKeys));
+  assert.deepEqual(normalize(actualFks.filter(fk => source.tables[fk.table] && !(fk.table === "user_account" && fk.column === "role"))), normalize(source.foreignKeys));
 });
 
 test("valid complete fixture passes without any connection", () => {
   const counts = validateSeedData(fixture());
-  assert.equal(Object.keys(counts).length, 26);
+  assert.equal(Object.keys(counts).length, 29);
   assert.equal(counts.userAccount, 9);
   assert.equal(counts.department, 6);
 });

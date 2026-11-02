@@ -10,11 +10,14 @@
     "generate": "prisma generate",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
+    "test:identity:offline": "node --experimental-transform-types --test tests/identity-offline.test.mjs",
     "seed:check": "tsx prisma/seed.ts --dry-run",
     "migration:check": "tsx scripts/check-migration.ts",
+    "connection:check": "tsx scripts/check-connection.ts",
     "check": "npm run validate && npm run generate && npm run typecheck && npm test && npm run seed:check && npm run migration:check",
     "migrate:deploy": "tsx scripts/supabase.ts migrate",
     "migrate:status": "tsx scripts/supabase.ts status",
+    "preseed": "npm run generate",
     "seed": "tsx scripts/supabase.ts seed"
   },
   "dependencies": {
