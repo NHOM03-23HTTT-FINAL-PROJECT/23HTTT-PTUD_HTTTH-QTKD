@@ -3,6 +3,7 @@
  * trình duyệt); không chọn → sessionStorage. Prototype chưa có JWT nên chỉ lưu định danh phiên.
  */
 const SESSION_KEY = 'qtkd.session';
+const SIGNED_OUT_KEY = 'qtkd.signedOut';
 
 export type StoredSession = {
   userId: string;
@@ -21,6 +22,7 @@ function safeStorage(kind: 'local' | 'session'): Storage | null {
 
 export const sessionStore = {
   save(session: StoredSession, remember: boolean) {
+    try { safeStorage('local')?.removeItem(SIGNED_OUT_KEY); safeStorage('session')?.removeItem(SIGNED_OUT_KEY); } catch { /* metadata only */ }
     const target = safeStorage(remember ? 'local' : 'session');
     const other = safeStorage(remember ? 'session' : 'local');
     try {
@@ -68,6 +70,7 @@ export const sessionStore = {
   },
 
   clear() {
+    this.markSignedOut();
     for (const kind of ['session', 'local'] as const) {
       try {
         safeStorage(kind)?.removeItem(SESSION_KEY);
@@ -75,5 +78,12 @@ export const sessionStore = {
         // Không có gì để xóa.
       }
     }
+  },
+  markSignedOut() {
+    try { safeStorage('local')?.setItem(SIGNED_OUT_KEY, '1'); safeStorage('session')?.setItem(SIGNED_OUT_KEY, '1'); } catch { /* storage unavailable */ }
+  },
+  isSignedOut() {
+    try { return safeStorage('local')?.getItem(SIGNED_OUT_KEY) === '1' || safeStorage('session')?.getItem(SIGNED_OUT_KEY) === '1'; }
+    catch { return false; }
   },
 };

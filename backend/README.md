@@ -1,75 +1,49 @@
-# BE: C#/.NET Web API
+# QTKD Identity backend — TASK-022/023
 
-Khung thư mục theo TASK-049 (Api / Application / Domain / Infrastructure). Chưa có solution, project file hay source. Phiên bản .NET chưa chốt. Bản đồ module chung xem tại [docs/architecture/STRUCTURE.md](../docs/architecture/STRUCTURE.md).
+.NET 10, Api/Application/Domain/Infrastructure. Identity Core custom store trên schema qtkd hiện có, EF Core/Npgsql chỉ truy cập dữ liệu; Prisma quản lý migration.
+Đọc docs/specs/identity/TASK-022-023-PLAN.md và ADR 0001–0003 trước khi sửa hợp đồng auth.
 
-## Cây thư mục
+## Hiện trạng
 
-```text
-BE/
-  src/
-    QTKD.Api/                      Tầng trình bày HTTP
-      Controllers/<Module>/        Mỗi module một thư mục controller
-      Authorization/               Policy theo vai trò/quyền, kiểm tra phạm vi hồ sơ
-      Middlewares/                 Xử lý lỗi tập trung, correlation id
-      Filters/                     Idempotency-Key (submit), validate model
-      Extensions/                  Đăng ký DI, Swagger, JWT
-    QTKD.Application/              Use case, không phụ thuộc EF/HTTP
-      Common/
-        Interfaces/                Abstraction cho DbContext, current user, clock, file storage
-        Models/                    Phân trang, kết quả, lỗi nghiệp vụ dùng chung
-        Exceptions/                Lỗi nghiệp vụ, không tìm thấy, xung đột phiên bản
-      Features/<Module>/           Dtos / Services / Validators cho mỗi module
-    QTKD.Domain/                   Entity, enum, quy tắc bất biến của từng module
-      Common/                      Entity cơ sở, trường audit, concurrency token
-      <Module>/
-    QTKD.Infrastructure/           Cài đặt kỹ thuật
-      Persistence/
-        Configurations/<Module>/   Cấu hình EF Core theo entity
-        Interceptors/              Audit SaveChanges interceptor (TASK-024)
-        Migrations/                EF Core migration (xem DB/README.md)
-        Seed/                      Seed danh mục, tài khoản mẫu 6 phòng ban
-      Identity/                    Phát JWT, hash mật khẩu
-      Storage/                     Lưu tệp đính kèm hợp đồng
-      Messaging/                   Sprint 2: Outbox thông báo
-      BackgroundJobs/              Sprint 2: job theo ngày (CTR-05, nhắc hạn)
-      ExternalServices/            Sprint 3: tích hợp dịch vụ bên ngoài, retry/callback
-  tests/
-    QTKD.UnitTests/<Module>/       Unit test rule theo module
-    QTKD.IntegrationTests/
-      Api/                         Test endpoint, 401/403, idempotency
-      Persistence/                 Test ràng buộc DB, đồng thời
+Có source login/JWT/session/refresh/logout/change-password, quản lý users/departments/role grants, policy và integration tests.
+Theo bàn giao, project API và dependency đã build; người dùng đã đăng nhập thật. Chưa có suite integration BE/PostgreSQL PASS đầy đủ; bcrypt interop gần nhất bị abort vì testhost không kết nối sau 90 giây. Không coi các task nghiệp vụ khác đã hoàn tất.
+Tài liệu API: ../docs/specs/identity/list_api-auth.md. Bằng chứng kiểm tra: ../docs/testing/test-cases/identity.md.
+
+## Chuẩn bị và chạy
+
+1. Cài .NET SDK 10.0.403 (global.json cho phép bản vá mới trong feature band), Node/npm phù hợp DB/frontend.
+2. Nhận backend/.env và DB/.env qua kênh bảo mật của nhóm. Từ backend/, chạy `dotnet restore QTKD.slnx`, rồi `dotnet build src/QTKD.Api/QTKD.Api.csproj --no-restore`; global.json áp dụng theo thư mục chạy lệnh.
+3. Với DB chung đã chuẩn bị, chỉ kiểm tra connection/migrate:status từ DB/. Chỉ phụ trách DB mới cần deploy/seed theo DB/README.md; không dùng EF migration, EnsureCreated hoặc reset DB ứng dụng.
+4. Khi dùng override: ConnectionStrings:Identity là Npgsql key=value connection string, `SSL Mode=VerifyFull`, PostgreSQL direct/session port 5432; Jwt:SigningKey ngẫu nhiên ít nhất 32 byte. Không dùng service key hoặc API URL thay connection string.
+5. dotnet run --project backend/src/QTKD.Api --launch-profile https. API mặc định https://localhost:7156.
+
+Để dùng file .env local đã chuẩn bị, xem [hướng dẫn fullstack](../docs/setup/LOCAL-FULLSTACK.md). Chạy từ gốc repo `./backend/Start-Api.ps1 -ValidateOnly`, rồi `./backend/Start-Api.ps1`. Launcher đọc backend/.env, giữ ConnectionStrings__Identity trống để tự chuyển URI từ DB/.env; không in secret. Plain dotnet run ở bước 5 chỉ phù hợp khi đã export biến môi trường hoặc dùng user secrets, không tự đọc backend/.env.
+
+Launcher hiện chuyển sslmode nhưng chưa chuyển sslrootcert. Khi dùng CA tại DB/.env.supabase-ca.crt, chạy trong terminal BE từ gốc repo:
+
+```powershell
+$env:PGSSLROOTCERT = (Resolve-Path -LiteralPath './DB/.env.supabase-ca.crt').Path
+./backend/Start-Api.ps1
 ```
 
-## Module Sprint 1 và vị trí làm việc
+CA PostgreSQL này khác HTTPS development certificate. Chạy `dotnet dev-certs https --trust` một lần để tin cậy HTTPS local. ValidateOnly không kiểm tra kết nối DB hoặc đọc CA.
 
-| Module | Thư mục chính | Task |
-| --- | --- | --- |
-| Identity | `Controllers/Identity`, `Features/Identity/{Auth,Users,Departments,Roles,Permissions}`, `Domain/Identity`, `Infrastructure/Identity` | TASK-022, 023 |
-| Audit | `Features/Audit`, `Domain/Audit`, `Persistence/Interceptors` | TASK-024 |
-| Catalogs | `Features/Catalogs/{Services,ServiceGroups,Units,TaxRates}`, `Domain/Catalogs` | TASK-033 |
-| Customers | `Controllers/Customers`, `Features/Customers`, `Domain/Customers` | TASK-013..015, 018, 020 |
-| Areas | `Controllers/Areas`, `Features/Areas`, `Domain/Areas` | TASK-040..042, 045 |
-| Contracts | `Controllers/Contracts`, `Features/Contracts`, `Domain/Contracts`, `Infrastructure/Storage` | TASK-026, 060..062, 065, 067 |
+Có thể đặt secret bằng environment Jwt__SigningKey và ConnectionStrings__Identity hoặc dotnet user-secrets của project. Không commit giá trị vào appsettings, README, log hoặc .env.example. Thiếu cấu hình, ứng dụng fail startup.
+Các giá trị timeout/Cors:Origins ở appsettings.json là cấu hình không nhạy cảm. Cấu hình AllowedHosts và origins đúng khi đổi host.
+Liveness /health/live chỉ chứng minh tiến trình chạy, không chứng minh kết nối DB.
 
-## Gợi ý đặt tên file khi triển khai
+FE dùng Vite proxy /api tới backend; bật VITE_AUTH_MODE=api. Cookie Secure đòi trình duyệt hỗ trợ ngữ cảnh localhost an toàn hoặc frontend HTTPS. Không tắt Secure để chạy production.
 
-Ví dụ cho module Customers; module khác làm tương tự.
+## Kiểm thử
 
-```text
-Controllers/Customers/CustomersController
-Features/Customers/Dtos/        CreateCustomerRequest, UpdateCustomerRequest, CustomerSearchQuery,
-                                CustomerListItem, CustomerDetail, ChangeCustomerStatusRequest
-Features/Customers/Services/    ICustomerService, CustomerService
-Features/Customers/Validators/  CreateCustomerValidator, UpdateCustomerValidator
-Domain/Customers/               Customer, CustomerStatus
-Persistence/Configurations/Customers/CustomerConfiguration
-tests/QTKD.UnitTests/Customers/ CustomerRulesTests
-```
+Từ backend/: `dotnet test QTKD.slnx`. Mặc định SQLite in-memory với Identity/JWT middleware thật; không thay bằng auth handler luôn thành công. Test parser launcher độc lập từ gốc repo: `./backend/tests/LocalEnvironment.Tests.ps1`.
+Chạy npm ci trong DB trước kiểm tra bcrypt hai chiều. Bộ test PostgreSQL dùng project test Supabase riêng và cần hai biến môi trường được mô tả trong tài liệu kiểm thử. Không tự dùng DB ứng dụng làm DB test.
 
-Nếu nhóm chọn MediatR/CQRS, thay `Services/` bằng `Commands/` và `Queries/` cho mọi module cùng lúc, ghi lại trong `docs/decisions/`.
+## Ranh giới
 
-## Quy ước
-
-- Kiểm tra quyền, phạm vi hồ sơ và assignee ở BE. Ẩn nút ở FE không thay thế kiểm tra này.
-- Module không truy cập trực tiếp entity của module khác để ghi dữ liệu; dùng service/interface công khai (ví dụ lookup khách hàng Active, khu vực Active cho hợp đồng).
-- Không đưa connection string, JWT secret, Supabase key vào Git. Dùng file local đã có trong `.gitignore`.
+- Application chỉ tham chiếu Domain; Api composition root đăng ký Infrastructure qua DI.
+- UserManager xử lý user/password/email qua custom store. Vai trò/quyền qua IIdentityService; không dùng RoleManager mặc định.
+- Runtime grants ở DB; FE permission constants phục vụ prototype/hiển thị.
+- ResourceAccess handler không thay việc module sở hữu kiểm tra scope, trạng thái và assignee trong transaction.
+- Logging vận hành có correlation/actor; audit interceptor append-only thuộc TASK-024, chưa triển khai ở đây.
+- Chưa có các controller nghiệp vụ khác, UI quản trị hoàn chỉnh, OTP/email, deployment hoặc CI.

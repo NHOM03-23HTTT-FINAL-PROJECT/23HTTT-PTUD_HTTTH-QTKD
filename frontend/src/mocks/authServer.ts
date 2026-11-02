@@ -78,11 +78,8 @@ export function mockLogin({ identifier, password }: LoginRequest): LoginSuccess 
     throw new LoginError('DISABLED');
   }
 
-  // E5: đúng mật khẩu nhưng chưa được gán vai trò – không tạo phiên.
-  if (account.roles.length === 0) {
-    mockStore.audit({ action: 'LOGIN_REJECTED', username: account.username, detail: 'Tài khoản chưa được phân quyền' });
-    throw new LoginError('NO_ROLE');
-  }
+  // Role is mandatory; broken configuration is a system error, not a normal login branch.
+  if (account.roles.length !== 1) throw new LoginError('SYSTEM_ERROR');
 
   // E6: lỗi truy cập dữ liệu / thiết lập phiên – không phát hành phiên.
   if (account.simulateSystemError) {
@@ -106,7 +103,7 @@ export function mockLogin({ identifier, password }: LoginRequest): LoginSuccess 
 export function mockCheckSession(userId: string, signedInAt: string): SessionCheck {
   const account = SEED_ACCOUNTS.find((a) => a.id === userId);
   if (!account || account.status !== 'active') return { status: 'disabled' };
-  if (account.roles.length === 0) return { status: 'no-role' };
+  if (account.roles.length !== 1) throw new LoginError('SYSTEM_ERROR');
   const revokedBefore = mockStore.getRevokedBefore(userId);
   if (revokedBefore && Date.parse(signedInAt) < revokedBefore) {
     // Bị thu hồi do tạm khóa (04.7) hay do mật khẩu được đổi/đặt lại (03.5).

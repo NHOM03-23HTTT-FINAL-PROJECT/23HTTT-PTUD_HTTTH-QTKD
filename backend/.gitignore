@@ -1,0 +1,6 @@
+**/bin/
+**/obj/
+**/TestResults/
+.local/
+appsettings.Local.json
+**/packages.lock.json.tmp

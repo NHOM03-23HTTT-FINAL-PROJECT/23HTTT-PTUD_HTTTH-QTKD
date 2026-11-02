@@ -1,97 +1,75 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
-import { authApi } from '@/features/auth/api/authApi';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { authApi, IS_MOCK_AUTH } from '@/features/auth/api/authApi';
 import type { AuthUser, LoginRequest, LoginSuccess } from '@/features/auth/types/auth';
 import { DEPARTMENTS, mergePermissions, ROLES, type Department, type Permission, type Role } from '@/constants/roles';
-import { SESSION_IDLE_MS } from '@/config/session';
+import { clearApiAuth } from '@/lib/http/client';
 import { sessionStore } from '@/lib/auth/session';
-import { signOutNotice } from '@/lib/auth/signOutNotice';
+import { signOutNotice, type SignOutReason } from '@/lib/auth/signOutNotice';
 
-export type CurrentUser = AuthUser & {
+export type CurrentUser = Omit<AuthUser, 'permissions'> & {
   primaryRole: Role;
   departmentInfo: Department;
   permissions: Set<Permission>;
   signedInAt: string;
 };
-
 type AuthContextValue = {
   user: CurrentUser | null;
+  loading: boolean;
   login: (request: LoginRequest & { remember: boolean }) => Promise<LoginSuccess>;
   logout: () => void;
-  /** Nhận token mới cho phiên hiện tại sau khi đổi mật khẩu (04.5) và gỡ cờ mật khẩu tạm (04.6). */
   refreshSession: (signedInAt: string) => void;
+  syncUser: (user: AuthUser) => void;
   can: (permission: Permission) => boolean;
 };
-
 const AuthContext = createContext<AuthContextValue | null>(null);
-
 function buildCurrentUser(user: AuthUser, signedInAt: string): CurrentUser {
   const primaryRole = ROLES[user.roles[0]];
-  return {
-    ...user,
-    primaryRole,
-    departmentInfo: DEPARTMENTS[primaryRole.department],
-    permissions: mergePermissions(user.roles),
-    signedInAt,
-  };
+  if (user.roles.length !== 1 || !primaryRole || !DEPARTMENTS[user.department] || primaryRole.department !== user.department
+    || (!IS_MOCK_AUTH && !Array.isArray(user.permissions))) throw new Error('Invalid Identity configuration');
+  return { ...user, primaryRole, departmentInfo: DEPARTMENTS[user.department],
+    permissions: IS_MOCK_AUTH ? mergePermissions(user.roles) : new Set(user.permissions), signedInAt };
 }
-
-/**
- * Khôi phục phiên khi tải trang. Phiên quá thời gian không thao tác (03.4) hoặc đã bị thu hồi (03.5) thì xóa
- * và để lại ghi chú lý do cho màn đăng nhập; guard sẽ đưa người dùng về đăng nhập kèm trang đang làm.
- */
-function restoreSession(): CurrentUser | null {
-  const stored = sessionStore.load();
-  if (!stored) return null;
-  const check = authApi.checkSession(stored.userId, stored.signedInAt);
-  const expired = Date.now() - stored.lastActiveAt > SESSION_IDLE_MS;
-
-  if (check.status !== 'active' || expired) {
-    sessionStore.clear();
-    if (check.status === 'active') void authApi.logout(stored.userId, 'expired').catch(() => undefined);
-    signOutNotice.save({
-      reason: check.status === 'active' ? 'expired' : check.status,
-      identifier: check.status === 'active' ? check.user.username : '',
-    });
-    return null;
-  }
-  return buildCurrentUser(check.user, stored.signedInAt);
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<CurrentUser | null>(restoreSession);
-
-  const login = useCallback(async ({ remember, ...request }: LoginRequest & { remember: boolean }) => {
+  const [user, setUser] = useState<CurrentUser | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [bootstrapError, setBootstrapError] = useState(false);
+  const [retry, setRetry] = useState(0);
+  useEffect(() => {
+    let active = true;
+    setLoading(true); setBootstrapError(false);
+    void authApi.restore().then(result => {
+      if (active) { setUser(result ? buildCurrentUser(result.user, result.signedInAt) : null); setLoading(false); }
+    }).catch(() => { if (active) { setBootstrapError(true); setLoading(false); } });
+    return () => { active = false; };
+  }, [retry]);
+  useEffect(() => {
+    function onEnded(event: Event) {
+      const code = (event as CustomEvent<string>).detail;
+      const reason: SignOutReason = ['password-changed', 'locked', 'disabled', 'permissions-changed'].includes(code) ? code as SignOutReason : 'expired';
+      signOutNotice.save({ reason, identifier: user?.username ?? '' });
+      sessionStore.clear(); setUser(null);
+    }
+    window.addEventListener('qtkd:session-ended', onEnded);
+    return () => window.removeEventListener('qtkd:session-ended', onEnded);
+  }, [user?.username]);
+  const login = useCallback(async (request: LoginRequest & { remember: boolean }) => {
     const result = await authApi.login(request);
-    sessionStore.save({ userId: result.user.id, signedInAt: result.signedInAt, lastActiveAt: Date.now() }, remember);
-    signOutNotice.clear();
-    setUser(buildCurrentUser(result.user, result.signedInAt));
-    return result;
+    const resolved = buildCurrentUser(result.user, result.signedInAt);
+    sessionStore.save({ userId: result.user.id, signedInAt: result.signedInAt, lastActiveAt: Date.now() }, request.remember);
+    signOutNotice.clear(); setUser(resolved); return result;
   }, []);
-
-  const logout = useCallback(() => {
-    sessionStore.clear();
-    setUser(null);
-  }, []);
-
+  const logout = useCallback(() => { clearApiAuth(); sessionStore.clear(); setUser(null); }, []);
+  const syncUser = useCallback((next: AuthUser) => setUser(current => current ? buildCurrentUser(next, current.signedInAt) : current), []);
   const refreshSession = useCallback((signedInAt: string) => {
     sessionStore.update({ signedInAt, lastActiveAt: Date.now() });
-    setUser((current) => (current ? { ...current, signedInAt, mustChangePassword: false } : current));
+    if (IS_MOCK_AUTH) { setUser(current => current ? { ...current, signedInAt, mustChangePassword: false } : null); return; }
+    void authApi.checkSession('', signedInAt).then(check => { if (check.status === 'active') setUser(buildCurrentUser(check.user, signedInAt)); }).catch(() => undefined);
   }, []);
-
-  const value = useMemo<AuthContextValue>(
-    () => ({
-      user,
-      login,
-      logout,
-      refreshSession,
-      can: (permission) => Boolean(user?.permissions.has(permission)),
-    }),
-    [user, login, logout, refreshSession],
-  );
-
+  const value = useMemo<AuthContextValue>(() => ({ user, loading, login, logout, refreshSession, syncUser, can: permission => Boolean(user?.permissions.has(permission)) }),
+    [user, loading, login, logout, refreshSession, syncUser]);
+  if (bootstrapError) return <main role="alert"><p>Chưa kết nối được dịch vụ xác thực. Vui lòng kiểm tra kết nối và thử lại.</p><button onClick={() => setRetry(value => value + 1)}>Thử lại</button></main>;
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
-
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) throw new Error('useAuth phải dùng bên trong AuthProvider');

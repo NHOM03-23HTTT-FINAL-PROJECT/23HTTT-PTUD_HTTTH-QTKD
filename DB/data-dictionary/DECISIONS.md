@@ -16,7 +16,7 @@ Nguồn là `data-dictionary.md` và `spec nghiệp vụ + hệ thống (8).docx
 ## Comment và khác biệt giữa các nguồn
 
 - Loại cột bị gạch bỏ: CONTRACT.department_id, CONTRACT_ITEM.scope, CHANGE_REQUEST.detail và hai cột replacement_*. Thêm CONTRACT.updated_at theo comment đã thống nhất. Không tự triển khai các đề nghị trong comment còn mở.
-- Giữ một role mỗi tài khoản theo dictionary. Spec đăng nhập có đoạn nhiều role; nếu nhóm chọn nhiều role thì cần bảng liên kết và migration mới.
+- Giữ một role bắt buộc mỗi tài khoản theo dictionary, đã được người dùng chốt Phase 0 TASK-022/023 ngày 02/11/2026. Không triển khai nhiều role; thiếu grants khác với thiếu role. Các bổ sung Identity theo ADR 0001–0003 và migration 0003, không sửa dữ liệu dictionary nguồn.
 - Giữ coordinates dạng text; chưa tách lat/long hay thêm PostGIS.
 - ATTACHMENT/CHANGE_REQUEST/APPROVAL_ROUND/SIGNING_SESSION dùng record_type Contract hoặc PaymentStatement, với CHECK đúng một FK tương ứng. Phụ lục nằm trong CONTRACT, phân biệt bằng document_type.
 - Giữ assignee_id NOT NULL và bất biến sau khi tạo bước theo dictionary. Spec có tình huống chờ phân công; muốn hỗ trợ phải thiết kế trạng thái và nullability bổ sung.

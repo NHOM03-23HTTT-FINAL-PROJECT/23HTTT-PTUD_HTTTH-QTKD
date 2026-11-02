@@ -14,11 +14,12 @@ function withRedirect(path: string, target: string) {
  * Đăng nhập bằng mật khẩu tạm → chỉ được vào màn đổi mật khẩu bắt buộc (01 A2 / 04 A1).
  */
 export function RequireAuth() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const location = useLocation();
   const target = location.pathname + location.search;
   const onForcedPage = location.pathname === ROUTES.forcedPasswordChange;
 
+  if (loading) return <p role="status">Đang kiểm tra phiên…</p>;
   if (!user) return <Navigate to={withRedirect(ROUTES.login, target)} replace />;
   if (user.mustChangePassword && !onForcedPage) {
     return <Navigate to={withRedirect(ROUTES.forcedPasswordChange, target)} replace />;
@@ -29,9 +30,10 @@ export function RequireAuth() {
 
 /** Đã đăng nhập thì không ở lại trang đăng nhập/quên mật khẩu. */
 export function PublicOnly() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const [searchParams] = useSearchParams();
 
+  if (loading) return <p role="status">Đang kiểm tra phiên…</p>;
   if (user) {
     return <Navigate to={safeRedirect(searchParams.get(REDIRECT_PARAM)) ?? ROUTES.dashboard} replace />;
   }

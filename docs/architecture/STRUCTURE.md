@@ -1,12 +1,16 @@
 # Cấu trúc thư mục và bản đồ module
 
-Tài liệu này mô tả bộ khung thư mục cho toàn dự án QTKD. Bộ khung chỉ gồm thư mục, `.gitkeep` và README; chưa có source, project file, dependency hay migration. Tên file dự kiến trong các README là gợi ý để thống nhất cách đặt tên, người chủ trì task quyết định khi triển khai.
+## Cập nhật Identity ngày 02/11/2026
+
+Backend thực tế ở `backend/`. TASK-022/023 đã có source theo bốn tầng, module Identity và test host; trạng thái kiểm chứng ở [plan](../specs/identity/TASK-022-023-PLAN.md). Prisma tiếp tục quản lý migration trong DB/, EF Core chỉ map dữ liệu. Cấu trúc các module khác bên dưới là kế hoạch khởi tạo, không phải các tính năng đã triển khai.
+
+Tài liệu này mô tả source hiện có và bản đồ module dự kiến cho toàn dự án QTKD. Identity có code chạy; các module còn giữ .gitkeep hoặc chỉ có FE mock chưa phải backend đã triển khai. Tên file dự kiến cho module mới là gợi ý để thống nhất, người chủ trì task quyết định khi triển khai.
 
 ## Nguyên tắc tổ chức
 
 - **Chia theo module nghiệp vụ.** Cùng một tên module xuất hiện ở FE, BE (4 tầng), test và docs. Thêm module mới ở Sprint 2/3 bằng cách nhân bản cấu trúc của một module Sprint 1 có sẵn, không sửa module khác.
 - **BE theo 4 tầng** Api / Application / Domain / Infrastructure (TASK-049). Phụ thuộc một chiều: Api → Application → Domain; Infrastructure cài đặt interface của Application.
-- **Workflow phê duyệt là module dùng chung** (`Approvals`), không nằm trong `Contracts`. Hồ sơ nào cần duyệt (hợp đồng, phụ lục, bảng giá, bảng thanh toán, đề nghị mở khóa kỳ…) chỉ cần cài đặt hợp đồng chung `IApprovableDocument` (TASK-056) và khai báo loại hồ sơ trong cấu hình quy trình.
+- **Workflow phê duyệt định hướng là module dùng chung** (`Approvals`), không nằm trong `Contracts`. Hợp đồng chung `IApprovableDocument` (TASK-056) và khai báo loại hồ sơ thuộc phần triển khai workflow tiếp theo, chưa được hiện thực bởi TASK-022/023.
 - **Module Sprint 2/3 đã có thư mục rỗng** để giữ chỗ và cho thấy ranh giới; không triển khai trước khi được giao.
 
 ## Bản đồ module
@@ -32,28 +36,24 @@ Các US tra cứu chéo ở Sprint 3 (CUS-08..10, ARE-14, 15, PRC-17) đặt tro
 
 Phụ lục hợp đồng (CTR-09..15) dùng chung vòng đời với hợp đồng nên đặt trong `Contracts` khi đến Sprint 2. US-CTR-16 ở Sprint 1 chỉ làm phần hợp đồng.
 
-## Cây tổng thể
+## Thư mục đang dùng
 
-```text
-23HTTT-PTUD_HTTTH--QTKD/
-  AGENTS.md, README.md, .gitignore
-  .agents/skills/qtkd-sprint1/     Skill cho agent
-  context/                         Context dự án, Sprint 1, business rules
-  docs/
-    sources/                       PDF đề bài, workbook kế hoạch (giữ nguyên)
-    architecture/                  Tài liệu này, sơ đồ kiến trúc
-    decisions/                     Quyết định kỹ thuật cần chốt (ADR)
-    specs/<module>/                Đặc tả UC theo module
-    diagrams/use-case|class|sequence/
-    ui/                            Liên kết Figma, ảnh chụp màn hình
-    testing/test-plan|test-cases|postman|demo/
-  BE/                              .NET Web API (xem BE/README.md)
-    src/QTKD.Api | QTKD.Application | QTKD.Domain | QTKD.Infrastructure
-    tests/QTKD.UnitTests | QTKD.IntegrationTests
-  frontend/                        React + TypeScript + Vite (xem frontend/README.md)
-    public/, src/{app,layouts,components,lib,features,...}, tests/
-  DB/                              ERD, seed, script, từ điển dữ liệu (xem DB/README.md)
-```
+| Đường dẫn | Vai trò |
+| --- | --- |
+| frontend/src/features/ | Feature FE, gồm auth API và các màn nghiệp vụ prototype |
+| frontend/src/lib/http/client.ts | Transport fetch, access token trong bộ nhớ, refresh/logout coordination |
+| frontend/src/app/router/BusinessRoute.tsx | Ngăn mount màn nghiệp vụ mock với danh tính API |
+| backend/src/QTKD.Api/ | Composition root, JWT middleware, policies và Minimal API endpoints trong Program.cs |
+| backend/src/QTKD.Application/Features/Identity/ | Interface dịch vụ, DTO, role mapping và lỗi ứng dụng |
+| backend/src/QTKD.Domain/Identity/ | Entity/enum Identity không phụ thuộc HTTP/EF |
+| backend/src/QTKD.Infrastructure/ | IdentityService, custom store/hasher, TokenIssuer và DbContext |
+| backend/tests/QTKD.IntegrationTests/ | WebApplicationFactory; SQLite mặc định, PostgreSQL riêng khi cấu hình rõ |
+| backend/scripts/ và Start-Api.ps1 | Launcher local và chuyển đổi cấu hình .env/URI |
+| DB/prisma/ | Schema, migration và seed; nguồn DDL duy nhất |
+| docs/decisions/, specs/identity/, setup/, testing/ | Quyết định, hợp đồng API, hướng dẫn team và bằng chứng kiểm thử |
+| context/ và AGENTS.md | Phạm vi, nghiệp vụ và hướng dẫn agent |
+
+Code Identity hiện dùng Minimal APIs và service interface; chưa áp đặt Controllers/MediatR cho module sau. Không tạo một backend độc lập trong BE/ để tích hợp. [README gốc](../../README.md) là điểm bắt đầu cho setup; [changelog](../specs/identity/CHANGELOG.md) ghi các ràng buộc tích hợp.
 
 ## Thêm một module mới
 

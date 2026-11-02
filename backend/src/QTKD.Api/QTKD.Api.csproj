@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup><UserSecretsId>qtkd-identity-local</UserSecretsId></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../QTKD.Infrastructure/QTKD.Infrastructure.csproj" /></ItemGroup>
+</Project>

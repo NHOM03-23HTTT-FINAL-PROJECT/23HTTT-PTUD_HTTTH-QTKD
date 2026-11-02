@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { Prisma } from "../generated/prisma/client.js";
+import { Prisma } from "../generated/prisma/client.ts";
 import type { SeedData } from "../prisma/seed-data.js";
 import { readSchema } from "./schema-info.js";
 
@@ -7,7 +7,7 @@ export function validateSeedData(data: SeedData) {
   const records = data as unknown as Record<string, Record<string, unknown>[]>;
   const models = readSchema();
   const modelByName = new Map(models.map((model) => [model.name, model]));
-  assert.equal(Object.keys(data).length, 26, "The demo must cover all 26 dictionary tables.");
+  assert.equal(Object.keys(data).length, 29, "The demo must cover 26 dictionary tables and 3 Identity tables.");
   for (const model of models) {
     const rows = records[model.delegate];
     assert(rows?.length, `Missing fixtures: ${model.name}`);
@@ -33,6 +33,11 @@ export function validateSeedData(data: SeedData) {
   for (const field of ["username", "companyEmail"] as const) {
     const keys = data.userAccount.map((row) => row[field].trim().toLowerCase());
     assert.equal(new Set(keys).size, keys.length, `Case-insensitive duplicate ${field}`);
+  }
+  for (const user of data.userAccount) {
+    const role = data.roleDefinition.find(role => role.code === user.role);
+    const department = data.department.find(department => department.departmentId === user.departmentId);
+    assert(role && department && role.departmentCode === department.code, "Invalid identity role/department assignment");
   }
   const areaCodes = data.area.map((row) => row.areaCode.trim().toLowerCase());
   assert.equal(new Set(areaCodes).size, areaCodes.length, "Case-insensitive duplicate area code");

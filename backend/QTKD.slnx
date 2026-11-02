@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/QTKD.Domain/QTKD.Domain.csproj" />
+    <Project Path="src/QTKD.Application/QTKD.Application.csproj" />
+    <Project Path="src/QTKD.Infrastructure/QTKD.Infrastructure.csproj" />
+    <Project Path="src/QTKD.Api/QTKD.Api.csproj" />
+  </Folder>
+  <Folder Name="/tests/"><Project Path="tests/QTKD.IntegrationTests/QTKD.IntegrationTests.csproj" /></Folder>
+</Solution>

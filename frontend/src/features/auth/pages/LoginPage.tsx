@@ -16,6 +16,7 @@ import { LoginError, type LoginErrorCode, type LoginSuccess } from '../types/aut
 import { RememberCheckbox } from '../components/RememberCheckbox';
 import type { PasswordResetState } from './ForgotPasswordPage';
 import './LoginPage.css';
+import { IS_MOCK_AUTH } from '../api/authApi';
 
 type FieldErrors = { identifier?: string; password?: string };
 
@@ -180,9 +181,9 @@ export function LoginPage() {
 
         <div className="login-options">
           <RememberCheckbox checked={remember} onChange={setRemember} disabled={fieldsDisabled} />
-          <Link to={ROUTES.forgotPassword} state={{ identifier: identifier.trim() }} className="login-options__forgot">
+          {IS_MOCK_AUTH ? <Link to={ROUTES.forgotPassword} state={{ identifier: identifier.trim() }} className="login-options__forgot">
             Quên mật khẩu?
-          </Link>
+          </Link> : <span className="login-options__forgot">Quên mật khẩu? Liên hệ Quản trị hệ thống.</span>}
         </div>
 
         {isLocked && lockedUntil && (
@@ -216,7 +217,8 @@ function FailureAlert({ failure }: { failure: Failure }) {
     case 'INVALID_CREDENTIALS':
       return (
         <Alert tone="danger" title="Tên đăng nhập hoặc mật khẩu không chính xác">
-          Bạn còn {failure.remainingAttempts} lần thử. Sau 5 lần sai liên tiếp, tài khoản sẽ bị tạm khóa 15 phút.
+          {failure.remainingAttempts !== undefined ? `Bạn còn ${failure.remainingAttempts} lần thử. ` : ''}
+          Sau 5 lần sai liên tiếp, tài khoản sẽ bị tạm khóa 15 phút.
         </Alert>
       );
     case 'LOCKED':
@@ -230,12 +232,6 @@ function FailureAlert({ failure }: { failure: Failure }) {
       return (
         <Alert tone="danger" title="Không thể đăng nhập">
           Tài khoản đã bị vô hiệu hóa, vui lòng liên hệ Quản trị hệ thống.
-        </Alert>
-      );
-    case 'NO_ROLE':
-      return (
-        <Alert tone="warning" title="Không thể đăng nhập">
-          Tài khoản chưa được phân quyền, vui lòng liên hệ Quản trị hệ thống.
         </Alert>
       );
     case 'SYSTEM_ERROR':
@@ -282,10 +278,16 @@ function SignOutAlert({ notice, redirect }: { notice: SignOutNotice; redirect: s
           Tài khoản đã bị vô hiệu hóa, vui lòng liên hệ Quản trị hệ thống.
         </Alert>
       );
-    case 'no-role':
+    case 'permissions-changed':
       return (
-        <Alert tone="warning" title="Không thể đăng nhập">
-          Tài khoản chưa được phân quyền, vui lòng liên hệ Quản trị hệ thống.
+        <Alert tone="info" title="Thông tin phân quyền đã thay đổi">
+          Vui lòng đăng nhập lại để sử dụng quyền hiện hành.
+        </Alert>
+      );
+    case 'local-logout':
+      return (
+        <Alert tone="warning" title="Đã xóa phiên trên trình duyệt">
+          Chưa xác nhận được việc thu hồi phiên trên máy chủ do lỗi kết nối. Phiên máy chủ vẫn chịu thời hạn đã cấu hình.
         </Alert>
       );
   }

@@ -1,5 +1,7 @@
 # Danh sách API Sprint 1 (đề xuất)
 
+Cập nhật 02/11/2026: Identity TASK-022/023 đã có source theo [hợp đồng API đã chốt](docs/specs/identity/list_api-auth.md); [plan](docs/specs/identity/TASK-022-023-PLAN.md) ghi trạng thái kiểm chứng. Các module khác bên dưới vẫn là đề xuất từ FE/mock.
+
 Nguồn: lớp API ở FE (`frontend/src/features/*/api/*.ts`) và mock server (`frontend/src/mocks/*Server.ts`). `backend/` chưa có controller nên mỗi hàm FE được ánh xạ sang một endpoint đề xuất.
 
 > Tên endpoint và mã HTTP là đề xuất từ chữ ký hàm, chưa đối chiếu đặc tả UC chi tiết và chưa được nhóm BE chốt.
@@ -16,7 +18,7 @@ Nguồn: lớp API ở FE (`frontend/src/features/*/api/*.ts`) và mock server (
 ## Quy ước chung
 
 - **Tiền tố:** `/api/v1`.
-- **Xác thực:** `Authorization: Bearer <JWT>` thay cho cặp `userId` + `signedInAt` mà FE đang gửi trong mọi request. BE tự kiểm tra phiên; phiên hết hạn hoặc bị thu hồi trả 401 kèm lý do (`password-changed`, `locked`, `disabled`, `no-role`).
+- **Xác thực:** `Authorization: Bearer <JWT>` thay cho cặp `userId` + `signedInAt` mà mock FE đang dùng. BE tự kiểm tra phiên; phiên hết hạn hoặc bị thu hồi trả 401 kèm lý do (`expired`, `password-changed`, `locked`, `disabled`, `permissions-changed`). Role lỗi do data/config trong login trả SYSTEM_ERROR và không tạo phiên; role hợp lệ thiếu quyền thao tác trả 403.
 - **Chống tạo trùng:** thao tác có `idempotencyKey` gửi qua header `Idempotency-Key`; kết quả trả về `replayed`.
 - **Ghi đè đồng thời:** `baseVersion` / `viewedVersion` đi trong body; lệch phiên bản trả 409.
 - **Mã lỗi → HTTP:**

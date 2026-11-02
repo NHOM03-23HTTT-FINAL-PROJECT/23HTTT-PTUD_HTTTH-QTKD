@@ -3,6 +3,9 @@
 generator client {
   provider = "prisma-client"
   output   = "../generated/prisma"
+  moduleFormat           = "esm"
+  generatedFileExtension = "ts"
+  importFileExtension    = "ts"
 }
 
 datasource db {
@@ -218,6 +221,7 @@ enum SigningStatus {
 model Department {
   departmentId   String  @id @default(dbgenerated("gen_random_uuid()")) @map("department_id") @db.Uuid
   departmentName String  @map("department_name") @db.VarChar(200)
+  code           String  @unique @map("code") @db.VarChar(16)
   managerId      String? @map("manager_id") @db.Uuid
 
   managerRef                UserAccount?  @relation("Department_managerId", fields: [managerId], references: [userId], onDelete: Restrict, onUpdate: Restrict)
@@ -241,6 +245,8 @@ model UserAccount {
   lockedUntil        DateTime?  @map("locked_until") @db.Timestamptz(6)
   mustChangePassword Boolean    @default(true) @map("must_change_password")
   canSign            Boolean    @default(false) @map("can_sign")
+  passwordChangedAt  DateTime?  @map("password_changed_at") @db.Timestamptz(6)
+  roleRef            RoleDefinition @relation(fields: [role], references: [code], onDelete: Restrict, onUpdate: Restrict)
 
   departmentByManagerId               Department[]             @relation("Department_managerId")
   departmentRef                       Department               @relation("UserAccount_departmentId", fields: [departmentId], references: [departmentId], onDelete: Restrict, onUpdate: Restrict)
@@ -275,7 +281,11 @@ model LoginSession {
   sessionId        String            @id @default(dbgenerated("gen_random_uuid()")) @map("session_id") @db.Uuid
   userId           String            @map("user_id") @db.Uuid
   refreshTokenHash String            @unique @map("refresh_token_hash") @db.VarChar(256)
+  logoutTokenHash  String            @unique @map("logout_token_hash") @db.VarChar(256)
   createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastActivityAt   DateTime          @default(now()) @map("last_activity_at") @db.Timestamptz(6)
+  remember         Boolean           @default(false) @map("remember")
+  revocationReason String?           @map("revocation_reason") @db.VarChar(50)
   expiresAt        DateTime          @map("expires_at") @db.Timestamptz(6)
   isRevoked        Boolean           @default(false) @map("is_revoked")
   endReason        SessionEndReason? @map("end_reason")
@@ -287,6 +297,34 @@ model LoginSession {
   @@index([userId])
   @@index([userId, isRevoked, expiresAt])
   @@map("login_session")
+  @@schema("qtkd")
+}
+
+model RoleDefinition {
+  code           UserRole @id @map("code")
+  name           String @map("name") @db.VarChar(100)
+  departmentCode String @map("department_code") @db.VarChar(16)
+  users          UserAccount[]
+  permissions    RolePermission[]
+  @@map("role_definition")
+  @@schema("qtkd")
+}
+
+model Permission {
+  code  String @id @map("code") @db.VarChar(100)
+  name  String @map("name") @db.VarChar(200)
+  roles RolePermission[]
+  @@map("permission")
+  @@schema("qtkd")
+}
+
+model RolePermission {
+  role           UserRole @map("role")
+  permissionCode String @map("permission_code") @db.VarChar(100)
+  roleRef RoleDefinition @relation(fields: [role], references: [code], onDelete: Restrict, onUpdate: Restrict)
+  permissionRef Permission @relation(fields: [permissionCode], references: [code], onDelete: Restrict, onUpdate: Restrict)
+  @@id([role, permissionCode])
+  @@map("role_permission")
   @@schema("qtkd")
 }
 

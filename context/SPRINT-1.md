@@ -1,5 +1,9 @@
 # Sprint 1
 
+## Cập nhật TASK-022/023
+
+Ngày 02/11/2026 người dùng chốt Phase 0 và giao thực hiện các phase theo [kế hoạch Identity](../docs/specs/identity/TASK-022-023-PLAN.md). Quyết định, thay đổi và bằng chứng kiểm thử được ghi ở docs/decisions, docs/specs/identity và docs/testing/test-cases/identity.md.
+
 ## Mục tiêu và phạm vi
 
 Theo `Tổng quan!A7:I7` của [kế hoạch](../docs/sources/SprintPlan_QTKD.xlsx): Sprint 1 chạy từ **25/10/2026 đến 07/11/2026**, demo MVP1 ngày **07/11**. Kế hoạch ghi 27 US, 67 task, 250 giờ. Có 32 PB trong Sprint 1, gồm cả các PB nền tảng không tương ứng từng US.
