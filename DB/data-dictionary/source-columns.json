@@ -1,0 +1,593 @@
+{
+  "source": "data-dictionary.md supplied 2026-11-02",
+  "tables": {
+    "department": [
+      "department_id",
+      "department_name",
+      "manager_id"
+    ],
+    "user_account": [
+      "user_id",
+      "username",
+      "company_email",
+      "password_hash",
+      "full_name",
+      "department_id",
+      "role",
+      "status",
+      "failed_login_count",
+      "locked_until",
+      "must_change_password",
+      "can_sign"
+    ],
+    "login_session": [
+      "session_id",
+      "user_id",
+      "refresh_token_hash",
+      "created_at",
+      "expires_at",
+      "is_revoked",
+      "end_reason",
+      "ip_address",
+      "device"
+    ],
+    "password_otp": [
+      "otp_id",
+      "user_id",
+      "otp_hash",
+      "expires_at",
+      "failed_count",
+      "is_used",
+      "sent_at"
+    ],
+    "notification": [
+      "notification_id",
+      "recipient_id",
+      "record_type",
+      "record_id",
+      "content",
+      "is_read",
+      "send_status",
+      "created_at"
+    ],
+    "audit_log": [
+      "log_id",
+      "entity_type",
+      "entity_id",
+      "action",
+      "actor_id",
+      "acted_at",
+      "status_before",
+      "status_after",
+      "value_before",
+      "value_after",
+      "note",
+      "ip_address"
+    ],
+    "attachment": [
+      "attachment_id",
+      "record_type",
+      "contract_id",
+      "statement_id",
+      "file_name",
+      "file_path",
+      "uploaded_by",
+      "uploaded_at"
+    ],
+    "customer": [
+      "customer_id",
+      "customer_name",
+      "tax_code",
+      "address",
+      "legal_representative",
+      "contact_name",
+      "contact_title",
+      "phone",
+      "email",
+      "customer_group",
+      "interested_services",
+      "status",
+      "account_manager_id",
+      "version"
+    ],
+    "customer_status_decision": [
+      "decision_id",
+      "customer_id",
+      "decision_type",
+      "reason",
+      "basis",
+      "follow_up_plan",
+      "confirmed_by",
+      "decided_at"
+    ],
+    "area": [
+      "area_id",
+      "area_code",
+      "area_name",
+      "area_type",
+      "parent_area_id",
+      "level",
+      "hierarchy_path",
+      "coordinates",
+      "area_m2",
+      "capacity",
+      "technical_description",
+      "status",
+      "row_version"
+    ],
+    "service": [
+      "service_id",
+      "service_name",
+      "unit",
+      "is_mandatory"
+    ],
+    "area_service": [
+      "area_id",
+      "service_id"
+    ],
+    "area_assignment": [
+      "assignment_id",
+      "area_id",
+      "user_id",
+      "from_date",
+      "to_date"
+    ],
+    "contract": [
+      "contract_id",
+      "document_type",
+      "parent_contract_id",
+      "customer_id",
+      "title",
+      "contract_type",
+      "start_date",
+      "end_date",
+      "contract_value",
+      "payment_terms",
+      "content",
+      "status",
+      "owner_id",
+      "version",
+      "created_at"
+    ],
+    "contract_item": [
+      "item_id",
+      "contract_id",
+      "service_id",
+      "area_id",
+      "area_name_snapshot"
+    ],
+    "price_list": [
+      "price_list_id",
+      "contract_id",
+      "version",
+      "effective_from",
+      "effective_to",
+      "status",
+      "created_by"
+    ],
+    "price_list_line": [
+      "line_id",
+      "price_list_id",
+      "service_id",
+      "area_id",
+      "unit_price",
+      "unit"
+    ],
+    "volume_period": [
+      "volume_period_id",
+      "contract_id",
+      "billing_period",
+      "status",
+      "locked_by",
+      "locked_at"
+    ],
+    "volume_line": [
+      "volume_line_id",
+      "volume_period_id",
+      "service_id",
+      "area_id",
+      "quantity"
+    ],
+    "payment_statement": [
+      "statement_id",
+      "contract_id",
+      "billing_period",
+      "price_list_id",
+      "volume_period_id",
+      "customer_name_snapshot",
+      "tax_code_snapshot",
+      "address_snapshot",
+      "representative_snapshot",
+      "subtotal",
+      "tax_amount",
+      "total_amount",
+      "status",
+      "original_statement_id",
+      "created_by",
+      "created_at",
+      "issued_at",
+      "is_locked"
+    ],
+    "payment_statement_line": [
+      "line_id",
+      "statement_id",
+      "price_list_line_id",
+      "volume_line_id",
+      "quantity",
+      "unit_price",
+      "amount",
+      "is_mandatory"
+    ],
+    "reconciliation": [
+      "reconciliation_id",
+      "statement_id",
+      "volume_confirmed_by",
+      "volume_confirmed_at",
+      "discrepancy_note",
+      "sent_to_customer_at",
+      "customer_result",
+      "customer_feedback",
+      "reconciled_by",
+      "completed_at",
+      "price_confirmed_at",
+      "price_mismatch_note"
+    ],
+    "change_request": [
+      "request_id",
+      "request_type",
+      "record_type",
+      "contract_id",
+      "statement_id",
+      "reason",
+      "status",
+      "requested_by",
+      "requested_at",
+      "approved_by",
+      "approver_comment",
+      "decided_at"
+    ],
+    "approval_round": [
+      "round_id",
+      "record_type",
+      "contract_id",
+      "statement_id",
+      "record_version",
+      "round_no",
+      "submitted_by",
+      "submitted_at",
+      "result",
+      "ended_at",
+      "record_snapshot"
+    ],
+    "approval_step": [
+      "step_id",
+      "round_id",
+      "step_name",
+      "step_order",
+      "assignee_id",
+      "assigned_at",
+      "accepted_at",
+      "step_status",
+      "decision",
+      "comment",
+      "legal_conclusion",
+      "decided_by",
+      "decided_at"
+    ],
+    "signing_session": [
+      "signing_session_id",
+      "record_type",
+      "contract_id",
+      "statement_id",
+      "provider_session_id",
+      "status",
+      "reason",
+      "company_signer_id",
+      "company_signed_at",
+      "customer_signer_name",
+      "customer_signer_email",
+      "customer_signed_at",
+      "signed_file_id",
+      "sent_by",
+      "sent_at",
+      "result_at"
+    ]
+  },
+  "foreignKeys": [
+    {
+      "table": "department",
+      "column": "manager_id",
+      "target": "user_account"
+    },
+    {
+      "table": "user_account",
+      "column": "department_id",
+      "target": "department"
+    },
+    {
+      "table": "login_session",
+      "column": "user_id",
+      "target": "user_account"
+    },
+    {
+      "table": "password_otp",
+      "column": "user_id",
+      "target": "user_account"
+    },
+    {
+      "table": "notification",
+      "column": "recipient_id",
+      "target": "user_account"
+    },
+    {
+      "table": "audit_log",
+      "column": "actor_id",
+      "target": "user_account"
+    },
+    {
+      "table": "attachment",
+      "column": "contract_id",
+      "target": "contract"
+    },
+    {
+      "table": "attachment",
+      "column": "statement_id",
+      "target": "payment_statement"
+    },
+    {
+      "table": "attachment",
+      "column": "uploaded_by",
+      "target": "user_account"
+    },
+    {
+      "table": "customer",
+      "column": "account_manager_id",
+      "target": "user_account"
+    },
+    {
+      "table": "customer_status_decision",
+      "column": "customer_id",
+      "target": "customer"
+    },
+    {
+      "table": "customer_status_decision",
+      "column": "confirmed_by",
+      "target": "user_account"
+    },
+    {
+      "table": "area",
+      "column": "parent_area_id",
+      "target": "area"
+    },
+    {
+      "table": "area_service",
+      "column": "area_id",
+      "target": "area"
+    },
+    {
+      "table": "area_service",
+      "column": "service_id",
+      "target": "service"
+    },
+    {
+      "table": "area_assignment",
+      "column": "area_id",
+      "target": "area"
+    },
+    {
+      "table": "area_assignment",
+      "column": "user_id",
+      "target": "user_account"
+    },
+    {
+      "table": "contract",
+      "column": "parent_contract_id",
+      "target": "contract"
+    },
+    {
+      "table": "contract",
+      "column": "customer_id",
+      "target": "customer"
+    },
+    {
+      "table": "contract",
+      "column": "owner_id",
+      "target": "user_account"
+    },
+    {
+      "table": "contract_item",
+      "column": "contract_id",
+      "target": "contract"
+    },
+    {
+      "table": "contract_item",
+      "column": "service_id",
+      "target": "service"
+    },
+    {
+      "table": "contract_item",
+      "column": "area_id",
+      "target": "area"
+    },
+    {
+      "table": "price_list",
+      "column": "contract_id",
+      "target": "contract"
+    },
+    {
+      "table": "price_list",
+      "column": "created_by",
+      "target": "user_account"
+    },
+    {
+      "table": "price_list_line",
+      "column": "price_list_id",
+      "target": "price_list"
+    },
+    {
+      "table": "price_list_line",
+      "column": "service_id",
+      "target": "service"
+    },
+    {
+      "table": "price_list_line",
+      "column": "area_id",
+      "target": "area"
+    },
+    {
+      "table": "volume_period",
+      "column": "contract_id",
+      "target": "contract"
+    },
+    {
+      "table": "volume_period",
+      "column": "locked_by",
+      "target": "user_account"
+    },
+    {
+      "table": "volume_line",
+      "column": "volume_period_id",
+      "target": "volume_period"
+    },
+    {
+      "table": "volume_line",
+      "column": "service_id",
+      "target": "service"
+    },
+    {
+      "table": "volume_line",
+      "column": "area_id",
+      "target": "area"
+    },
+    {
+      "table": "payment_statement",
+      "column": "contract_id",
+      "target": "contract"
+    },
+    {
+      "table": "payment_statement",
+      "column": "price_list_id",
+      "target": "price_list"
+    },
+    {
+      "table": "payment_statement",
+      "column": "volume_period_id",
+      "target": "volume_period"
+    },
+    {
+      "table": "payment_statement",
+      "column": "original_statement_id",
+      "target": "payment_statement"
+    },
+    {
+      "table": "payment_statement",
+      "column": "created_by",
+      "target": "user_account"
+    },
+    {
+      "table": "payment_statement_line",
+      "column": "statement_id",
+      "target": "payment_statement"
+    },
+    {
+      "table": "payment_statement_line",
+      "column": "price_list_line_id",
+      "target": "price_list_line"
+    },
+    {
+      "table": "payment_statement_line",
+      "column": "volume_line_id",
+      "target": "volume_line"
+    },
+    {
+      "table": "reconciliation",
+      "column": "statement_id",
+      "target": "payment_statement"
+    },
+    {
+      "table": "reconciliation",
+      "column": "volume_confirmed_by",
+      "target": "user_account"
+    },
+    {
+      "table": "reconciliation",
+      "column": "reconciled_by",
+      "target": "user_account"
+    },
+    {
+      "table": "change_request",
+      "column": "contract_id",
+      "target": "contract"
+    },
+    {
+      "table": "change_request",
+      "column": "statement_id",
+      "target": "payment_statement"
+    },
+    {
+      "table": "change_request",
+      "column": "requested_by",
+      "target": "user_account"
+    },
+    {
+      "table": "change_request",
+      "column": "approved_by",
+      "target": "user_account"
+    },
+    {
+      "table": "approval_round",
+      "column": "contract_id",
+      "target": "contract"
+    },
+    {
+      "table": "approval_round",
+      "column": "statement_id",
+      "target": "payment_statement"
+    },
+    {
+      "table": "approval_round",
+      "column": "submitted_by",
+      "target": "user_account"
+    },
+    {
+      "table": "approval_step",
+      "column": "round_id",
+      "target": "approval_round"
+    },
+    {
+      "table": "approval_step",
+      "column": "assignee_id",
+      "target": "user_account"
+    },
+    {
+      "table": "approval_step",
+      "column": "decided_by",
+      "target": "user_account"
+    },
+    {
+      "table": "signing_session",
+      "column": "contract_id",
+      "target": "contract"
+    },
+    {
+      "table": "signing_session",
+      "column": "statement_id",
+      "target": "payment_statement"
+    },
+    {
+      "table": "signing_session",
+      "column": "company_signer_id",
+      "target": "user_account"
+    },
+    {
+      "table": "signing_session",
+      "column": "signed_file_id",
+      "target": "attachment"
+    },
+    {
+      "table": "signing_session",
+      "column": "sent_by",
+      "target": "user_account"
+    }
+  ]
+}
