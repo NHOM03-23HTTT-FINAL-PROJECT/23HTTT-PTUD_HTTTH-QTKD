@@ -10,7 +10,7 @@ export type ApiAuthResult = {
   passwordChangedAt?: string;
 };
 export class ApiError extends Error {
-  constructor(readonly status: number, readonly code: string, readonly detail: { remainingAttempts?: number; lockedUntil?: string } = {}) { super(code); }
+  constructor(readonly status: number, readonly code: string, readonly detail: { remainingAttempts?: number; lockedUntil?: string; detail?: unknown } = {}) { super(code); }
 }
 let token: string | null = null;
 let generation = 0;

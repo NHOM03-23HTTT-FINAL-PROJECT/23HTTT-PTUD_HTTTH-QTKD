@@ -1,13 +1,12 @@
-import { useMemo } from 'react';
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/app/providers/AuthProvider';
+import { IS_MOCK_AUTH } from '@/features/auth/api/authApi';
 import { ButtonLink } from '@/components/button/Button';
 import { Alert } from '@/components/feedback/Alert';
 import { Icon, type IconName } from '@/components/icon/Icon';
 import { StatusBadge } from '@/components/status-badge/StatusBadge';
 import { ROUTES } from '@/constants/routes';
 import { formatDate, formatDateTime, initials, todayIso } from '@/utils/format';
-import { customersApi } from '../api/customersApi';
 import { customerStatusApi } from '../api/customerStatusApi';
 import { ContractsTab, PaymentsTab, PriceListsTab } from '../components/CustomerRecordTabs';
 import {
@@ -25,6 +24,8 @@ import {
   type CustomerCatalogs,
 } from '../components/customerFormat';
 import { useCustomerRecords, type CustomerRecordsState } from '../hooks/useCustomerRecords';
+import { useCustomer } from '../hooks/useCustomer';
+import { useCustomerCatalogs } from '../hooks/useCustomerCatalogs';
 import type { Customer, CustomerField, CustomerHistoryEntry, CustomerStatus, EditableCustomerField } from '../types/customer';
 import type { CustomerRecordGroup } from '../types/customerRecords';
 import { CUSTOMER_FIELD_LABELS } from '../utils/customerChanges';
@@ -73,7 +74,9 @@ const TABS: { key: TabKey; label: string; group?: CustomerRecordGroup }[] = [
  */
 export function CustomerDetailPage() {
   const { code = '' } = useParams();
-  const customer = customersApi.getCustomer(code);
+  const { customer, loading, failed } = useCustomer(code);
+  if (loading) return <Alert tone="info" title="Đang tải hồ sơ khách hàng" />;
+  if (failed) return <Alert tone="danger" title="Không tải được hồ sơ khách hàng">Vui lòng thử lại sau.</Alert>;
   if (!customer) return <CannotOpenProfile />;
   return <CustomerProfile key={customer.code} customer={customer} />;
 }
@@ -113,10 +116,12 @@ function CannotOpenProfile() {
 
 function CustomerProfile({ customer }: { customer: Customer }) {
   const location = useLocation();
-  const { can } = useAuth();
+  const { can, user } = useAuth();
+  const canEdit = can('customers.update') && (IS_MOCK_AUTH || user?.roles.includes('TP_KD') || customer.ownerId === user?.id);
+  const canChangeStatus = can('customers.change-status') && (IS_MOCK_AUTH || user?.roles.includes('TP_KD') || customer.ownerId === user?.id);
   const [searchParams, setSearchParams] = useSearchParams();
   const state = location.state as CustomerDetailState | null;
-  const catalogs: CustomerCatalogs = useMemo(() => customersApi.getFormOptions(), []);
+  const { catalogs } = useCustomerCatalogs();
   const records = useCustomerRecords(customer.code);
 
   const requestedTab = searchParams.get('tab') as TabKey | null;
@@ -154,7 +159,7 @@ function CustomerProfile({ customer }: { customer: Customer }) {
             Về danh sách
           </ButtonLink>
           {/* Menu "Chỉnh sửa thông tin ▾": Trưởng phòng KD có thêm thao tác trạng thái (03.0 / 04.0). */}
-          {can('customers.update') && <CustomerActionsMenu customer={customer} canChangeStatus={can('customers.change-status')} />}
+          {(canEdit || canChangeStatus) && <CustomerActionsMenu customer={customer} canEdit={canEdit} canChangeStatus={canChangeStatus} />}
         </div>
       </div>
 
@@ -275,6 +280,11 @@ function ActionBanners({ customer, state }: { customer: Customer; state: Custome
           đổi trạng thái hay mở lại quyền giao dịch.
         </Alert>
       )}
+      {customer.status === 'suspended' && !customer.suspension && (
+        <Alert tone="warning" title="Khách hàng đang Tạm ngưng">
+          Việc xem hoặc cập nhật hồ sơ không thay đổi trạng thái. Giao dịch mới cần được kiểm tra tại phân hệ liên quan.
+        </Alert>
+      )}
     </>
   );
 }
@@ -290,7 +300,8 @@ type OverviewProps = {
 
 /** 06.1 · Tổng quan: nhận diện, đầu mối liên hệ, trạng thái hợp tác, hồ sơ liên quan, thông tin tạo/cập nhật. */
 function OverviewTab({ customer, catalogs, state, records, onRetry, onOpenTab }: OverviewProps) {
-  const { can } = useAuth();
+  const { can, user } = useAuth();
+  const canEdit = can('customers.update') && (IS_MOCK_AUTH || user?.roles.includes('TP_KD') || customer.ownerId === user?.id);
   const recentlyChanged = new Set<CustomerField>(state?.updated ? state.changedFields ?? [] : []);
   const badge = CUSTOMER_STATUS_BADGE[customer.status];
   const last = customer.history[customer.history.length - 1];
@@ -314,6 +325,7 @@ function OverviewTab({ customer, catalogs, state, records, onRetry, onOpenTab }:
                 <dd>{formatFieldValue(field, customer[field], catalogs) || '—'}</dd>
               </div>
             ))}
+            {customer.legacyInterestedServices && <div className="customer-detail__item"><dt>Dịch vụ ghi trên hồ sơ cũ</dt><dd>{customer.legacyInterestedServices}</dd></div>}
           </dl>
         </section>
 
@@ -323,7 +335,7 @@ function OverviewTab({ customer, catalogs, state, records, onRetry, onOpenTab }:
               Đầu mối liên hệ
               {contactChanged && <span className="recent-tag">Mới cập nhật</span>}
             </h2>
-            {can('customers.update') && (
+            {canEdit && (
               <Link to={ROUTES.customerEdit(customer.code)} className="link-button">
                 Quản lý người liên hệ
               </Link>
@@ -346,6 +358,16 @@ function OverviewTab({ customer, catalogs, state, records, onRetry, onOpenTab }:
         </section>
 
         <StatusDecisionCards customer={customer} />
+        {customer.statusDecisions?.length ? <section className="customer-card">
+          <div className="customer-card__heading"><h2>Quyết định trạng thái gần nhất</h2></div>
+          {(() => { const decision = customer.statusDecisions![customer.statusDecisions!.length - 1]; return <dl className="customer-detail__grid customer-detail__grid--single">
+            <DecisionItem label="Quyết định">{decision.type === 'Suspend' ? 'Tạm ngưng' : 'Kích hoạt lại'}</DecisionItem>
+            <DecisionItem label="Lý do">{decision.reason}</DecisionItem>
+            {decision.basis && <DecisionItem label="Căn cứ">{decision.basis}</DecisionItem>}
+            {decision.followUpPlan && <DecisionItem label="Phương án">{decision.followUpPlan}</DecisionItem>}
+            <DecisionItem label="Người xác nhận">{decision.decidedBy} · {formatDateTime(decision.at)}</DecisionItem>
+          </dl>; })()}
+        </section> : null}
       </div>
 
       <aside className="customer-layout__side">
@@ -357,7 +379,7 @@ function OverviewTab({ customer, catalogs, state, records, onRetry, onOpenTab }:
           </div>
           <div className="side-card__item">
             <span className="side-card__label">Hợp tác từ</span>
-            <span className="side-card__value">{formatDate(customer.createdAt)}</span>
+            <span className="side-card__value">{customer.createdAt ? formatDate(customer.createdAt) : 'Chưa có thông tin'}</span>
           </div>
           <div className="side-card__item">
             <span className="side-card__label">Nhân viên phụ trách</span>
@@ -373,14 +395,14 @@ function OverviewTab({ customer, catalogs, state, records, onRetry, onOpenTab }:
           <div className="side-card__item">
             <span className="side-card__label">Tạo hồ sơ</span>
             <span className="side-card__value">
-              {customer.createdBy} · {formatDateTime(customer.createdAt)}
+              {customer.createdBy ?? 'Không rõ'} · {customer.createdAt ? formatDateTime(customer.createdAt) : 'Chưa có thông tin'}
             </span>
           </div>
           <div className="side-card__item">
             <span className="side-card__label">Cập nhật lần cuối</span>
             <span className="side-card__value">
-              {last.by} · {formatDateTime(last.at)}
-              {last.statusChange && ` (${STATUS_LABEL[last.statusChange.to].toLowerCase()})`}
+              {last ? `${last.by} · ${formatDateTime(last.at)}` : 'Chưa có thông tin'}
+              {last?.statusChange && ` (${STATUS_LABEL[last.statusChange.to].toLowerCase()})`}
             </span>
           </div>
           <div className="side-card__item">

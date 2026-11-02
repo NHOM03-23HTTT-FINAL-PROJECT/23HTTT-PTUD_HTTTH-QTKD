@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@/app/providers/AuthProvider';
+import { IS_MOCK_AUTH } from '@/features/auth/api/authApi';
 import { useSession, useUnsavedChanges } from '@/app/providers/SessionProvider';
 import { Button, ButtonLink } from '@/components/button/Button';
 import { Alert } from '@/components/feedback/Alert';
@@ -12,7 +13,7 @@ import { Icon, type IconName } from '@/components/icon/Icon';
 import { StatusBadge } from '@/components/status-badge/StatusBadge';
 import { ROUTES } from '@/constants/routes';
 import { formatTime } from '@/utils/format';
-import { customersApi } from '../api/customersApi';
+import { useCustomer } from '../hooks/useCustomer';
 import { customerStatusApi } from '../api/customerStatusApi';
 import { DecisionItem, StepProgress } from '../components/CustomerStatusPanels';
 import type { Customer } from '../types/customer';
@@ -51,7 +52,9 @@ function newIdempotencyKey() {
 /** UC-CUS-03 · Tạm ngưng giao dịch với khách hàng – frame 03.1 → 03.8. */
 export function CustomerSuspendPage() {
   const { code = '' } = useParams();
-  const customer = customersApi.getCustomer(code);
+  const { customer, loading, failed } = useCustomer(code);
+  if (loading) return <Alert tone="info" title="Đang tải hồ sơ khách hàng" />;
+  if (failed) return <Alert tone="danger" title="Không tải được hồ sơ khách hàng">Vui lòng thử lại sau.</Alert>;
 
   if (!customer) {
     return (
@@ -125,8 +128,8 @@ function SuspendFlow({ customer }: { customer: Customer }) {
       // Giữ hướng xử lý đã chọn; mục mới lấy hướng đầu tiên làm mặc định.
       setPlan((current) => Object.fromEntries(result.items.map((item) => [item.id, current[item.id] ?? item.options[0]])));
       setServerAlert(null);
-    } catch {
-      setServerAlert('review-failed');
+    } catch (error) {
+      setServerAlert(error instanceof StatusChangeError && error.code === 'REVIEW_INCOMPLETE' ? 'review-incomplete' : 'review-failed');
     } finally {
       setLoadingReview(false);
     }
@@ -292,7 +295,8 @@ function SuspendFlow({ customer }: { customer: Customer }) {
               disabled={loadingReview}
               onChange={(e) => setReason(e.target.value)}
             />
-            <FileUploadField label="Căn cứ liên quan (nếu có)" files={evidence} onChange={setEvidence} disabled={loadingReview} />
+            {IS_MOCK_AUTH ? <FileUploadField label="Căn cứ liên quan (nếu có)" files={evidence} onChange={setEvidence} disabled={loadingReview} /> :
+              <p>Chức năng lưu tệp căn cứ chưa sẵn sàng.</p>}
           </div>
           <aside className="customer-layout__side">
             <section className="side-card">
@@ -558,8 +562,8 @@ function SuspendAlertBanner({ kind, retrying, onRetry, onReload }: AlertBannerPr
       );
     case 'review-incomplete':
       return (
-        <Alert tone="danger" title="Phương án xử lý chưa đầy đủ" action={retry('Tải lại kết quả rà soát')}>
-          Danh sách hồ sơ bị ảnh hưởng đã thay đổi. Tải lại kết quả rà soát và chọn hướng xử lý cho từng mục trước khi xác nhận.
+        <Alert tone="danger" title="Chưa đủ dữ liệu để rà soát" action={retry('Tải lại kết quả rà soát')}>
+          {IS_MOCK_AUTH ? 'Danh sách hồ sơ bị ảnh hưởng đã thay đổi. Tải lại kết quả rà soát và chọn hướng xử lý cho từng mục trước khi xác nhận.' : 'Chưa xác minh được dữ liệu công việc, công nợ và tranh chấp từ các phân hệ liên quan. Khách hàng vẫn giữ nguyên trạng thái.'}
         </Alert>
       );
     case 'review-failed':

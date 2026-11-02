@@ -9,6 +9,8 @@ export function validateSeedData(data: SeedData) {
   const modelByName = new Map(models.map((model) => [model.name, model]));
   assert.equal(Object.keys(data).length, 29, "The demo must cover 26 dictionary tables and 3 Identity tables.");
   for (const model of models) {
+    // These tables hold live customer metadata and request receipts, not seed fixtures.
+    if (["CustomerProfileData", "CustomerOperation"].includes(model.name)) continue;
     const rows = records[model.delegate];
     assert(rows?.length, `Missing fixtures: ${model.name}`);
     for (const columns of model.uniques) {

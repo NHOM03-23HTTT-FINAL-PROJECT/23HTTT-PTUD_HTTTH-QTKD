@@ -2,7 +2,7 @@
 
 Nguồn: `frontend/src/features/customers/api/customersApi.ts`, `customerRecordsApi.ts`, `customerStatusApi.ts` và các mock server tương ứng trong `frontend/src/mocks/`. Quy ước chung (tiền tố, JWT, Idempotency-Key, mã lỗi) xem [list_api.md](../../../list_api.md).
 
-> Endpoint là đề xuất từ chữ ký hàm FE, chưa đối chiếu đặc tả UC chi tiết và chưa được nhóm BE chốt.
+> Trạng thái thực hiện được ghi trong [implementation-status.md](implementation-status.md). Bảng dưới giữ tên endpoint từ đề xuất; không coi mọi endpoint trong bảng đã hoàn thiện.
 
 | Method | Endpoint | UC | Hàm FE | Ghi chú |
 |---|---|---|---|---|
@@ -15,10 +15,10 @@ Nguồn: `frontend/src/features/customers/api/customersApi.ts`, `customerRecords
 | POST | `/customers/{code}/payments/{paymentCode}/discrepancy-reports` | CUS-06 | `customerRecordsApi.reportDiscrepancy` | `{content}` |
 | GET | `/customers/suspension-reason-groups` | CUS-03 | `customerStatusApi.getSuspensionReasonGroups` | |
 | GET | `/customers/{code}/suspension-review` | CUS-03 b2 | `customerStatusApi.getSuspensionReview` | Hồ sơ và công việc bị ảnh hưởng |
-| POST | `/customers/{code}/suspend` | CUS-03 | `customerStatusApi.suspend` | Idempotency-Key; `{baseVersion, reasonGroup, reason, evidence, plan, coordinationNote}`; chỉ Trưởng phòng KD |
+| POST | `/customers/{code}/suspend` | CUS-03 | `customerStatusApi.suspend` | Idempotency-Key; `{baseVersion, reasonGroup, reason, evidence, plan, coordinationNote}`; cần quyền và phạm vi hợp lệ; hiện trả `REVIEW_INCOMPLETE` |
 | GET | `/customers/{code}/reactivation-context` | CUS-04 | `customerStatusApi.getReactivationContext` | Thông tin tạm ngưng hiện hành và điều kiện kích hoạt lại |
-| POST | `/customers/{code}/reactivate` | CUS-04 | `customerStatusApi.reactivate` | Idempotency-Key; `{baseVersion, reason, evidence, exception?}`; chỉ Trưởng phòng KD |
+| POST | `/customers/{code}/reactivate` | CUS-04 | `customerStatusApi.reactivate` | Idempotency-Key; `{baseVersion, reason, evidence, exception?}`; cần quyền và phạm vi hợp lệ; hiện trả `REVIEW_INCOMPLETE` |
 
 ## Phụ thuộc module Sprint 2/3
 
-Nhóm `priceLists` / `payments` và báo cáo sai lệch thanh toán phụ thuộc module Bảng giá, Thanh toán. Nên giữ endpoint nhưng trả rỗng ở Sprint 1.
+Nhóm `contracts`, `priceLists` và `payments` còn phụ thuộc quyền theo từng phân hệ và hợp đồng dữ liệu thật. Khi nguồn chưa sẵn sàng không trả danh sách rỗng như thể đã xác minh; API trả lỗi phù hợp và giao diện báo chưa tải được. Báo cáo sai lệch thanh toán chưa được kết nối.

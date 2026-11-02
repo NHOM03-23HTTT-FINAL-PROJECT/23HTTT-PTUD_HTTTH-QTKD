@@ -256,6 +256,8 @@ model UserAccount {
   auditLogByActorId                   AuditLog[]               @relation("AuditLog_actorId")
   attachmentByUploadedBy              Attachment[]             @relation("Attachment_uploadedBy")
   customerByAccountManagerId          Customer[]               @relation("Customer_accountManagerId")
+  customerProfileCreated              CustomerProfileData[]    @relation("CustomerProfileCreatedBy")
+  customerOperations                  CustomerOperation[]
   customerStatusDecisionByConfirmedBy CustomerStatusDecision[] @relation("CustomerStatusDecision_confirmedBy")
   areaAssignmentByUserId              AreaAssignment[]         @relation("AreaAssignment_userId")
   contractByOwnerId                   Contract[]               @relation("Contract_ownerId")
@@ -410,6 +412,7 @@ model Attachment {
 
 model Customer {
   customerId          String       @id @default(dbgenerated("gen_random_uuid()")) @map("customer_id") @db.Uuid
+  customerCode        String       @unique @default(dbgenerated("qtkd.next_customer_code()")) @map("customer_code") @db.VarChar(30)
   customerName        String       @map("customer_name") @db.VarChar(250)
   taxCode             String       @unique @map("tax_code") @db.VarChar(13)
   address             String       @map("address") @db.Text
@@ -423,13 +426,48 @@ model Customer {
   status              ActiveStatus @default(Active) @map("status")
   accountManagerId    String       @map("account_manager_id") @db.Uuid
   version             Int          @default(1) @map("version")
+  customerUpdatedAt   DateTime?    @map("customer_updated_at") @db.Timestamptz(6)
+  flowRevision        Int          @default(0) @map("flow_revision")
 
   accountManagerRef                  UserAccount              @relation("Customer_accountManagerId", fields: [accountManagerId], references: [userId], onDelete: Restrict, onUpdate: Restrict)
   customerStatusDecisionByCustomerId CustomerStatusDecision[] @relation("CustomerStatusDecision_customerId")
+  profileData                        CustomerProfileData?
+  operations                         CustomerOperation[]
   contractByCustomerId               Contract[]               @relation("Contract_customerId")
 
   @@index([accountManagerId])
   @@map("customer")
+  @@schema("qtkd")
+}
+
+// Legacy customers may not have creation metadata; do not invent a creator or date.
+model CustomerProfileData {
+  customerId    String    @id @map("customer_id") @db.Uuid
+  serviceGroups String[]  @default([]) @map("service_groups")
+  createdAt     DateTime? @map("created_at") @db.Timestamptz(6)
+  createdBy     String?   @map("created_by") @db.Uuid
+  updatedAt     DateTime? @map("updated_at") @db.Timestamptz(6)
+  customerRef   Customer  @relation(fields: [customerId], references: [customerId], onDelete: Restrict, onUpdate: Restrict)
+  creatorRef    UserAccount? @relation("CustomerProfileCreatedBy", fields: [createdBy], references: [userId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@map("customer_profile_data")
+  @@schema("qtkd")
+}
+
+model CustomerOperation {
+  actorId     String   @map("actor_id") @db.Uuid
+  operation   String   @db.VarChar(40)
+  requestKey  String   @map("request_key") @db.VarChar(100)
+  requestHash String   @map("request_hash") @db.VarChar(64)
+  customerId  String   @map("customer_id") @db.Uuid
+  response    Json     @db.JsonB
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  actorRef    UserAccount @relation(fields: [actorId], references: [userId], onDelete: Restrict, onUpdate: Restrict)
+  customerRef Customer @relation(fields: [customerId], references: [customerId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([actorId, operation, requestKey])
+  @@index([customerId])
+  @@map("customer_operation")
   @@schema("qtkd")
 }
 

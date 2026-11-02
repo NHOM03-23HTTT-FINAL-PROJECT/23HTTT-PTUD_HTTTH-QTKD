@@ -63,9 +63,12 @@ export type Customer = CustomerDraft & {
   ownerId: string;
   ownerName: string;
   version: number;
-  createdAt: string;
-  createdBy: string;
+  createdAt: string | null;
+  createdBy: string | null;
   history: CustomerHistoryEntry[];
+  /** Văn bản dịch vụ cũ được giữ nguyên, chưa chuyển đổi sang danh mục. */
+  legacyInterestedServices?: string | null;
+  statusDecisions?: { type: 'Suspend' | 'Reactivate'; reason: string; basis: string | null; followUpPlan: string | null; decidedBy: string; at: string }[];
   /** Quyết định tạm ngưng hiện hành, có khi khách hàng đang Tạm ngưng. */
   suspension?: SuspensionRecord;
   /** Lần kích hoạt lại gần nhất. */
@@ -93,6 +96,7 @@ export type DuplicateCustomer = Pick<Customer, 'code' | 'name' | 'status' | 'tax
 export type CreateCustomerErrorCode =
   | 'VALIDATION' // A5.1 / A5.2 / A5.4 / A5.5 – BE kiểm tra lại
   | 'DUPLICATE_TAX_CODE' // A5.3 / A5.6 / A6.1
+  | 'IDEMPOTENCY_KEY_REUSED'
   | 'SAVE_FAILED' // A6.3
   | 'NETWORK' // A6.4
   | 'FORBIDDEN' // A5 – bị thu hồi quyền
@@ -128,6 +132,7 @@ export type UpdateCustomerErrorCode =
   | 'NO_CHANGES' // A6.1
   | 'CONFLICT' // A5.3
   | 'IMMUTABLE_FIELD' // A5.4
+  | 'IDEMPOTENCY_KEY_REUSED'
   | 'NOT_FOUND' // A5.5 – không tồn tại hoặc ngoài phạm vi
   | 'FORBIDDEN' // A5.5 – mất quyền
   | 'SAVE_FAILED' // A6.2

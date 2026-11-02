@@ -72,7 +72,7 @@ const COLUMNS: Column<CustomerListItem>[] = [
     width: 120,
     render: (row) => <StatusBadge label={CUSTOMER_STATUS_BADGE[row.status].label} tone={CUSTOMER_STATUS_BADGE[row.status].tone} />,
   },
-  { key: 'updatedAt', header: 'Cập nhật', width: 110, render: (row) => formatDateTime(row.updatedAt).slice(0, 10) },
+  { key: 'updatedAt', header: 'Cập nhật', width: 110, render: (row) => row.updatedAt ? formatDateTime(row.updatedAt).slice(0, 10) : 'Chưa rõ' },
   {
     key: 'actions',
     header: '',
@@ -169,7 +169,7 @@ export function CustomerListPage() {
       <div className="page-header">
         <div className="page-header__title">
           <h1>Danh sách khách hàng</h1>
-          <p>Tìm theo mã, tên hoặc mã số thuế trong phạm vi được phân công.</p>
+          <p>Tìm theo mã, tên hoặc mã số thuế trong phạm vi phòng Kinh doanh.</p>
         </div>
         {can('customers.create') && (
           <div className="page-header__actions">
@@ -272,7 +272,7 @@ export function CustomerListPage() {
                 <p>
                   {query.keyword
                     ? `${STATUS_SCOPE_TEXT[query.status]} · trong phạm vi của bạn`
-                    : 'Chỉ gồm khách hàng trong phạm vi được phân công cho bạn'}
+                    : 'Chỉ gồm khách hàng trong phạm vi phòng Kinh doanh'}
                 </p>
               </>
             )}

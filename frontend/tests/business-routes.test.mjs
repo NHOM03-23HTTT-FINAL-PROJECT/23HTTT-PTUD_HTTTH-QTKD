@@ -110,12 +110,17 @@ function ignoreStaticRedirectWarning(t) {
   });
 }
 
-test('API identity can open all 26 mock business routes without mounting mocks or losing its session', () => {
+test('API identity can open customer screens; other unfinished business screens remain unavailable', () => {
   api.acceptAuth(authResult);
   for (const [path, permission] of routes) {
     const html = api.renderRoute(path, { ...user, permissions: new Set([permission]) });
-    assert.ok(html.includes('Chức năng chưa sẵn sàng'), path);
-    assert.ok(html.includes('Bạn vẫn đang đăng nhập'), path);
+    if (path.startsWith('/khach-hang')) {
+      assert.ok(!html.includes('Chức năng chưa sẵn sàng'), path);
+      assert.ok(html.includes('Đang tải') || html.includes('Danh sách khách hàng'), path);
+    } else {
+      assert.ok(html.includes('Chức năng chưa sẵn sàng'), path);
+      assert.ok(html.includes('Bạn vẫn đang đăng nhập'), path);
+    }
     assert.equal(api.apiAuthState().user.id, user.id);
   }
 });

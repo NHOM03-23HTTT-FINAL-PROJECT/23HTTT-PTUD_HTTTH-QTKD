@@ -1,4 +1,7 @@
 import { mockGetCustomerRecords, mockReportPaymentDiscrepancy } from '@/mocks/customerRecordsServer';
+import { IS_MOCK_AUTH } from '@/features/auth/api/authApi';
+import { ApiError, apiRequest } from '@/lib/http/client';
+import { CustomerRecordsError } from '../types/customerRecords';
 import type { CustomerRecordGroup, CustomerRecordsByGroup, ReportDiscrepancyRequest } from '../types/customerRecords';
 
 function delay(ms: number) {
@@ -16,11 +19,24 @@ export const customerRecordsApi = {
     group: G,
     retry = false,
   ): Promise<CustomerRecordsByGroup[G]> {
+    if (!IS_MOCK_AUTH) {
+      try { return await apiRequest(`/customers/${encodeURIComponent(code)}/records/${group}`); }
+      catch (error) {
+        if (error instanceof ApiError) {
+          if (error.status === 401) throw new CustomerRecordsError('SESSION_ENDED');
+          if (error.status === 403) throw new CustomerRecordsError('FORBIDDEN');
+          if (error.status === 404) throw new CustomerRecordsError('NOT_FOUND');
+          throw new CustomerRecordsError('LOAD_FAILED');
+        }
+        throw error;
+      }
+    }
     await delay(350);
     return mockGetCustomerRecords(user.id, user.signedInAt, code, group, retry);
   },
 
   async reportDiscrepancy(request: ReportDiscrepancyRequest): Promise<{ reportedAt: string }> {
+    if (!IS_MOCK_AUTH) throw new CustomerRecordsError('LOAD_FAILED');
     await delay(700);
     return mockReportPaymentDiscrepancy(request);
   },

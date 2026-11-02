@@ -10,9 +10,12 @@ using Microsoft.IdentityModel.Tokens;
 using Npgsql.NameTranslation;
 using QTKD.Api.Authorization;
 using QTKD.Application.Features.Identity;
+using QTKD.Application.Features.Customers;
 using QTKD.Domain.Identity;
+using QTKD.Infrastructure.Customers;
 using QTKD.Infrastructure.Identity;
 using QTKD.Infrastructure.Persistence;
+using QTKD.Api.Customers;
 using TokenOptions = QTKD.Infrastructure.Identity.TokenOptions;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -22,10 +25,13 @@ builder.Logging.AddJsonConsole(options => options.IncludeScopes = true);
 builder.Services.AddOptions<TokenOptions>().BindConfiguration("Jwt").ValidateDataAnnotations().ValidateOnStart();
 builder.Services.AddOptions<DatabaseOptions>().BindConfiguration("ConnectionStrings").ValidateDataAnnotations().ValidateOnStart();
 builder.Services.AddSingleton(TimeProvider.System);
+// Reuse the enum translator: a new singleton instance per DbContext causes EF
+// to create a new internal service provider on every request.
+var enumNames = new NpgsqlNullNameTranslator();
 builder.Services.AddDbContext<IdentityDbContext>((sp, options) => options.UseNpgsql(
     sp.GetRequiredService<IConfiguration>().GetConnectionString("Identity") ?? throw new InvalidOperationException("ConnectionStrings:Identity is required."),
-    pg => { var names = new NpgsqlNullNameTranslator(); pg.MapEnum<UserRole>("user_role", "qtkd", names);
-        pg.MapEnum<UserStatus>("user_status", "qtkd", names); pg.MapEnum<SessionEndReason>("session_end_reason", "qtkd", names); }));
+    pg => { pg.MapEnum<UserRole>("user_role", "qtkd", enumNames);
+        pg.MapEnum<UserStatus>("user_status", "qtkd", enumNames); pg.MapEnum<SessionEndReason>("session_end_reason", "qtkd", enumNames); }));
 builder.Services.AddIdentityCore<UserAccount>(options =>
 {
     options.User.RequireUniqueEmail = true;
@@ -35,6 +41,7 @@ builder.Services.AddIdentityCore<UserAccount>(options =>
 builder.Services.AddScoped<IPasswordHasher<UserAccount>, BcryptPasswordHasher>();
 builder.Services.AddScoped<TokenIssuer>();
 builder.Services.AddScoped<IIdentityService, IdentityService>();
+builder.Services.AddScoped<CustomerService>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
 builder.Services.AddSingleton<Microsoft.Extensions.Options.IOptionsChangeTokenSource<JwtBearerOptions>>(
@@ -94,7 +101,7 @@ builder.Services.AddRateLimiter(options =>
 });
 var allowedOrigins = builder.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? [];
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy.WithOrigins(allowedOrigins)
-    .WithMethods("GET", "POST", "PUT").WithHeaders("Content-Type", "Authorization", "X-QTKD-CSRF").AllowCredentials()));
+    .WithMethods("GET", "POST", "PUT", "PATCH").WithHeaders("Content-Type", "Authorization", "X-QTKD-CSRF", "Idempotency-Key").AllowCredentials()));
 
 var app = builder.Build();
 app.Use(async (context, next) =>
@@ -107,6 +114,16 @@ app.Use(async (context, next) =>
     {
         context.Response.StatusCode = error.Status;
         await context.Response.WriteAsJsonAsync(new { code = error.Code, remainingAttempts = error.RemainingAttempts, lockedUntil = error.LockedUntil, traceId = context.TraceIdentifier });
+    }
+    catch (CustomerFailure error)
+    {
+        context.Response.StatusCode = error.Status;
+        await context.Response.WriteAsJsonAsync(new { code = error.Code, detail = error.Detail, traceId = context.TraceIdentifier });
+    }
+    catch (BadHttpRequestException error) when (error.StatusCode == 400)
+    {
+        context.Response.StatusCode = 400;
+        await context.Response.WriteAsJsonAsync(new { code = "VALIDATION", traceId = context.TraceIdentifier });
     }
     catch (Exception error)
     {
@@ -199,6 +216,7 @@ app.MapPut("/api/v1/roles/{code}/permissions", async (string code, GrantsRequest
     await identity.SaveGrants(code, request.Permissions, ct); return Results.NoContent();
 }).RequireAuthorization("roles.manage");
 app.MapGet("/api/v1/permissions", async (IIdentityService identity, CancellationToken ct) => Results.Ok(await identity.Permissions(ct))).RequireAuthorization("roles.manage");
+app.MapCustomerEndpoints();
 app.Run();
 
 public partial class Program;

@@ -83,7 +83,7 @@ export function AppRoutes() {
             <Route
               path={ROUTES.customers}
               element={
-                <BusinessRoute permission="customers.view" label="Danh sách khách hàng">
+                <BusinessRoute permission="customers.view" label="Danh sách khách hàng" apiReady>
                   <CustomerListPage />
                 </BusinessRoute>
               }
@@ -91,7 +91,7 @@ export function AppRoutes() {
             <Route
               path={ROUTES.customerCreate}
               element={
-                <BusinessRoute permission="customers.create" label="Tạo khách hàng">
+                <BusinessRoute permission="customers.create" label="Tạo khách hàng" apiReady>
                   <CustomerCreatePage />
                 </BusinessRoute>
               }
@@ -99,7 +99,7 @@ export function AppRoutes() {
             <Route
               path="/khach-hang/:code"
               element={
-                <BusinessRoute permission="customers.view" label="Hồ sơ khách hàng">
+                <BusinessRoute permission="customers.view" label="Hồ sơ khách hàng" apiReady>
                   <CustomerDetailPage />
                 </BusinessRoute>
               }
@@ -107,7 +107,7 @@ export function AppRoutes() {
             <Route
               path="/khach-hang/:code/chinh-sua"
               element={
-                <BusinessRoute permission="customers.update" label="Chỉnh sửa khách hàng">
+                <BusinessRoute permission="customers.update" label="Chỉnh sửa khách hàng" apiReady>
                   <CustomerEditPage />
                 </BusinessRoute>
               }
@@ -115,7 +115,7 @@ export function AppRoutes() {
             <Route
               path="/khach-hang/:code/tam-ngung"
               element={
-                <BusinessRoute permission="customers.change-status" label="Tạm ngưng khách hàng">
+                <BusinessRoute permission="customers.change-status" label="Tạm ngưng khách hàng" apiReady>
                   <CustomerSuspendPage />
                 </BusinessRoute>
               }
@@ -123,7 +123,7 @@ export function AppRoutes() {
             <Route
               path="/khach-hang/:code/kich-hoat-lai"
               element={
-                <BusinessRoute permission="customers.change-status" label="Kích hoạt lại khách hàng">
+                <BusinessRoute permission="customers.change-status" label="Kích hoạt lại khách hàng" apiReady>
                   <CustomerReactivatePage />
                 </BusinessRoute>
               }

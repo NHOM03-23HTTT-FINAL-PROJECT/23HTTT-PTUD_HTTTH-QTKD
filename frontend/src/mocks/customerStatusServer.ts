@@ -151,6 +151,7 @@ function reactivationChecks(customer: Customer): ReactivationCheck[] {
   const cause = CAUSE_CHECK[customer.suspension?.reasonGroup ?? ''];
   return (Object.keys(CHECK_LABELS) as ReactivationCheck['id'][]).map((id) => {
     const labels = CHECK_LABELS[id];
+    if (!cause) return { id, label: labels.unmet, status: 'unmet', detail: `Chưa có xác nhận của ${labels.owner}` };
     return id === cause
       ? { id, label: labels.unmet, status: 'unmet', detail: `Chưa có xác nhận của ${labels.owner}` }
       : { id, label: labels.met, status: 'met', detail: 'Không phát sinh trong lượt tạm ngưng này' };
@@ -185,7 +186,8 @@ export function mockReactivateCustomer(request: ReactivateCustomerRequest): Stat
 
   // A4.1 / A4.2: điều kiện chưa đạt; chỉ công nợ được chấp thuận theo quyết định ngoại lệ.
   const exception = request.exception?.decisionNo.trim() && request.exception.content.trim() ? request.exception : undefined;
-  const blocked = reactivationChecks(current).some((c) => c.status === 'unmet' && !(c.id === 'debt' && exception));
+  // Text entered in the prototype is not evidence that an exception was approved.
+  const blocked = reactivationChecks(current).some((c) => c.status === 'unmet');
   if (blocked) throw new StatusChangeError('CONDITIONS_NOT_MET');
 
   const at = new Date().toISOString();

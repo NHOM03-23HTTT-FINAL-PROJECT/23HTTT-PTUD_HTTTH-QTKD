@@ -1,6 +1,8 @@
 import { useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useSession, useUnsavedChanges } from '@/app/providers/SessionProvider';
+import { useAuth } from '@/app/providers/AuthProvider';
+import { IS_MOCK_AUTH } from '@/features/auth/api/authApi';
 import { Button, ButtonLink } from '@/components/button/Button';
 import { Alert } from '@/components/feedback/Alert';
 import { Dialog } from '@/components/feedback/Dialog';
@@ -10,11 +12,11 @@ import { MultiSelectField, SelectField } from '@/components/form/SelectField';
 import { TextAreaField } from '@/components/form/TextAreaField';
 import { StatusBadge } from '@/components/status-badge/StatusBadge';
 import { ROUTES } from '@/constants/routes';
-import { customersApi } from '../api/customersApi';
 import { CustomerConflictDialog, UnsavedChangesCard } from '../components/CustomerChangePanels';
-import type { CustomerCatalogs } from '../components/customerFormat';
 import { FormSection } from '../components/FormSection';
 import { useEditCustomerForm, type EditCustomerAlert } from '../hooks/useEditCustomerForm';
+import { useCustomer } from '../hooks/useCustomer';
+import { useCustomerCatalogs } from '../hooks/useCustomerCatalogs';
 import type { Customer, EditableCustomerField } from '../types/customer';
 import { CUSTOMER_FIELD_LABELS } from '../utils/customerChanges';
 import { CUSTOMER_STATUS_BADGE, type CustomerDetailState } from './CustomerDetailPage';
@@ -48,7 +50,10 @@ const LOCKED_NOTES = [
 /** UC-CUS-02 · Cập nhật thông tin khách hàng – frame 02.1 → 02.8; lưu thành công chuyển sang 02.9. */
 export function CustomerEditPage() {
   const { code = '' } = useParams();
-  const customer = customersApi.getCustomer(code);
+  const { customer, loading, failed } = useCustomer(code);
+  const { user } = useAuth();
+  if (loading) return <Alert tone="info" title="Đang tải hồ sơ khách hàng" />;
+  if (failed) return <Alert tone="danger" title="Không tải được hồ sơ khách hàng">Vui lòng thử lại sau.</Alert>;
 
   if (!customer) {
     return (
@@ -71,6 +76,8 @@ export function CustomerEditPage() {
       </>
     );
   }
+  if (!IS_MOCK_AUTH && !user?.roles.includes('TP_KD') && customer.ownerId !== user?.id)
+    return <Alert tone="warning" title="Không có quyền cập nhật">Bạn chỉ được sửa khách hàng mình phụ trách.</Alert>;
   // Mỗi hồ sơ một trạng thái biểu mẫu riêng.
   return <CustomerEditForm key={customer.code} customer={customer} />;
 }
@@ -80,12 +87,7 @@ function CustomerEditForm({ customer }: { customer: Customer }) {
   const { endSession } = useSession();
   const formRef = useRef<HTMLFormElement>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
-  const catalogs: CustomerCatalogs = useMemo(() => customersApi.getFormOptions(), []);
-  const options = useMemo(() => {
-    const toOption = ({ code, label }: { code: string; label: string }) => ({ value: code, label });
-    return { customerGroups: catalogs.customerGroups.map(toOption), serviceGroups: catalogs.serviceGroups.map(toOption) };
-  }, [catalogs]);
-
+  const { catalogs, loading: loadingCatalogs, failed: catalogsFailed } = useCustomerCatalogs();
   const form = useEditCustomerForm(customer, {
     onUpdated: ({ customer: updated, changedFields, replayed }) => {
       const state: CustomerDetailState = { updated: true, changedFields, replayed };
@@ -95,9 +97,18 @@ function CustomerEditForm({ customer }: { customer: Customer }) {
     onSessionEnded: endSession,
   });
   const { baseline, values, errors, submitting, changedFields } = form;
+  const options = useMemo(() => {
+    const toOption = ({ code, label }: { code: string; label: string }) => ({ value: code, label });
+    const customerGroups = catalogs.customerGroups.map(toOption);
+    if (baseline.customerGroup && !customerGroups.some((option) => option.value === baseline.customerGroup))
+      customerGroups.push({ value: baseline.customerGroup, label: `${baseline.customerGroup} (giá trị cũ)` });
+    return { customerGroups, serviceGroups: catalogs.serviceGroups.map(toOption) };
+  }, [catalogs, baseline.customerGroup]);
   useUnsavedChanges(form.dirty ? `Chỉnh sửa khách hàng – ${baseline.code}` : null);
   const detailPath = ROUTES.customerDetail(baseline.code);
   const badge = CUSTOMER_STATUS_BADGE[baseline.status];
+  if (loadingCatalogs) return <Alert tone="info" title="Đang tải danh mục khách hàng" />;
+  if (catalogsFailed) return <Alert tone="danger" title="Không tải được danh mục khách hàng">Vui lòng tải lại trang để thử lại.</Alert>;
 
   async function save() {
     const outcome = await form.submit();
@@ -329,6 +340,10 @@ function EditCustomerAlertBanner({ alert, version, retrying, onRetry }: AlertBan
   );
 
   switch (alert.kind) {
+    case 'server-invalid':
+      return <Alert tone="danger" title="Dữ liệu chưa hợp lệ">Kiểm tra độ dài, thông tin liên hệ và các danh mục đã chọn.</Alert>;
+    case 'request-changed':
+      return <Alert tone="warning" title="Yêu cầu trước có thể đã được lưu">Dữ liệu đã thay đổi sau lần gửi trước. Hãy kiểm tra hồ sơ hiện tại trước khi chỉnh sửa lại.</Alert>;
     case 'invalid':
       return (
         <Alert tone="danger" title="Chưa lưu thay đổi">

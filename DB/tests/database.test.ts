@@ -15,14 +15,15 @@ test("all 26 source tables and all 239 active columns are mapped", () => {
     tables: Record<string, string[]>; foreignKeys: { table: string; column: string; target: string }[];
   };
   const models = readSchema();
-  assert.deepEqual(models.filter(model => !["role_definition", "permission", "role_permission"].includes(model.table)).map((model) => model.table).sort(), Object.keys(source.tables).sort());
+  const addedTables = ["role_definition", "permission", "role_permission", "customer_profile_data", "customer_operation"];
+  assert.deepEqual(models.filter(model => !addedTables.includes(model.table)).map((model) => model.table).sort(), Object.keys(source.tables).sort());
   assert.equal(Object.values(source.tables).flat().length, 239);
   for (const model of models) {
     if (!source.tables[model.table]) continue;
     const actual = model.fields.flatMap((field) => field.column ? [field.column] : []);
     for (const column of source.tables[model.table]) assert(actual.includes(column), `${model.table}.${column}`);
     const additions = actual.filter((column) => !source.tables[model.table].includes(column));
-    const expected: Record<string, string[]> = { Contract: ["updated_at"], Department: ["code"], UserAccount: ["password_changed_at"], LoginSession: ["logout_token_hash", "last_activity_at", "remember", "revocation_reason"] };
+    const expected: Record<string, string[]> = { Contract: ["updated_at"], Customer: ["customer_code", "customer_updated_at", "flow_revision"], Department: ["code"], UserAccount: ["password_changed_at"], LoginSession: ["logout_token_hash", "last_activity_at", "remember", "revocation_reason"] };
     assert.deepEqual(additions, expected[model.name] ?? []);
   }
   const actualFks = models.flatMap((model) => model.relations.flatMap((relation) => relation.fields.map((field) => ({

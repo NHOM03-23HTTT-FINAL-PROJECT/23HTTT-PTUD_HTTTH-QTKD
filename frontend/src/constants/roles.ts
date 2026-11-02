@@ -23,7 +23,7 @@ export type Permission =
   | 'customers.view'
   | 'customers.create'
   | 'customers.update'
-  /** Tạm ngưng / kích hoạt lại khách hàng (UC-CUS-03 / 04) – chỉ Trưởng phòng Kinh doanh. */
+  /** Tạm ngưng / kích hoạt lại khách hàng (UC-CUS-03 / 04); quyền mặc định thuộc Trưởng phòng Kinh doanh. */
   | 'customers.change-status'
   | 'contracts.view'
   | 'contracts.create'

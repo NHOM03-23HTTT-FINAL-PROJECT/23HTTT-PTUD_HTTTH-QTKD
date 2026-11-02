@@ -63,6 +63,7 @@ async function main() {
       // A collision on username/email/natural keys must fail rather than silently leave a partial fixture.
       const records = data as unknown as Record<string, Record<string, unknown>[]>;
       for (const model of readSchema()) {
+        if (["CustomerProfileData", "CustomerOperation"].includes(model.name)) continue;
         const primary = model.fields.find((field) => field.attributes.includes("@id"));
         if (!primary) continue; // AREA_SERVICE has a composite PK; its FKs are validated above.
         if (!/^[a-z_]+$/.test(model.table) || !/^[a-z_]+$/.test(primary.column!)) throw new Error("Invalid internal identifier");

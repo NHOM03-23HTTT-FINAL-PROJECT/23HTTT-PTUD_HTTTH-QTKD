@@ -29,7 +29,7 @@ export type CustomerListItem = {
   address: string;
   taxCode: string;
   status: CustomerStatus;
-  updatedAt: string;
+  updatedAt: string | null;
 };
 
 export type CustomerSearchResult = {
