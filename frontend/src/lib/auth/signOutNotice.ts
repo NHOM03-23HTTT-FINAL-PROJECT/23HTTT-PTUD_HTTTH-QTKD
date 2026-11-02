@@ -10,7 +10,8 @@ export type SignOutReason =
   | 'password-changed' // 03.5 – phiên bị thu hồi do đổi/đặt lại mật khẩu
   | 'locked' // 04.7 – sai mật khẩu hiện tại 5 lần khi đổi mật khẩu
   | 'disabled' // 03.5 – tài khoản bị vô hiệu hóa (thông báo như 01.5)
-  | 'no-role'; // tài khoản bị gỡ hết vai trò (thông báo như 01.6)
+  | 'permissions-changed'
+  | 'local-logout';
 
 export type SignOutNotice = {
   reason: SignOutReason;
@@ -29,7 +30,9 @@ export const signOutNotice = {
   peek(): SignOutNotice | null {
     try {
       const raw = window.sessionStorage.getItem(NOTICE_KEY);
-      return raw ? (JSON.parse(raw) as SignOutNotice) : null;
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as SignOutNotice;
+      return ['logout', 'expired', 'password-changed', 'locked', 'disabled', 'permissions-changed', 'local-logout'].includes(parsed.reason) ? parsed : null;
     } catch {
       return null;
     }

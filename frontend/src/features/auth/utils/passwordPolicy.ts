@@ -2,7 +2,7 @@
 export type PolicyRuleId = 'length' | 'case' | 'digit' | 'special' | 'notCurrent';
 
 export const POLICY_RULES: { id: Exclude<PolicyRuleId, 'notCurrent'>; label: string }[] = [
-  { id: 'length', label: 'Tối thiểu 8 ký tự' },
+  { id: 'length', label: 'Tối thiểu 12 ký tự, tối đa 72 byte UTF-8' },
   { id: 'case', label: 'Có chữ hoa và chữ thường' },
   { id: 'digit', label: 'Có chữ số' },
   { id: 'special', label: 'Có ký tự đặc biệt (!@#$…)' },
@@ -11,7 +11,7 @@ export const POLICY_RULES: { id: Exclude<PolicyRuleId, 'notCurrent'>; label: str
 /** Các tiêu chí kiểm tra được ngay ở trình duyệt; "không trùng mật khẩu hiện tại" chỉ server biết. */
 export function checkPolicy(password: string): Record<Exclude<PolicyRuleId, 'notCurrent'>, boolean> {
   return {
-    length: password.length >= 8,
+    length: password.length >= 12 && new TextEncoder().encode(password).length <= 72,
     case: /[a-z]/.test(password) && /[A-Z]/.test(password),
     digit: /\d/.test(password),
     special: /[^A-Za-z0-9]/.test(password),

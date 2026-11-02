@@ -15,7 +15,8 @@ import { Dialog } from '@/components/feedback/Dialog';
 import { Icon } from '@/components/icon/Icon';
 import { SESSION_IDLE_MS, SESSION_WARNING_MS } from '@/config/session';
 import { REDIRECT_PARAM, ROUTES } from '@/constants/routes';
-import { authApi } from '@/features/auth/api/authApi';
+import { authApi, IS_MOCK_AUTH } from '@/features/auth/api/authApi';
+import { Alert } from '@/components/feedback/Alert';
 import { sessionStore } from '@/lib/auth/session';
 import { signOutNotice, type SignOutReason } from '@/lib/auth/signOutNotice';
 import { formatCountdown } from '@/utils/format';
@@ -46,6 +47,8 @@ const PERSIST_INTERVAL_MS = 10 * 1000;
  */
 export function useEndSession() {
   const { user, logout } = useAuth();
+  const userRef = useRef(user);
+  userRef.current = user;
   const navigate = useNavigate();
   const location = useLocation();
   const ended = useRef(false);
@@ -54,40 +57,49 @@ export function useEndSession() {
 
   return useCallback(
     (reason: SignOutReason) => {
+      const user = userRef.current;
       if (ended.current || !user) return;
       ended.current = true;
-      signOutNotice.save({ reason, identifier: user.username });
+      void (async () => {
+      let noticeReason = reason;
       if (reason === 'logout' || reason === 'expired') {
-        // E1/E2: lỗi server hoặc mất mạng vẫn xóa phiên phía trình duyệt; phiên server được dọn sau.
-        void authApi.logout(user.id, reason).catch(() => undefined);
+        try { await authApi.logout(user.id, reason); }
+        catch { noticeReason = 'local-logout'; }
       }
+      signOutNotice.save({ reason: noticeReason, identifier: user.username });
       // A2: đăng nhập lại sẽ quay về trang đang làm.
       const target = currentPath.current;
       const search =
         reason === 'expired' && target !== ROUTES.dashboard ? `?${REDIRECT_PARAM}=${encodeURIComponent(target)}` : '';
       navigate(`${ROUTES.login}${search}`, { replace: true });
       logout();
+      })();
     },
-    [logout, navigate, user],
+    [logout, navigate],
   );
 }
 
 export function SessionProvider({ user, children }: { user: CurrentUser; children: ReactNode }) {
+  const { syncUser } = useAuth();
   const location = useLocation();
   const endSession = useEndSession();
   const [unsaved, setUnsavedMap] = useState<Record<string, string>>({});
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [warningRemaining, setWarningRemaining] = useState<number | null>(null);
+  const [sessionError, setSessionError] = useState(false);
 
   const lastActivity = useRef(sessionStore.load()?.lastActiveAt ?? Date.now());
   const warningOpen = useRef(false);
 
   const continueSession = useCallback(() => {
+    void authApi.activity().then(() => {
     const now = Date.now();
     lastActivity.current = now;
     sessionStore.touch(now);
     warningOpen.current = false;
     setWarningRemaining(null);
+    setSessionError(false);
+    }).catch(() => setSessionError(true));
   }, []);
 
   // Theo dõi thao tác và đếm thời gian không thao tác.
@@ -101,12 +113,14 @@ export function SessionProvider({ user, children }: { user: CurrentUser; childre
       if (now - lastPersist > PERSIST_INTERVAL_MS) {
         lastPersist = now;
         sessionStore.touch(now);
+        void authApi.activity().then(() => setSessionError(false)).catch(() => setSessionError(true));
       }
     }
     ACTIVITY_EVENTS.forEach((name) => window.addEventListener(name, onActivity, { passive: true }));
 
     const timer = window.setInterval(() => {
-      const remaining = lastActivity.current + SESSION_IDLE_MS - Date.now();
+      const deadlines = IS_MOCK_AUTH ? null : authApi.getDeadlines();
+      const remaining = (deadlines ? Math.min(deadlines.idle, deadlines.absolute) : lastActivity.current + SESSION_IDLE_MS) - Date.now();
       if (remaining <= 0) {
         endSession('expired');
       } else if (remaining <= SESSION_WARNING_MS) {
@@ -123,9 +137,12 @@ export function SessionProvider({ user, children }: { user: CurrentUser; childre
 
   // A3: kiểm tra phiên ở mỗi lần chuyển trang và khi quay lại tab.
   const verifySession = useCallback(() => {
-    const check = authApi.checkSession(user.id, user.signedInAt);
-    if (check.status !== 'active') endSession(check.status);
-  }, [endSession, user.id, user.signedInAt]);
+    void authApi.checkSession(user.id, user.signedInAt).then(check => {
+      setSessionError(false);
+      if (check.status !== 'active') endSession(check.status);
+      else syncUser(check.user);
+    }).catch(() => setSessionError(true));
+  }, [endSession, syncUser, user.id, user.signedInAt]);
 
   useEffect(() => {
     verifySession();
@@ -175,6 +192,7 @@ export function SessionProvider({ user, children }: { user: CurrentUser; childre
   return (
     <SessionContext.Provider value={value}>
       {children}
+      {sessionError && <Alert tone="warning" title="Chưa kiểm tra được phiên">Kiểm tra kết nối rồi thử thao tác lại. Thời hạn phiên vẫn do máy chủ quyết định.</Alert>}
 
       {confirmOpen && (
         <Dialog

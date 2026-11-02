@@ -39,6 +39,7 @@ export type Permission =
   | 'areas.manage'
   | 'payments.view'
   | 'users.manage'
+  | 'departments.manage'
   | 'roles.manage'
   | 'workflows.manage'
   | 'audit.view'
@@ -114,11 +115,11 @@ export const ROLES: Record<RoleCode, Role> = {
     code: 'QTHT',
     name: 'Quản trị hệ thống',
     department: 'QTHT',
-    permissions: ['users.manage', 'roles.manage', 'workflows.manage', 'audit.view', 'catalogs.manage'],
+    permissions: ['users.manage', 'departments.manage', 'roles.manage', 'workflows.manage', 'audit.view', 'catalogs.manage'],
   },
 };
 
-/** Người dùng nhiều vai trò được hợp nhất quyền (ghi chú hàng "Trang làm việc theo phòng ban"). */
+/** Adapter mock nhận đúng một role; API mode lấy permissions từ BE thay vì hàm này. */
 export function mergePermissions(roleCodes: RoleCode[]): Set<Permission> {
   return new Set(roleCodes.flatMap((code) => ROLES[code].permissions));
 }

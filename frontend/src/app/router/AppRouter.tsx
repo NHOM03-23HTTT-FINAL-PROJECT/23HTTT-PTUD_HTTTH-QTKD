@@ -1,4 +1,5 @@
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { IS_MOCK_AUTH } from '@/features/auth/api/authApi';
 import { ACCOUNT_NAV, WORKSPACE_NAV } from '@/constants/navigation';
 import { ROUTES } from '@/constants/routes';
 import { ChangePasswordPage } from '@/features/auth/pages/ChangePasswordPage';
@@ -24,7 +25,8 @@ import { ContractProgressPage } from '@/features/contracts/pages/ContractProgres
 import { WorkflowConfigFormPage, WorkflowConfigListPage } from '@/features/contracts/pages/WorkflowConfigPages';
 import { DashboardPage } from '@/features/dashboard/pages/DashboardPage';
 import { MainLayout } from '@/layouts/MainLayout';
-import { PublicOnly, RequireAuth, RequirePermission } from './guards';
+import { PublicOnly, RequireAuth } from './guards';
+import { BusinessRoute } from './BusinessRoute';
 import { NavPlaceholderPage, NotFoundPage, RecordPlaceholderPage } from './PlaceholderPages';
 
 /** Đường dẫn trong menu đã có màn hình thật, không dùng trang giữ chỗ. */
@@ -60,10 +62,17 @@ const NAV_PATHS = [
 export function AppRouter() {
   return (
     <BrowserRouter>
+      <AppRoutes />
+    </BrowserRouter>
+  );
+}
+
+export function AppRoutes() {
+  return (
       <Routes>
         <Route element={<PublicOnly />}>
           <Route path={ROUTES.login} element={<LoginPage />} />
-          <Route path={ROUTES.forgotPassword} element={<ForgotPasswordPage />} />
+          <Route path={ROUTES.forgotPassword} element={IS_MOCK_AUTH ? <ForgotPasswordPage /> : <Navigate to={ROUTES.login} replace />} />
         </Route>
 
         <Route element={<RequireAuth />}>
@@ -74,209 +83,209 @@ export function AppRouter() {
             <Route
               path={ROUTES.customers}
               element={
-                <RequirePermission permission="customers.view" label="Danh sách khách hàng">
+                <BusinessRoute permission="customers.view" label="Danh sách khách hàng">
                   <CustomerListPage />
-                </RequirePermission>
+                </BusinessRoute>
               }
             />
             <Route
               path={ROUTES.customerCreate}
               element={
-                <RequirePermission permission="customers.create" label="Tạo khách hàng">
+                <BusinessRoute permission="customers.create" label="Tạo khách hàng">
                   <CustomerCreatePage />
-                </RequirePermission>
+                </BusinessRoute>
               }
             />
             <Route
               path="/khach-hang/:code"
               element={
-                <RequirePermission permission="customers.view" label="Hồ sơ khách hàng">
+                <BusinessRoute permission="customers.view" label="Hồ sơ khách hàng">
                   <CustomerDetailPage />
-                </RequirePermission>
+                </BusinessRoute>
               }
             />
             <Route
               path="/khach-hang/:code/chinh-sua"
               element={
-                <RequirePermission permission="customers.update" label="Chỉnh sửa khách hàng">
+                <BusinessRoute permission="customers.update" label="Chỉnh sửa khách hàng">
                   <CustomerEditPage />
-                </RequirePermission>
+                </BusinessRoute>
               }
             />
             <Route
               path="/khach-hang/:code/tam-ngung"
               element={
-                <RequirePermission permission="customers.change-status" label="Tạm ngưng khách hàng">
+                <BusinessRoute permission="customers.change-status" label="Tạm ngưng khách hàng">
                   <CustomerSuspendPage />
-                </RequirePermission>
+                </BusinessRoute>
               }
             />
             <Route
               path="/khach-hang/:code/kich-hoat-lai"
               element={
-                <RequirePermission permission="customers.change-status" label="Kích hoạt lại khách hàng">
+                <BusinessRoute permission="customers.change-status" label="Kích hoạt lại khách hàng">
                   <CustomerReactivatePage />
-                </RequirePermission>
+                </BusinessRoute>
               }
             />
             <Route
               path={ROUTES.areas}
               element={
-                <RequirePermission permission="areas.view" label="Danh sách khu vực">
+                <BusinessRoute permission="areas.view" label="Danh sách khu vực">
                   <AreaLookupPage key="list" variant="list" />
-                </RequirePermission>
+                </BusinessRoute>
               }
             />
             <Route
               path={ROUTES.areaLookup}
               element={
-                <RequirePermission permission="areas.view" label="Tra cứu khu vực">
+                <BusinessRoute permission="areas.view" label="Tra cứu khu vực">
                   <AreaLookupPage key="lookup" variant="lookup" />
-                </RequirePermission>
+                </BusinessRoute>
               }
             />
             <Route
               path={ROUTES.areaHierarchy}
               element={
-                <RequirePermission permission="areas.view" label="Sơ đồ phân cấp">
+                <BusinessRoute permission="areas.view" label="Sơ đồ phân cấp">
                   <AreaLookupPage key="hierarchy" variant="hierarchy" />
-                </RequirePermission>
+                </BusinessRoute>
               }
             />
             <Route
               path={ROUTES.areaCreate}
               element={
-                <RequirePermission permission="areas.create" label="Tạo khu vực">
+                <BusinessRoute permission="areas.create" label="Tạo khu vực">
                   <AreaCreatePage />
-                </RequirePermission>
+                </BusinessRoute>
               }
             />
             <Route
               path="/khu-vuc/:code"
               element={
-                <RequirePermission permission="areas.view" label="Chi tiết khu vực">
+                <BusinessRoute permission="areas.view" label="Chi tiết khu vực">
                   <AreaDetailPage />
-                </RequirePermission>
+                </BusinessRoute>
               }
             />
             <Route
               path="/khu-vuc/:code/chinh-sua"
               element={
-                <RequirePermission permission="areas.update" label="Chỉnh sửa khu vực">
+                <BusinessRoute permission="areas.update" label="Chỉnh sửa khu vực">
                   <AreaEditPage />
-                </RequirePermission>
+                </BusinessRoute>
               }
             />
             <Route
               path={ROUTES.contractCreate}
               element={
-                <RequirePermission permission="contracts.create" label="Tạo hợp đồng">
+                <BusinessRoute permission="contracts.create" label="Tạo hợp đồng">
                   <ContractCreatePage />
-                </RequirePermission>
+                </BusinessRoute>
               }
             />
             <Route
               path={ROUTES.contracts}
               element={
-                <RequirePermission permission="contracts.view" label="Danh sách hợp đồng">
+                <BusinessRoute permission="contracts.view" label="Danh sách hợp đồng">
                   <ContractListPage key="all" />
-                </RequirePermission>
+                </BusinessRoute>
               }
             />
             <Route
               path={ROUTES.contractRevision}
               element={
-                <RequirePermission permission="contracts.create" label="Hợp đồng cần chỉnh sửa">
+                <BusinessRoute permission="contracts.create" label="Hợp đồng cần chỉnh sửa">
                   <ContractListPage key="revision" variant="revision" />
-                </RequirePermission>
+                </BusinessRoute>
               }
             />
             <Route
               path="/hop-dong/:code"
               element={
-                <RequirePermission permission="contracts.view" label="Hồ sơ hợp đồng">
+                <BusinessRoute permission="contracts.view" label="Hồ sơ hợp đồng">
                   <ContractDetailPage />
-                </RequirePermission>
+                </BusinessRoute>
               }
             />
             <Route
               path="/hop-dong/:code/chinh-sua"
               element={
-                <RequirePermission permission="contracts.create" label="Chỉnh sửa hợp đồng">
+                <BusinessRoute permission="contracts.create" label="Chỉnh sửa hợp đồng">
                   <ContractEditPage />
-                </RequirePermission>
+                </BusinessRoute>
               }
             />
             <Route
               path="/hop-dong/:code/tien-do"
               element={
-                <RequirePermission permission="contracts.view" label="Tiến độ và lịch sử phê duyệt">
+                <BusinessRoute permission="contracts.view" label="Tiến độ và lịch sử phê duyệt">
                   <ContractProgressPage />
-                </RequirePermission>
+                </BusinessRoute>
               }
             />
             <Route
               path={ROUTES.approvalSales}
               element={
-                <RequirePermission permission="approvals.approve" label="Hồ sơ chờ tôi duyệt">
+                <BusinessRoute permission="approvals.approve" label="Hồ sơ chờ tôi duyệt">
                   <ApprovalInboxPage key="sales" step="sales" />
-                </RequirePermission>
+                </BusinessRoute>
               }
             />
             <Route
               path={ROUTES.approvalLegal}
               element={
-                <RequirePermission permission="approvals.review-legal" label="Chờ rà soát pháp lý">
+                <BusinessRoute permission="approvals.review-legal" label="Chờ rà soát pháp lý">
                   <ApprovalInboxPage key="legal" step="legal" />
-                </RequirePermission>
+                </BusinessRoute>
               }
             />
             <Route
               path={ROUTES.approvalLegalDone}
               element={
-                <RequirePermission permission="approvals.review-legal" label="Đã rà soát">
+                <BusinessRoute permission="approvals.review-legal" label="Đã rà soát">
                   <ApprovalInboxPage key="legal-done" step="legal" done />
-                </RequirePermission>
+                </BusinessRoute>
               }
             />
             <Route
               path={ROUTES.approvalBoard}
               element={
-                <RequirePermission permission="approvals.approve" label="Hồ sơ chờ phê duyệt">
+                <BusinessRoute permission="approvals.approve" label="Hồ sơ chờ phê duyệt">
                   <ApprovalInboxPage key="board" step="board" />
-                </RequirePermission>
+                </BusinessRoute>
               }
             />
             <Route
               path={ROUTES.approvalTracking}
               element={
-                <RequirePermission permission="approvals.track" label="Theo dõi tiến độ">
+                <BusinessRoute permission="approvals.track" label="Theo dõi tiến độ">
                   <ContractListPage key="tracking" variant="tracking" />
-                </RequirePermission>
+                </BusinessRoute>
               }
             />
             <Route
               path={ROUTES.workflows}
               element={
-                <RequirePermission permission="workflows.manage" label="Quy trình phê duyệt">
+                <BusinessRoute permission="workflows.manage" label="Quy trình phê duyệt">
                   <WorkflowConfigListPage />
-                </RequirePermission>
+                </BusinessRoute>
               }
             />
             <Route
               path={ROUTES.workflowCreate}
               element={
-                <RequirePermission permission="workflows.manage" label="Tạo cấu hình người tham gia">
+                <BusinessRoute permission="workflows.manage" label="Tạo cấu hình người tham gia">
                   <WorkflowConfigFormPage key="new" />
-                </RequirePermission>
+                </BusinessRoute>
               }
             />
             <Route
               path="/quan-tri/quy-trinh/:code/cap-nhat"
               element={
-                <RequirePermission permission="workflows.manage" label="Cập nhật cấu hình người tham gia">
+                <BusinessRoute permission="workflows.manage" label="Cập nhật cấu hình người tham gia">
                   <WorkflowConfigFormPage key="edit" />
-                </RequirePermission>
+                </BusinessRoute>
               }
             />
             <Route path="/bang-thanh-toan/:code" element={<RecordPlaceholderPage kind="payment" />} />
@@ -287,6 +296,5 @@ export function AppRouter() {
           </Route>
         </Route>
       </Routes>
-    </BrowserRouter>
   );
 }

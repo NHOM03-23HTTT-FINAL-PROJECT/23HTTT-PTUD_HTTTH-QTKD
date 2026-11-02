@@ -1,4 +1,4 @@
-import type { DepartmentCode, RoleCode } from '@/constants/roles';
+import type { DepartmentCode, Permission, RoleCode } from '@/constants/roles';
 
 export type AuthUser = {
   id: string;
@@ -6,7 +6,10 @@ export type AuthUser = {
   email: string;
   fullName: string;
   department: DepartmentCode;
+  /** Hợp đồng API luôn có đúng một phần tử; role được gán ngay khi cấp tài khoản. */
   roles: RoleCode[];
+  permissions?: Permission[];
+  passwordChangedAt?: string | null;
   /** Đăng nhập bằng mật khẩu tạm: phiên chỉ được vào màn đổi mật khẩu bắt buộc (UC-CHUNG-01 A2). */
   mustChangePassword: boolean;
 };
@@ -31,7 +34,7 @@ export type LoginSuccess = {
 /** Kết quả kiểm tra phiên ở mỗi request (UC-CHUNG-03 A3). */
 export type SessionCheck =
   | { status: 'active'; user: AuthUser }
-  | { status: 'password-changed' | 'locked' | 'disabled' | 'no-role' };
+  | { status: 'password-changed' | 'locked' | 'disabled' | 'expired' | 'permissions-changed' };
 
 export type ChangePasswordRequest = {
   userId: string;
@@ -70,7 +73,6 @@ export type LoginErrorCode =
   | 'INVALID_CREDENTIALS' // E2 / E2.1
   | 'LOCKED' // E2.2 / E3
   | 'DISABLED' // E4
-  | 'NO_ROLE' // E5
   | 'SYSTEM_ERROR'; // E6
 
 export class LoginError extends Error {
