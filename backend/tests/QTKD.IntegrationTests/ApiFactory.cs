@@ -11,6 +11,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
 using Npgsql.NameTranslation;
 using QTKD.Api.Authorization;
+using QTKD.Application.Features.ContractApprovals;
 using QTKD.Domain.Identity;
 using QTKD.Infrastructure.Persistence;
 
@@ -20,6 +21,8 @@ namespace QTKD.IntegrationTests;
 // SQLite supplies offline API checks only. The same suite can target an explicitly disposable Supabase DB.
 public sealed class ApiFactory : WebApplicationFactory<Program>
 {
+    public IContractApprovalEngine? ApprovalEngine { get; init; }
+    public IApprovalStore? ApprovalStore { get; init; }
     private readonly SqliteConnection sqlite = new("Data Source=:memory:");
     public readonly string Key = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48));
     public readonly string Password = "Identity.Test@2026";
@@ -39,6 +42,16 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         { ["Jwt:SigningKey"] = Key, ["Jwt:Issuer"] = "qtkd-api", ["Jwt:Audience"] = "qtkd-web", ["ConnectionStrings:Identity"] = "test-context-replaced-by-factory" }));
         builder.ConfigureTestServices(services =>
         {
+            if (ApprovalStore is not null)
+            {
+                services.RemoveAll<IApprovalStore>();
+                services.AddSingleton(ApprovalStore);
+            }
+            if (ApprovalEngine is not null)
+            {
+                services.RemoveAll<IContractApprovalEngine>();
+                services.AddSingleton(ApprovalEngine);
+            }
             services.RemoveAll<IdentityDbContext>();
             services.RemoveAll<DbContextOptions<IdentityDbContext>>();
             services.RemoveAll<IDbContextOptionsConfiguration<IdentityDbContext>>();

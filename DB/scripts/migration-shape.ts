@@ -18,11 +18,12 @@ export function migrationColumns(input: string) {
     assert(table, "ALTER references missing table: " + match[1]);
     table.set(match[2], normalizeSqlWhitespace(match[3]));
   }
-  for (const match of sql.matchAll(/ALTER TABLE "(\w+)" ALTER COLUMN "(\w+)" SET NOT NULL;/g)) {
+  for (const match of sql.matchAll(/ALTER TABLE "(\w+)" ALTER COLUMN "(\w+)" (SET|DROP) NOT NULL;/g)) {
     const table = tables.get(match[1]);
     const value = table?.get(match[2]);
     assert(value, "ALTER references missing column: " + match[1] + "." + match[2]);
-    if (!value.includes("NOT NULL")) table!.set(match[2], value.replace(/ DEFAULT /, " NOT NULL DEFAULT ") + (value.includes(" DEFAULT ") ? "" : " NOT NULL"));
+    if (match[3] === "DROP") table!.set(match[2], value.replace(/\s+NOT NULL\b/, ""));
+    else if (!value.includes("NOT NULL")) table!.set(match[2], value.replace(/ DEFAULT /, " NOT NULL DEFAULT ") + (value.includes(" DEFAULT ") ? "" : " NOT NULL"));
   }
   return [...tables].sort(([a], [b]) => a.localeCompare(b)).map(([table, cols]) => [table, [...cols].sort(([a], [b]) => a.localeCompare(b))]);
 }

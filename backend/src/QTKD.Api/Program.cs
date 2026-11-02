@@ -9,6 +9,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Npgsql.NameTranslation;
 using QTKD.Api.Authorization;
+using QTKD.Api.Endpoints;
+using QTKD.Application.Features.ContractApprovals;
+using QTKD.Application.Features.Workflows;
+using QTKD.Infrastructure.ContractApprovals;
 using QTKD.Application.Features.Identity;
 using QTKD.Domain.Identity;
 using QTKD.Infrastructure.Identity;
@@ -35,6 +39,14 @@ builder.Services.AddIdentityCore<UserAccount>(options =>
 builder.Services.AddScoped<IPasswordHasher<UserAccount>, BcryptPasswordHasher>();
 builder.Services.AddScoped<TokenIssuer>();
 builder.Services.AddScoped<IIdentityService, IdentityService>();
+builder.Services.AddScoped<ContractApprovalService>();
+builder.Services.AddSingleton<WorkflowEngine>();
+builder.Services.AddScoped<PostgresApprovalStore>();
+builder.Services.AddScoped<IApprovalDbSessions, ApprovalDbSessions>();
+builder.Services.AddScoped<ContractCoordinationService>();
+builder.Services.AddScoped<WorkflowAssignmentService>();
+builder.Services.AddScoped<IApprovalStore>(sp => sp.GetRequiredService<PostgresApprovalStore>());
+builder.Services.AddScoped<IContractApprovalEngine, ContractApprovalEngine>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
 builder.Services.AddSingleton<Microsoft.Extensions.Options.IOptionsChangeTokenSource<JwtBearerOptions>>(
@@ -94,7 +106,7 @@ builder.Services.AddRateLimiter(options =>
 });
 var allowedOrigins = builder.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? [];
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy.WithOrigins(allowedOrigins)
-    .WithMethods("GET", "POST", "PUT").WithHeaders("Content-Type", "Authorization", "X-QTKD-CSRF").AllowCredentials()));
+    .WithMethods("GET", "POST", "PUT").WithHeaders("Content-Type", "Authorization", "X-QTKD-CSRF", "Idempotency-Key").AllowCredentials()));
 
 var app = builder.Build();
 app.Use(async (context, next) =>
@@ -103,6 +115,16 @@ app.Use(async (context, next) =>
     context.Response.Headers["Cache-Control"] = "no-store";
     context.Response.Headers["X-Correlation-ID"] = context.TraceIdentifier;
     try { await next(context); }
+    catch (BadHttpRequestException)
+    {
+        context.Response.StatusCode = 400;
+        await context.Response.WriteAsJsonAsync(new { code = "VALIDATION", traceId = context.TraceIdentifier });
+    }
+    catch (ReviewFailure error)
+    {
+        context.Response.StatusCode = error.Status;
+        await context.Response.WriteAsJsonAsync(new { code = error.Code, traceId = context.TraceIdentifier });
+    }
     catch (IdentityFailure error)
     {
         context.Response.StatusCode = error.Status;
@@ -134,6 +156,9 @@ app.Use(async (context, next) =>
 });
 app.UseRateLimiter();
 app.UseAuthorization();
+app.MapContractApprovals(allowedOrigins);
+app.MapGet("/api/v1/notifications", async (HttpContext context, PostgresApprovalStore store, CancellationToken ct)
+    => Results.Ok(await store.Notifications(Guid.Parse(context.User.FindFirstValue("sub")!), ct))).RequireAuthorization();
 
 const string cookieName = "__Host-qtkd-refresh";
 bool Csrf(HttpContext context) => context.Request.Headers["X-QTKD-CSRF"] == "1"

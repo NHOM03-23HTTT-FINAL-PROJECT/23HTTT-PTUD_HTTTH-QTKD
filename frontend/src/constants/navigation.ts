@@ -138,6 +138,7 @@ export const WORKSPACE_SEARCH_PLACEHOLDER: Record<WorkspaceKey, string> = {
 
 /** Màn hình dùng chung cho mọi vai trò (không cần quyền nghiệp vụ). */
 export const ACCOUNT_NAV = {
+  coordination: { label: 'Yêu cầu phối hợp phòng ban', path: '/phe-duyet/phoi-hop', icon: 'users', module: 'Phối hợp rà soát hợp đồng' },
   profile: { label: 'Thông tin cá nhân', path: '/tai-khoan/thong-tin', icon: 'user', module: 'Tài khoản cá nhân' },
   changePassword: { label: 'Đổi mật khẩu', path: '/doi-mat-khau', icon: 'lock', module: 'UC-CHUNG-04 · Đổi mật khẩu' },
   contactAdmin: { label: 'Liên hệ Quản trị hệ thống', path: '/lien-he-quan-tri', icon: 'mail', module: 'Hỗ trợ người dùng' },

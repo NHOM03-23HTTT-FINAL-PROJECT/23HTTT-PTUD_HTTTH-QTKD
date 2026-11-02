@@ -19,6 +19,8 @@ import { CustomerSuspendPage } from '@/features/customers/pages/CustomerSuspendP
 import { ApprovalInboxPage } from '@/features/contracts/pages/ApprovalInboxPage';
 import { ContractCreatePage } from '@/features/contracts/pages/ContractCreatePage';
 import { ContractDetailPage } from '@/features/contracts/pages/ContractDetailPage';
+import { ContractReviewPage } from '@/features/contracts/pages/ContractReviewPage';
+import { CoordinationInboxPage } from '@/features/contracts/pages/LegalCoordinationPanel';
 import { ContractEditPage } from '@/features/contracts/pages/ContractEditPage';
 import { ContractListPage } from '@/features/contracts/pages/ContractListPage';
 import { ContractProgressPage } from '@/features/contracts/pages/ContractProgressPage';
@@ -31,6 +33,7 @@ import { NavPlaceholderPage, NotFoundPage, RecordPlaceholderPage } from './Place
 
 /** Đường dẫn trong menu đã có màn hình thật, không dùng trang giữ chỗ. */
 const IMPLEMENTED_PATHS = new Set<string>([
+  '/phe-duyet/phoi-hop',
   ROUTES.changePassword,
   ROUTES.customers,
   ROUTES.customerCreate,
@@ -227,7 +230,7 @@ export function AppRoutes() {
             <Route
               path={ROUTES.approvalSales}
               element={
-                <BusinessRoute permission="approvals.approve" label="Hồ sơ chờ tôi duyệt">
+                <BusinessRoute apiReady permission="approvals.approve" label="Hồ sơ chờ tôi duyệt">
                   <ApprovalInboxPage key="sales" step="sales" />
                 </BusinessRoute>
               }
@@ -235,7 +238,7 @@ export function AppRoutes() {
             <Route
               path={ROUTES.approvalLegal}
               element={
-                <BusinessRoute permission="approvals.review-legal" label="Chờ rà soát pháp lý">
+                <BusinessRoute apiReady permission="approvals.review-legal" label="Chờ rà soát pháp lý">
                   <ApprovalInboxPage key="legal" step="legal" />
                 </BusinessRoute>
               }
@@ -243,7 +246,7 @@ export function AppRoutes() {
             <Route
               path={ROUTES.approvalLegalDone}
               element={
-                <BusinessRoute permission="approvals.review-legal" label="Đã rà soát">
+                <BusinessRoute apiReady permission="approvals.review-legal" label="Đã rà soát">
                   <ApprovalInboxPage key="legal-done" step="legal" done />
                 </BusinessRoute>
               }
@@ -251,7 +254,7 @@ export function AppRoutes() {
             <Route
               path={ROUTES.approvalBoard}
               element={
-                <BusinessRoute permission="approvals.approve" label="Hồ sơ chờ phê duyệt">
+                <BusinessRoute apiReady permission="approvals.approve" label="Hồ sơ chờ phê duyệt">
                   <ApprovalInboxPage key="board" step="board" />
                 </BusinessRoute>
               }
@@ -288,6 +291,8 @@ export function AppRoutes() {
                 </BusinessRoute>
               }
             />
+            <Route path="/phe-duyet/ho-so/:id" element={<ContractReviewPage />} />
+            <Route path="/phe-duyet/phoi-hop" element={<BusinessRoute apiReady label="Phối hợp phòng ban"><CoordinationInboxPage /></BusinessRoute>} />
             <Route path="/bang-thanh-toan/:code" element={<RecordPlaceholderPage kind="payment" />} />
             {NAV_PATHS.map((path) => (
               <Route key={path} path={path} element={<NavPlaceholderPage />} />
