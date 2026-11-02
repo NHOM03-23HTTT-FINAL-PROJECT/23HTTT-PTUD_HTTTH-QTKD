@@ -1,20 +1,84 @@
-# API Xác thực (UC-CHUNG-01 → 04)
+# API Identity — TASK-022/023
 
-Nguồn: `frontend/src/features/auth/api/authApi.ts`, `passwordRecoveryApi.ts` và `frontend/src/mocks/authServer.ts`, `passwordRecoveryServer.ts`. Quy ước chung (tiền tố, JWT, Idempotency-Key, mã lỗi) xem [list_api.md](../../../list_api.md).
+Tiền tố /api/v1. Hợp đồng theo ADR 0001–0003, được chốt Phase 0 ngày 02/11/2026.
+Đã có source và đăng nhập thật theo bàn giao; integration BE/PostgreSQL chưa có suite PASS đầy đủ. Xem [bằng chứng kiểm tra](../../testing/test-cases/identity.md), không suy ra API đã nghiệm thu từ tài liệu này.
 
-> Endpoint là đề xuất từ chữ ký hàm FE, chưa đối chiếu đặc tả UC chi tiết và chưa được nhóm BE chốt.
+## Quy tắc chung
 
-| Method | Endpoint | UC | Hàm FE | Ghi chú |
-|---|---|---|---|---|
-| POST | `/auth/login` | CHUNG-01 | `authApi.login` | `{identifier, password}` → token, user, `previousLogin`; mật khẩu tạm thì bắt buộc đổi (A2) |
-| GET | `/auth/session` | CHUNG-03 A3 | `authApi.checkSession` | `active` / `password-changed` / `locked` / `disabled` / `no-role` |
-| POST | `/auth/logout` | CHUNG-03 | `authApi.logout` | `{reason: logout \| expired}` |
-| POST | `/auth/password/change` | CHUNG-04 | `authApi.changePassword` | `{currentPassword, newPassword}` → token mới, `passwordChangedAt`; các phiên khác bị thu hồi |
-| GET | `/auth/password/changed-at` | CHUNG-04 | `authApi.getPasswordChangedAt` | Có thể gộp vào `/auth/session` |
-| POST | `/auth/password-recovery/otp` | CHUNG-02 | `passwordRecoveryApi.sendOtp` | `{identifier}` → `expiresAt`, `resendAvailableAt`; phản hồi như nhau dù tài khoản có tồn tại hay không |
-| POST | `/auth/password-recovery/otp/verify` | CHUNG-02 | `passwordRecoveryApi.verifyOtp` | `{identifier, code}` → `resetToken`, `accountLabel` |
-| POST | `/auth/password-recovery/reset` | CHUNG-02 | `passwordRecoveryApi.resetPassword` | `{resetToken, newPassword}` |
+- JWT qua Authorization: Bearer. Không nhận userId/signedInAt làm bằng chứng đăng nhập.
+- Có đúng một role bắt buộc. DTO roles là array đúng một phần tử. permissions do BE trả, có thể rỗng.
+- 401: token/phiên không hợp lệ. 403: đã xác thực nhưng thiếu quyền, hoặc phải đổi mật khẩu trước. Không kết thúc phiên chỉ vì 403.
+- Role/data/config lỗi trong đăng nhập: 500 SYSTEM_ERROR và không tạo session. Không có nhánh NO_ROLE.
+- Body lỗi: code, traceId; remainingAttempts/lockedUntil chỉ có khi phù hợp. Không trả lỗi SQL hoặc nội dung secret.
+- Cookie __Host-qtkd-refresh: HttpOnly, Secure, SameSite=Strict, Path=/, không Domain. Secret không trả trong JSON.
+- Login/refresh/logout/change-password yêu cầu Origin trong Cors:Origins và X-QTKD-CSRF: 1. Body JSON. Server giới hạn auth 30 request/phút/IP, không hàng đợi; vượt trả 429.
+- Chỉ thêm permission đã có trong catalog. Role catalog tám mã cố định. QTHT không có wildcard bỏ qua scope/assignee.
+- API không tự migrate/seed. Chưa có recovery OTP/email thật trong phạm vi này.
 
-## Chưa có trong code
+## Xác thực và phiên
 
-Quản lý người dùng, phòng ban, vai trò, quyền (TASK-021..028) chưa có FE (`features/users/` mới có `.gitkeep`), nên chưa có API trong danh sách này.
+| Method | Endpoint | Dữ liệu / kết quả | Điều kiện |
+| --- | --- | --- | --- |
+| POST | /auth/login | identifier, password, remember → accessToken, accessTokenExpiresAt, user, signedInAt, previousLogin, idleExpiresAt, expiresAt | Anonymous + Origin/CSRF + rate limit |
+| GET | /auth/session | status=active, user hiện hành, signedInAt và thời hạn | JWT và session DB hợp lệ; không gia hạn idle |
+| POST | /auth/activity | Body {} → session hiện hành và idleExpiresAt mới | JWT/session; gia hạn tối đa tới giới hạn tuyệt đối |
+| POST | /auth/refresh | Body {} → kết quả auth mới và xoay cookie | Cookie refresh hiện hành + Origin/CSRF; không gia hạn idle |
+| POST | /auth/logout | Body {} → 204, thu hồi phiên có proof logout và xóa cookie | Origin/CSRF; gọi lặp an toàn, không cần JWT còn hạn |
+| POST | /auth/password/change | currentPassword, newPassword → kết quả auth mới và passwordChangedAt | JWT + cookie cùng phiên + Origin/CSRF; giữ phiên hiện tại, thu hồi phiên khác |
+
+user gồm id, username, email, fullName, department (mã), roles, permissions, mustChangePassword, passwordChangedAt và status.
+signedInAt là thời điểm phiên được tạo, không phải token để xác thực.
+Password mới tối thiểu 12 ký tự, tối đa 72 byte UTF-8, có hoa/thường/số/ký tự đặc biệt.
+Password tạm chỉ vào session/activity/refresh/logout/change-password; endpoint khác trả 403 PASSWORD_CHANGE_REQUIRED.
+JWT 10 phút, clock skew 60 giây; idle 30 phút, tuyệt đối 8 giờ. Ghi nhớ chỉ thay đổi persistence cookie.
+
+Sai credential trả 401 INVALID_CREDENTIALS chung, không hiển thị số lần còn lại cho login HTTP.
+Đang khóa và đã xác minh đúng mật khẩu: 423 LOCKED kèm lockedUntil; disabled: 403 DISABLED.
+Đổi mật khẩu sai hiện tại: 400 WRONG_CURRENT, tới lần 5: 400 LOCKED và thu hồi phiên.
+Phiên kết thúc có code expired/password-changed/locked/disabled/permissions-changed. Token hỏng trả SESSION_ENDED.
+
+## Người dùng, phòng ban, vai trò và quyền
+
+| Method | Endpoint | Dữ liệu | Permission |
+| --- | --- | --- | --- |
+| GET | /users | Tối đa 200 tài khoản, không hash mật khẩu | users.manage |
+| GET | /users/{id} | Chi tiết tài khoản, có status, không hash mật khẩu | users.manage |
+| POST | /users | username, email, fullName, departmentId, role (mã FE), password → 201; mustChangePassword=true | users.manage |
+| PUT | /users/{id} | fullName, departmentId, role, status (Active/Disabled) | users.manage |
+| GET | /departments | departmentId, code, departmentName, managerId | users.manage |
+| POST | /departments | code, name | departments.manage |
+| PUT | /departments/{id} | code bất biến, name | departments.manage |
+| GET | /roles | code, name, department, permissions | roles.manage |
+| PUT | /roles/{code}/permissions | permissions: string[]; thay toàn bộ grants của role | roles.manage |
+| GET | /permissions | Mã permission catalog | roles.manage |
+
+Cấp user thiếu role/role không hợp lệ hoặc role không thuộc phòng ban: 400.
+Username dùng chữ thường a-z, số, dấu ._-; email chuẩn hóa lowercase và unique.
+Không xóa user/department/role qua API để giữ tham chiếu lịch sử.
+Thay role/phòng ban/status thu hồi session user; thay grants được kiểm tra lại mỗi request.
+Chặn tự thay role/phòng ban/status của mình, admin cuối và bỏ quyền admin thiết yếu: 409.
+Lookup department/role cho màn quản trị hiện dành cho QTHT có bộ quyền đầy đủ; chưa thiết kế UI quản trị TASK-025.
+
+## Ánh xạ role
+
+| DB | FE | Phòng ban |
+| --- | --- | --- |
+| SalesStaff | NV_KD | KD |
+| SalesManager | TP_KD | KD |
+| OperationsStaff | NV_KT | KT |
+| OperationsManager | TP_KT | KT |
+| Accountant | NV_KTOAN | KTOAN |
+| LegalStaff | NV_PC | PC |
+| BoardMember | GD | BGD |
+| SystemAdmin | QTHT | QTHT |
+
+Ma trận grants khởi tạo nằm tại DB/prisma/identity-catalog.ts và migration 202611020003_identity.
+Sau khi admin thay grants, DB là nguồn quyền; chạy seed không tự phục hồi quyền đã gỡ.
+
+## Tích hợp các module tiếp theo
+
+Policy ResourceAccess nhận resource metadata từ BE đã tải: permission, InScope, OwnerId/AssigneeId nếu cần, StateAllowsAction.
+Không bind trực tiếp ResourceAccess từ body client và không mặc định InScope=true khi thiếu AC.
+Handler chỉ cung cấp cơ chế; chưa chứng minh endpoint duyệt thật đã tích hợp handler.
+
+OTP recovery, get-password-changed-at riêng và CRUD UI quản trị chưa thuộc API đã triển khai. passwordChangedAt được gộp trong user/session.
