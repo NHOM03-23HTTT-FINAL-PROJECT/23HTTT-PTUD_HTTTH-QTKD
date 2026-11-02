@@ -1,8 +1,16 @@
 # Database QTKD trên Supabase
 
+## Cập nhật TASK-022/023 ngày 02/11/2026
+
+Giữ nguyên 26 bảng từ dictionary và hai migration cũ, bổ sung ba bảng role_definition/permission/role_permission cùng metadata Identity trong migration `202611020003_identity`. Schema hiện có 29 model. Một role bắt buộc; grants có thể rỗng. Nguồn dictionary 239 cột vẫn được giữ trong source-columns.json để đối chiếu, không sửa nguồn nghiệp vụ thành quyết định mới.
+
+Nhận DB/.env qua kênh bảo mật của nhóm và đặt CA tại DB/.env.supabase-ca.crt nếu dùng file CA riêng. Chạy connection:check và migrate:status từ DB/ để biết trạng thái DB đích. Thành viên pull code dùng DB chung đã chuẩn bị không cần tự deploy/seed. Số bảng và migration trong tài liệu mô tả schema mục tiêu; không thay thế kiểm tra môi trường thực tế. Integration/replay/seed hai lần trên PostgreSQL test riêng vẫn chưa có bằng chứng PASS đầy đủ.
+
+Ma trận ban đầu nằm trong `prisma/identity-catalog.ts`, được bootstrap bằng migration; seed không khôi phục grants admin đã gỡ. Native checks không cần dependencies: `node --experimental-transform-types --test tests/identity-offline.test.mjs`. Đây là kiểm tra nguồn/mapping, không thực thi PostgreSQL. `npm run check` cần cài dependencies và vẫn không chứng minh migration chạy được trên DB thật.
+
 Bộ Prisma độc lập này dựng toàn bộ **26 bảng, 239 cột còn hiệu lực, 59 khóa ngoại** trong `data-dictionary.md` được cung cấp ngày 02/11/2026, đối chiếu `spec nghiệp vụ + hệ thống (8).docx`. DB đích là PostgreSQL trên Supabase; không dùng PostgreSQL/Docker local. Backend ứng dụng vẫn là C#/.NET Web API.
 
-**Chưa có Supabase để thực thi migration và seed.** Kiểm tra offline không chứng minh trigger, RLS, transaction hay việc chạy lại seed đã hoạt động trên PostgreSQL thật.
+Kiểm tra offline không chứng minh trigger, RLS, transaction hay việc chạy lại seed đã hoạt động trên PostgreSQL thật. Chín tài khoản demo trên DB chung đã được reset theo phê duyệt riêng, xem [changelog Identity](../docs/specs/identity/CHANGELOG.md); thao tác đó không phải hành vi tự động của seed.
 
 ## Kiểm tra khi chưa có DB
 
@@ -17,11 +25,15 @@ npm run check
 
 `npm run seed:check` chỉ kiểm tra dữ liệu seed. URL `.invalid` trong `prisma.config.ts` chỉ giúp các lệnh offline đọc cấu hình; không phải DB local hoặc DB có thể kết nối.
 
+Generator `prisma-client` xuất `generated/prisma/client.ts`, không phải client.js. Repo import trực tiếp `.ts` và đặt importFileExtension=ts cho tsx. `npm run seed` tự chạy generate qua preseed; nếu gọi `npx prisma db seed` hoặc `npm run seed:check` trực tiếp thì chạy `npm run generate` trước. Dùng Node 24 LTS theo hướng dẫn local; cảnh báo DEP0205 trên Node 26 không phải lỗi thiếu Prisma Client.
+
 ## Chạy khi đã có project Supabase
 
+Nếu seed lỗi P1011, chạy `npm run connection:check` để kiểm tra kết nối bằng SELECT 1 mà không ghi dữ liệu. Xem [hướng dẫn TLS/CA và mã lỗi](../docs/setup/DATABASE-TLS.md). Khuyến nghị sslmode=verify-full; khi cần CA, dùng sslrootcert trỏ file tải từ Supabase Database Settings.
+
 1. Trong **Supabase > Connect**, lấy URI **Direct connection** cổng 5432. Nếu mạng không hỗ trợ IPv6, dùng **Session pooler** cổng 5432. Không dùng Transaction pooler cổng 6543 cho migration.
-2. Copy `.env.example` thành `DB/.env`. Điền `DIRECT_URL` thật, giữ `schema=qtkd` và `sslmode=require`; URL-encode ký tự đặc biệt trong mật khẩu. Đặt `SEED_PASSWORD` riêng cho demo, tối thiểu 12 ký tự, tối đa 72 byte UTF-8.
-3. Chạy từ `DB/`:
+2. Dùng DB/.env nhận riêng từ nhóm, hoặc copy .env.example nếu dựng DB riêng. Giữ `schema=qtkd` và `sslmode=verify-full`; URL-encode ký tự đặc biệt trong mật khẩu. Khi CA nằm cùng .env, dùng `sslrootcert=./.env.supabase-ca.crt` và chạy lệnh từ DB/. Đặt SEED_PASSWORD riêng cho demo khi tạo mới, tối thiểu 12 ký tự, tối đa 72 byte UTF-8.
+3. Trên DB chung đã chuẩn bị, chỉ chạy `npm run connection:check` và `npm run migrate:status`. Phần ghi dữ liệu sau dành cho người phụ trách dựng DB mới hoặc cập nhật schema đã được nhóm thống nhất, chạy từ `DB/`:
 
 ```powershell
 npm run migrate:status
@@ -39,7 +51,7 @@ Sau khi migrate/seed, dùng [scripts/verify-supabase.sql](scripts/verify-supabas
 
 | File | Vai trò |
 | --- | --- |
-| `prisma/schema.prisma` | Nguồn cấu trúc 26 model và 20 enum |
+| `prisma/schema.prisma` | Nguồn cấu trúc 29 model (26 dictionary + 3 Identity) và 20 enum |
 | `prisma.config.ts` | Cấu hình CLI và lệnh seed |
 | `prisma/migrations/202611020001_dictionary/migration.sql` | DDL sinh offline, bọc transaction và đặt search path `qtkd` |
 | `prisma/migrations/202611020002_constraints/migration.sql` | CHECK, index có điều kiện, trigger và RLS |
@@ -54,7 +66,7 @@ Theo yêu cầu chuẩn bị Prisma, bộ này dùng **Prisma làm nguồn migra
 
 Seed có 6 phòng ban, 9 tài khoản thuộc 8 vai trò, khách hàng Active/Suspended, cây khu vực 3 cấp, dịch vụ, hợp đồng/phụ lục, bảng giá, sản lượng, thanh toán, lượt duyệt và phiên ký giả lập. Username dạng `demo.*`, email `example.invalid`; không có dữ liệu cá nhân thật.
 
-Mật khẩu băm bcrypt cost 12 từ biến môi trường, bật bắt buộc đổi mật khẩu. Backend .NET cần xác minh bcrypt tương ứng; đây không phải định dạng mặc định của ASP.NET Identity PasswordHasher. Không ghi mật khẩu cố định vào source. Phiên đăng nhập mẫu đã thu hồi; OTP mẫu đã dùng và hết hạn.
+Tài khoản seed mới dùng bcrypt cost 12 từ biến môi trường, bật bắt buộc đổi mật khẩu. Chín tài khoản hiện có trên QTKD_DATH được bỏ bắt đổi lần đầu theo thao tác reset riêng ngày 02/11/2026, không thay đổi fixture tạo mới. Backend .NET đã có custom hasher và test bcrypt hai chiều; lần chạy gần nhất bị abort do testhost không kết nối, chưa PASS. Đây không phải định dạng mặc định của ASP.NET Identity PasswordHasher. Không ghi mật khẩu thật vào source. Phiên đăng nhập mẫu đã thu hồi; OTP mẫu đã dùng và hết hạn.
 
 Đường dẫn `demo-placeholder/...` chỉ là metadata, không có file thật. Seed không upload Storage, gửi email hoặc gọi dịch vụ ký. Các trạng thái lịch sử Approved/Issued/Succeeded được nhập sẵn làm fixture, không phải kết quả đã chạy luồng nghiệp vụ.
 

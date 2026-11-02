@@ -1,15 +1,25 @@
 # FE: React + TypeScript + Vite
 
+## Cập nhật Identity ngày 02/11/2026
+
+TASK-022/023 đã có adapter HTTP cho đăng nhập/phiên/đăng xuất/đổi mật khẩu tối thiểu. Mặc định `VITE_AUTH_MODE=api`, Vite proxy `/api` tới `https://localhost:7156`. Chỉ dùng chế độ này khi BE và migration Identity sẵn sàng. Cookie Secure cần localhost được trình duyệt tin cậy hoặc HTTPS local.
+
+Nhận frontend/.env.local qua kênh bảo mật của nhóm; hướng dẫn chạy FE/BE sau khi pull ở [README gốc](../README.md). Để xem các màn nghiệp vụ prototype, đặt `VITE_AUTH_MODE=mock` rồi khởi động lại Vite. Trong API mode, BusinessRoute chặn 26 route Khách hàng/Khu vực/Hợp đồng/Phê duyệt/Workflow chưa có API sau kiểm tra permission, hiển thị chưa sẵn sàng và giữ phiên. Tài khoản DB không dùng với auth mock. Dashboard vẫn là dữ liệu minh họa, chưa phải số liệu DB thật.
+
+Một tài khoản luôn có đúng một role. Hai mock thiếu role đã bỏ; role không có permission vẫn đăng nhập. HTTP mode lấy permissions từ BE, 403 không làm logout. Không lưu access/refresh token vào Web Storage; chỉ lưu metadata phiên và cờ đã đăng xuất cục bộ. OTP recovery chỉ hiển thị trong mock mode.
+
+Sau `npm ci`, chạy `npm run typecheck`, `npm run build`, `npm run test:auth` (15 tests HTTP/session/route SSR). Chỉ hai test file auth-client.test.mjs và session-store.test.mjs chạy độc lập không cần npm dependencies bằng Node native TypeScript; business-routes.test.mjs cần React/TypeScript trong node_modules. Hợp đồng và trạng thái nghiệm thu xem [plan](../docs/specs/identity/TASK-022-023-PLAN.md).
+
 Khung thư mục theo TASK-031, 032. Bản đồ module chung xem tại [docs/architecture/STRUCTURE.md](../docs/architecture/STRUCTURE.md).
 
 ## Prototype hiện có
 
-Prototype tương tác theo Figma "PTUD ERP – App shell & Dashboard theo vai trò", page **04 · Dùng chung (CHUNG)**. Chưa có API/BE/DB: dữ liệu mẫu nằm trong `src/mocks/`, trạng thái giả lập (bộ đếm sai mật khẩu, thời điểm khóa, lần đăng nhập trước) lưu ở localStorage key `qtkd.mock.v1`.
+Phần hướng dẫn prototype dưới đây áp dụng cho **VITE_AUTH_MODE=mock**. Prototype tương tác theo Figma "PTUD ERP – App shell & Dashboard theo vai trò", page **04 · Dùng chung (CHUNG)**. Chế độ này không gọi API/BE/DB: dữ liệu mẫu nằm trong `src/mocks/`, trạng thái giả lập lưu ở localStorage key `qtkd.mock.v1`.
 
 Phiên bản dùng cho prototype: React 18.3.1, React Router 6.28.0, Vite 5.4.11, TypeScript 5.6.3 (đã chạy với Node.js 24). Đây là lựa chọn khi dựng prototype, nhóm vẫn cần chốt phiên bản chính thức.
 
 ```bash
-npm install
+npm ci
 npm run dev      # http://localhost:5173
 npm run build    # kiểm tra kiểu + build production
 ```
@@ -24,7 +34,6 @@ npm run build    # kiểm tra kiểu + build production
 | 01.3 Sai thông tin (E2) | Nhập sai mật khẩu; hiển thị số lần thử còn lại |
 | 01.4 Tạm khóa (E2.2/E3) | Sai 5 lần liên tiếp, hoặc đăng nhập `quan.tm` (khóa sẵn) |
 | 01.5 Vô hiệu hóa (E4) | `tuan.lv` |
-| 01.6 Chưa phân quyền (E5) | `thao.nt` hoặc `khoa.pv` |
 | 01.7 Lỗi hệ thống (E6) | `test.loi` |
 | 01.8 Đang xử lý | Trạng thái trong ~0,9 giây sau khi bấm "Đăng nhập" |
 | 01.9 Không có quyền (A3) | Đăng nhập `an.nv` từ `/bang-thanh-toan/BTT-2026-0076` |
