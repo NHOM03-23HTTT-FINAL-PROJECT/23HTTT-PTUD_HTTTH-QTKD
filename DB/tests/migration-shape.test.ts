@@ -18,6 +18,14 @@ test("column types and nullability remain significant", () => {
   assert.notDeepEqual(migrationColumns(expected), migrationColumns(expected.replace('VARCHAR(16)', 'TEXT')));
   assert.notDeepEqual(migrationColumns(expected), migrationColumns(expected.replace(' NOT NULL', '')));
 });
+
+test("future assignee can become nullable through an additive migration", () => {
+  const base = 'CREATE TABLE "example" (\n "assignee_id" UUID NOT NULL\n);';
+  const migrated = base + '\nALTER TABLE "qtkd"."example" ALTER COLUMN "assignee_id" DROP NOT NULL;';
+  assert.deepEqual(migrationColumns(migrated), migrationColumns(base.replace(' NOT NULL', '')));
+  assert.deepEqual(migrationColumns(migrated + '\nALTER TABLE "example" ALTER COLUMN "assignee_id" SET NOT NULL;'), migrationColumns(base));
+  assert.throws(() => migrationColumns(base + '\nALTER TABLE "example" ALTER COLUMN "missing" DROP NOT NULL;'), /example\.missing/);
+});
 test("an ALTER for a missing column is rejected with its location", () => {
   assert.throws(() => migrationColumns('CREATE TABLE "example" (\n "id" UUID\n);\nALTER TABLE "example" ALTER COLUMN "missing" SET NOT NULL;'), /example\.missing/);
 });
