@@ -62,6 +62,18 @@ public class ContractsController : ControllerBase
         await _service.Update(
             await _actor.Get(ct), code, request, ct);
 
+    [HttpGet("{code}/submit-check")]
+    [Authorize(Policy = "contracts.create")]
+    public async Task<System.Text.Json.Nodes.JsonObject> SubmitCheck(string code, CancellationToken ct) =>
+        await _service.SubmitCheck(
+            await _actor.Get(ct), code, ct);
+
+    [HttpPost("{code}/submit")]
+    [Authorize(Policy = "contracts.create")]
+    public async Task<System.Text.Json.Nodes.JsonObject> Submit(string code, CancellationToken ct) =>
+        await _service.Submit(
+            await _actor.Get(ct), code, Key, ct);
+
     [HttpPost("{code}/cancel")]
     [Authorize(Policy = "contracts.create")]
     public async Task<System.Text.Json.Nodes.JsonObject> Cancel(

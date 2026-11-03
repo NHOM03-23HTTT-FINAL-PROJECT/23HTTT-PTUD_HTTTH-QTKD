@@ -114,8 +114,6 @@ export const contractsApi = BACKEND_ENABLED
   ? {
       ...mockContractsApi,
       ...serverContractsApi,
-      checkSubmit: deferred,
-      submit: deferred,
       acceptReview: deferred,
       decide: deferred,
       retryPendingTask: deferred,

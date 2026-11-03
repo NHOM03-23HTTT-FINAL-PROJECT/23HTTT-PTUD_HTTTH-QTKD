@@ -25,6 +25,12 @@ public class ContractService
     public async Task<JsonObject> Get(Actor actor, string code, CancellationToken ct) =>
         (await _store.Get(actor, code, ct)).Data;
 
+    public Task<JsonObject> SubmitCheck(Actor actor, string code, CancellationToken ct) =>
+        _store.SubmitCheck(actor, code, ct);
+
+    public Task<JsonObject> Submit(Actor actor, string code, string key, CancellationToken ct) =>
+        _store.Submit(actor, code, Key(key), ct);
+
     public Task<JsonObject> Cancel(Actor actor, string code, CancelContract request, string key, CancellationToken ct)
     {
         ContractValidator.Reason(request.Reason);

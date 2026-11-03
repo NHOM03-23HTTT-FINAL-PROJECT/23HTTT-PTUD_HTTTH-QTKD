@@ -266,7 +266,7 @@ export function ContractDetailPage() {
               Hủy hồ sơ
             </Button>
           )}
-          {editable && !BACKEND_ENABLED && (
+          {editable && (
             <Button disabled={checking} onClick={() => void openSubmit()}>
               {checking
                 ? 'Đang kiểm tra…'
