@@ -2,7 +2,7 @@
 
 ## Cập nhật TASK-022/023 ngày 02/11/2026
 
-Giữ nguyên 26 bảng từ dictionary và hai migration cũ, bổ sung ba bảng role_definition/permission/role_permission cùng metadata Identity trong migration `202611020003_identity`. Schema hiện có 30 model sau khi thêm `workflow_config` (SYS-CTR-10, migration `202611030002_workflow_config`). Một role bắt buộc; grants có thể rỗng. Nguồn dictionary 239 cột vẫn được giữ trong source-columns.json để đối chiếu, không sửa nguồn nghiệp vụ thành quyết định mới.
+Giữ nguyên 26 bảng từ dictionary và hai migration cũ, bổ sung ba bảng role_definition/permission/role_permission cùng metadata Identity trong migration `202611020003_identity`. Schema hiện có 29 model. Bảng `workflow_config` (migration `202611030002`) đã được bỏ bằng migration `202611030003_approval_assignment` khi SYS-CTR-10 đổi sang phân công người duyệt. Một role bắt buộc; grants có thể rỗng. Nguồn dictionary 239 cột vẫn được giữ trong source-columns.json để đối chiếu, không sửa nguồn nghiệp vụ thành quyết định mới.
 
 Nhận DB/.env qua kênh bảo mật của nhóm và đặt CA tại DB/.env.supabase-ca.crt nếu dùng file CA riêng. Chạy connection:check và migrate:status từ DB/ để biết trạng thái DB đích. Thành viên pull code dùng DB chung đã chuẩn bị không cần tự deploy/seed. Số bảng và migration trong tài liệu mô tả schema mục tiêu; không thay thế kiểm tra môi trường thực tế. Integration/replay/seed hai lần trên PostgreSQL test riêng vẫn chưa có bằng chứng PASS đầy đủ.
 
@@ -51,13 +51,15 @@ Sau khi migrate/seed, dùng [scripts/verify-supabase.sql](scripts/verify-supabas
 
 | File | Vai trò |
 | --- | --- |
-| `prisma/schema.prisma` | Nguồn cấu trúc 30 model (26 dictionary + 3 Identity + `workflow_config`) và 20 enum |
+| `prisma/schema.prisma` | Nguồn cấu trúc 29 model (26 dictionary + 3 Identity) và 20 enum |
 | `prisma.config.ts` | Cấu hình CLI và lệnh seed |
 | `prisma/migrations/202611020001_dictionary/migration.sql` | DDL sinh offline, bọc transaction và đặt search path `qtkd` |
 | `prisma/migrations/202611020002_constraints/migration.sql` | CHECK, index có điều kiện, trigger và RLS |
 | `prisma/migrations/202611020003_identity/migration.sql` | Bảng quyền Identity, `department.code`, metadata mật khẩu/phiên |
 | `prisma/migrations/202611030001_approval_unassigned/migration.sql` | Cho phép bước duyệt tương lai chưa có người được giao (SYS-CTR-08 A4) |
-| `prisma/migrations/202611030002_workflow_config/migration.sql` | Bảng `workflow_config` cho SYS-CTR-10, index một phiên bản đang áp dụng, trigger chặn sửa lịch sử, RLS |
+| `prisma/migrations/202611030002_workflow_config/migration.sql` | Bảng `workflow_config` (cấu hình theo phiên bản). Đã áp lên DB chung; giữ nguyên lịch sử, bị bỏ ở migration sau |
+| `prisma/migrations/202611030003_manager_roles/migration.sql` | Thêm giá trị enum `LegalManager` (Trưởng phòng Pháp chế), `BoardChair` (Tổng Giám đốc). Tách riêng vì giá trị enum mới không dùng được trong cùng transaction |
+| `prisma/migrations/202611030004_approval_assignment/migration.sql` | SYS-CTR-10: bỏ `workflow_config`; thêm vai trò LegalManager/BoardChair (quyền như nhân viên phòng + `approvals.assign`), cấp `approvals.assign` cho SalesManager; trigger cho đổi người khi bước chưa bắt đầu |
 | `prisma/seed-data.ts` | Fixture có ID cố định và snapshot riêng |
 | `prisma/seed.ts` | Dry-run hoặc seed trong một transaction |
 | `data-dictionary/source-columns.json` | Coverage trích từ bảng/cột/FK trong tài liệu nguồn |
@@ -65,33 +67,11 @@ Sau khi migrate/seed, dùng [scripts/verify-supabase.sql](scripts/verify-supabas
 
 Theo yêu cầu chuẩn bị Prisma, bộ này dùng **Prisma làm nguồn migration**. Không tạo bộ EF Core migration song song. Khi dựng backend .NET, ánh xạ entity vào DB này; nếu nhóm chuyển sang EF Core quản lý schema, phải baseline lịch sử và chốt chuyển đổi trước.
 
-## Bảng workflow_config (SYS-CTR-10)
-
-Ngoại lệ ngoài 26 bảng dictionary, lý do ghi trong [DECISIONS.md](data-dictionary/DECISIONS.md). Mỗi dòng là một phiên bản cấu hình người tham gia; API ở `backend/src/QTKD.Api/Endpoints/WorkflowConfigEndpoints.cs`, mô tả trong [list_api-contract.md](../docs/specs/contracts/list_api-contract.md).
-
-| Cột | Kiểu | Ý nghĩa |
-| --- | --- | --- |
-| `config_id` | UUID PK | Định danh phiên bản |
-| `code` | VARCHAR(32) | Mã cấu hình, cố định qua các phiên bản, dạng `QT-<loại>-<mã phòng ban>` (VD `QT-HD-KD`) |
-| `version` | INTEGER ≥ 1 | Số phiên bản; `(code, version)` duy nhất |
-| `config_name` | VARCHAR(200) | Tên cấu hình |
-| `doc_type` | VARCHAR(32) | `contract`, `appendix`, `cancel-agreement`, `termination` |
-| `department_id` | UUID FK → `department` | Phạm vi áp dụng |
-| `stages` | JSONB (mảng) | Giai đoạn theo thứ tự: `key`, `enabled`, `role`, `mode`, `participants`, `backups`, `notify` (mảng `user_id`), `condition`, `confirmDepartment` (chỉ `dept-confirm`) |
-| `change_summary` | TEXT | Tóm tắt thay đổi so với phiên bản trước |
-| `is_active` | BOOLEAN | Phiên bản đang áp dụng |
-| `activated_by` | UUID FK → `user_account` | Người kích hoạt |
-| `activated_at` | TIMESTAMPTZ | Thời điểm kích hoạt |
-
-Ràng buộc:
-- Mỗi `(doc_type, department_id)` và mỗi `code` chỉ có một dòng `is_active`.
-- Trigger `workflow_config_history` chặn DELETE và mọi UPDATE, trừ việc tắt `is_active`.
-- Lượt duyệt không tham chiếu bảng này mà giữ bản sao trong `approval_round.record_snapshot`, nên kích hoạt phiên bản mới không đổi lượt đang chạy.
-- Mỗi lần kích hoạt ghi một dòng `audit_log` (`entity_type='WorkflowConfig'`, `action='activate'`), kèm Idempotency-Key và trạng thái trước/sau.
-
 ## Dữ liệu demo
 
-Seed có 6 phòng ban, 9 tài khoản thuộc 8 vai trò, khách hàng Active/Suspended, cây khu vực 3 cấp, dịch vụ, hợp đồng/phụ lục, bảng giá, sản lượng, thanh toán, lượt duyệt, phiên ký giả lập và một cấu hình người tham gia `QT-HD-KD` v1 cho hợp đồng Phòng Kinh doanh. Username dạng `demo.*`, email `example.invalid`; không có dữ liệu cá nhân thật.
+Dữ liệu thử phân công người duyệt (SYS-CTR-10): 3 hồ sơ "Chờ TP Kinh doanh / TP Pháp chế / Tổng Giám đốc phân công Demo" có lượt đang chạy với bước chưa có người duyệt; hồ sơ "Hợp đồng chờ rà soát Demo" có đủ người nên dùng để thử đổi người.
+
+Seed có 6 phòng ban, 11 tài khoản thuộc 10 vai trò, khách hàng Active/Suspended, cây khu vực 3 cấp, dịch vụ, hợp đồng/phụ lục, bảng giá, sản lượng, thanh toán, lượt duyệt và phiên ký giả lập. Username dạng `demo.*`, email `example.invalid`; không có dữ liệu cá nhân thật.
 
 Tài khoản seed mới dùng bcrypt cost 12 từ biến môi trường, bật bắt buộc đổi mật khẩu. Chín tài khoản hiện có trên QTKD_DATH được bỏ bắt đổi lần đầu theo thao tác reset riêng ngày 02/11/2026, không thay đổi fixture tạo mới. Backend .NET đã có custom hasher và test bcrypt hai chiều; lần chạy gần nhất bị abort do testhost không kết nối, chưa PASS. Đây không phải định dạng mặc định của ASP.NET Identity PasswordHasher. Không ghi mật khẩu thật vào source. Phiên đăng nhập mẫu đã thu hồi; OTP mẫu đã dùng và hết hạn.
 

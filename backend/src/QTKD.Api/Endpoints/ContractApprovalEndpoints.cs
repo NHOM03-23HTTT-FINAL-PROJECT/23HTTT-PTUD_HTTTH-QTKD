@@ -26,8 +26,12 @@ public static class ContractApprovalEndpoints
             => Results.Ok(await service.Decide(Actor(c), id, request, Write(c), ct)));
         group.MapPost("/contracts/{id:guid}/handoff", async (Guid id, ReviewRequest request, HttpContext c, ContractApprovalService service, CancellationToken ct)
             => Results.Ok(await service.Handoff(Actor(c), id, request, Write(c), ct)));
-        group.MapPost("/contracts/{id:guid}/assignment", async (Guid id, AssignReviewRequest request, HttpContext c, WorkflowAssignmentService service, CancellationToken ct)
-            => { Write(c); return Results.Ok(await service.Assign(Actor(c), id, request, ct)); }).RequireAuthorization("workflows.manage");
+        group.MapGet("/assignments", async (HttpContext c, ApprovalAssignmentService service, CancellationToken ct)
+            => Results.Ok(await service.Board(Actor(c), ct))).RequireAuthorization("approvals.assign");
+        group.MapGet("/contracts/{id:guid}/candidates", async (Guid id, string step, HttpContext c, ApprovalAssignmentService service, CancellationToken ct)
+            => Results.Ok(await service.Candidates(Actor(c), id, step, ct))).RequireAuthorization("approvals.assign");
+        group.MapPost("/contracts/{id:guid}/assignment", async (Guid id, AssignReviewRequest request, HttpContext c, ApprovalAssignmentService service, CancellationToken ct)
+            => { Write(c); return Results.Ok(await service.Assign(Actor(c), id, request, ct)); }).RequireAuthorization("approvals.assign");
         group.MapPost("/contracts/{id:guid}/pending-task/retry", async (Guid id, string step, HttpContext c, ContractApprovalService service, CancellationToken ct)
             => Results.Ok(await service.Retry(Actor(c), id, step, Write(c), ct)));
         group.MapGet("/coordination-inbox", async (HttpContext c, ContractCoordinationService service, CancellationToken ct)

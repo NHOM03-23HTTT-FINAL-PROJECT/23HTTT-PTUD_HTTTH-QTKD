@@ -27,7 +27,7 @@ Nguồn là `data-dictionary.md` và `spec nghiệp vụ + hệ thống (8).docx
 
 Migration có CHECK về MST, liên hệ khách hàng, kích thước/cấp khu vực, ngày hiệu lực, số tiền và dữ liệu quyết định. Index chặn hai lượt duyệt đang chạy trên cùng hồ sơ, hai bước hiện hành trong cùng lượt và hai phiên ký đang chạy cho cùng hồ sơ. Trigger cấm sửa/xóa/truncate audit log, giữ snapshot/lịch sử duyệt, bảo vệ nội dung hợp đồng ngoài Draft/RevisionRequested và tính đường dẫn cây khu vực.
 
-RLS bật cho cả 26 bảng (và các bảng thêm sau: Identity, `workflow_config`), thu hồi quyền của anon/authenticated; chưa tạo policy mở dữ liệu. Backend cần kết nối server được cấp quyền riêng. Không giả định dùng Supabase Auth hay nối USER_ACCOUNT với auth.users; không đưa Prisma Client hoặc PostgreSQL password vào frontend.
+RLS bật cho cả 26 bảng (và các bảng Identity thêm sau), thu hồi quyền của anon/authenticated; chưa tạo policy mở dữ liệu. Backend cần kết nối server được cấp quyền riêng. Không giả định dùng Supabase Auth hay nối USER_ACCOUNT với auth.users; không đưa Prisma Client hoặc PostgreSQL password vào frontend.
 
 ## Công việc vẫn cần có ở backend hoặc migration tiếp theo
 
@@ -35,6 +35,6 @@ Quyền theo vai trò/phạm vi hồ sơ, danh tính người thực hiện và 
 
 Dictionary chưa có Outbox, Idempotency-Key, dedup sự kiện callback ký, lịch sử phiên bản sản lượng hoặc đề nghị mở khóa. Không tự thêm các bảng này ngoài phạm vi 26 bảng. Snapshot demo chứa đối tượng workflow để minh họa bảo toàn cấu hình.
 
-Ngoại lệ đã chốt ngày 03/11/2026 cho SYS-CTR-10: thêm một bảng `workflow_config` (migration `202611030002_workflow_config`), mỗi dòng là một phiên bản cấu hình người tham gia. Mỗi loại hồ sơ + phòng ban và mỗi mã cấu hình chỉ có một dòng `is_active`; trigger chặn xóa hoặc sửa phiên bản, chỉ cho phép tắt `is_active`. Lượt duyệt vẫn giữ bản sao cấu hình trong `approval_round.record_snapshot`. Idempotency-Key của API kích hoạt lưu trong `audit_log` như các API phê duyệt, không thêm bảng riêng.
+SYS-CTR-10 (chốt 03/11/2026): trưởng bộ phận phân công người duyệt cho từng hồ sơ, lưu thẳng vào `approval_step.assignee_id`; không có bảng cấu hình. Bảng `workflow_config` tạo ở migration `202611030002` đã bị bỏ ở `202611030003_approval_assignment`. Trigger `guard_approval_history` cho đổi người khi bước `NotStarted` hoặc `Pending` chưa tiếp nhận; quyết định và thứ tự vẫn không sửa được. Trưởng bộ phận xác định qua `department.manager_id`; người phân công còn phải có quyền `approvals.assign`, chỉ cấp cho vai trò trưởng: SalesManager, LegalManager (Trưởng phòng Pháp chế), BoardChair (Tổng Giám đốc). Seed đặt trưởng Pháp chế là `demo.legal.manager`, trưởng BGĐ là `demo.board.chair`.
 
 Seed nhập lịch sử giả lập bằng INSERT; trigger bảo vệ cập nhật lịch sử không biến dữ liệu nhập sẵn thành bằng chứng quy trình đã thực thi. Các kiểm tra race condition, trigger, RLS, rollback và seed hai lần vẫn cần môi trường Supabase thực tế. Test offline chỉ xác nhận hình dạng và tính nhất quán của dữ liệu.

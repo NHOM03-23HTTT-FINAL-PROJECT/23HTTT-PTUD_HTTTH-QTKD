@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { migrationColumns, migrationPrimaryKeys } from "../scripts/migration-shape.ts";
+import { migrationColumns, migrationEnums, migrationPrimaryKeys } from "../scripts/migration-shape.ts";
 
 test("migration comparison handles qtkd qualification and Windows line endings", () => {
   const plain = 'CREATE TABLE "example" (\n "role" "user_role" NOT NULL\n);';
@@ -33,4 +33,14 @@ test("primary key list spacing is insignificant but column order is significant"
   const compact = 'CONSTRAINT "example_pkey" PRIMARY KEY ("role","permission_code")';
   assert.deepEqual(migrationPrimaryKeys(compact), migrationPrimaryKeys(compact.replace(',', ', ')));
   assert.notDeepEqual(migrationPrimaryKeys(compact), migrationPrimaryKeys('CONSTRAINT "example_pkey" PRIMARY KEY ("permission_code","role")'));
+});
+test("a dropped table no longer appears in the migrated shape", () => {
+  const created = 'CREATE TABLE "example" (\n "id" UUID NOT NULL\n);\nCREATE TABLE "qtkd"."gone" (\n "id" UUID NOT NULL\n);';
+  assert.deepEqual(migrationColumns(created + '\nDROP TABLE IF EXISTS "qtkd"."gone";'), migrationColumns('CREATE TABLE "example" (\n "id" UUID NOT NULL\n);'));
+});
+test("enum values added by ALTER TYPE match the final schema order", () => {
+  const base = 'CREATE TYPE "qtkd"."role" AS ENUM (\'A\', \'B\', \'C\');';
+  const migrated = base + '\nALTER TYPE "qtkd"."role" ADD VALUE IF NOT EXISTS \'A2\' AFTER \'A\';';
+  assert.deepEqual(migrationEnums(migrated), migrationEnums('CREATE TYPE "role" AS ENUM (\'A\', \'A2\', \'B\', \'C\');'));
+  assert.notDeepEqual(migrationEnums(migrated), migrationEnums('CREATE TYPE "role" AS ENUM (\'A\', \'B\', \'C\', \'A2\');'));
 });

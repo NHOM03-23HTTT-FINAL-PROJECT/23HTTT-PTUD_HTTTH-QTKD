@@ -27,9 +27,7 @@ export const ROUTES = {
   approvalLegalDone: '/phe-duyet/da-ra-soat',
   approvalBoard: '/phe-duyet/cho-phe-duyet',
   approvalTracking: '/phe-duyet/tien-do',
-  workflows: '/quan-tri/quy-trinh',
-  workflowCreate: '/quan-tri/quy-trinh/tao-moi',
-  workflowEdit: (code: string) => `/quan-tri/quy-trinh/${code}/cap-nhat`,
+  approvalAssignments: '/phe-duyet/phan-cong',
   paymentDetail: (code: string) => `/bang-thanh-toan/${code}`,
 } as const;
 

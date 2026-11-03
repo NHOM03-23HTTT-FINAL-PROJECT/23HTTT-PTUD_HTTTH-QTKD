@@ -24,7 +24,7 @@ import { CoordinationInboxPage } from '@/features/contracts/pages/LegalCoordinat
 import { ContractEditPage } from '@/features/contracts/pages/ContractEditPage';
 import { ContractListPage } from '@/features/contracts/pages/ContractListPage';
 import { ContractProgressPage } from '@/features/contracts/pages/ContractProgressPage';
-import { WorkflowConfigFormPage, WorkflowConfigListPage } from '@/features/contracts/pages/WorkflowConfigPages';
+import { ApprovalAssignmentPage } from '@/features/contracts/pages/ApprovalAssignmentPage';
 import { DashboardPage } from '@/features/dashboard/pages/DashboardPage';
 import { MainLayout } from '@/layouts/MainLayout';
 import { PublicOnly, RequireAuth } from './guards';
@@ -49,7 +49,7 @@ const IMPLEMENTED_PATHS = new Set<string>([
   ROUTES.approvalLegalDone,
   ROUTES.approvalBoard,
   ROUTES.approvalTracking,
-  ROUTES.workflows,
+  ROUTES.approvalAssignments,
 ]);
 
 /**
@@ -268,26 +268,10 @@ export function AppRoutes() {
               }
             />
             <Route
-              path={ROUTES.workflows}
+              path={ROUTES.approvalAssignments}
               element={
-                <BusinessRoute permission="workflows.manage" label="Quy trình phê duyệt">
-                  <WorkflowConfigListPage />
-                </BusinessRoute>
-              }
-            />
-            <Route
-              path={ROUTES.workflowCreate}
-              element={
-                <BusinessRoute permission="workflows.manage" label="Tạo cấu hình người tham gia">
-                  <WorkflowConfigFormPage key="new" />
-                </BusinessRoute>
-              }
-            />
-            <Route
-              path="/quan-tri/quy-trinh/:code/cap-nhat"
-              element={
-                <BusinessRoute permission="workflows.manage" label="Cập nhật cấu hình người tham gia">
-                  <WorkflowConfigFormPage key="edit" />
+                <BusinessRoute apiReady permission="approvals.assign" label="Phân công người duyệt">
+                  <ApprovalAssignmentPage />
                 </BusinessRoute>
               }
             />

@@ -21,8 +21,8 @@
 1. Người dùng mở màn hình chi tiết hợp đồng và chọn "Tiến độ và lịch sử phê duyệt". Hoặc người dùng chọn một hợp đồng trong danh sách "Theo dõi tiến độ" (A10).
 2. Hệ thống kiểm tra quyền xem và phạm vi truy cập hồ sơ theo vai trò của người dùng.
 3. Hệ thống xác định các lượt duyệt của hồ sơ và chọn mặc định lượt gần nhất.
-4. Hệ thống hiển thị thông tin lượt duyệt: thứ tự lượt, người trình, thời điểm trình, phiên bản hồ sơ được trình, phiên bản cấu hình quy trình áp dụng cho lượt (SYS-CTR-10 – Cấu hình quy trình phê duyệt hợp đồng và phụ lục), trạng thái hiện tại của hồ sơ và kết quả lượt (Đang xử lý, Hoàn tất, Yêu cầu chỉnh sửa, Bị từ chối, Đã rút).
-5. Hệ thống hiển thị tuyến duyệt theo cấu hình của lượt: Trưởng phòng Kinh doanh → Pháp chế → Ban Giám đốc, đánh dấu từng bước Đã hoàn thành, Đang xử lý hoặc Chưa đến lượt.
+4. Hệ thống hiển thị thông tin lượt duyệt: thứ tự lượt, người trình, thời điểm trình, phiên bản hồ sơ được trình, trạng thái hiện tại của hồ sơ và kết quả lượt (Đang xử lý, Hoàn tất, Yêu cầu chỉnh sửa, Bị từ chối, Đã rút).
+5. Hệ thống hiển thị tuyến duyệt của lượt: Trưởng phòng Kinh doanh → Pháp chế → Ban Giám đốc, người duyệt từng bước do trưởng bộ phận phụ trách phân công (SYS-CTR-10), đánh dấu từng bước Đã hoàn thành, Đang xử lý hoặc Chưa đến lượt.
 6. Với bước đang xử lý, hệ thống hiển thị người được giao, thời điểm giao và tình trạng của bước: Chờ tiếp nhận, Đang rà soát (kèm thời điểm tiếp nhận) hoặc Chờ chuyển bước (bước trước đã chấp thuận, chờ gửi hồ sơ sang bước sau theo UC-CTR-02).
 7. Với bước đã hoàn thành, hệ thống hiển thị người thực hiện, thời điểm, kết quả, ý kiến hoặc kết luận và phiên bản hồ sơ được rà soát trong phạm vi được phép xem.
 8. Người dùng chọn "Lịch sử xử lý".
@@ -56,12 +56,12 @@
 
 ### A5 — Hồ sơ là phụ lục có bước xác nhận của bộ phận liên quan (bước 5)
 
-- Hệ thống hiển thị thêm bước xác nhận của bộ phận liên quan sau bước Trưởng phòng Kinh doanh theo cấu hình của lượt.
-- Nếu cấu hình của lượt không áp dụng bước này (SYS-CTR-10 A2), hệ thống không hiển thị bước.
+- Hệ thống hiển thị thêm bước xác nhận của bộ phận liên quan sau bước Trưởng phòng Kinh doanh nếu lượt có bước này.
+- Nếu lượt không có bước này, hệ thống không hiển thị bước.
 
 ### A6 — Bước hiện tại chưa được phân công (bước 6)
 
-- Hệ thống hiển thị bước ở tình trạng "Đang chờ phân công" (SYS-CTR-08 – Rà soát pháp lý hợp đồng, A4), không hiển thị người nhận giả định.
+- Hệ thống hiển thị bước ở tình trạng "Đang chờ phân công" (SYS-CTR-08 – Rà soát pháp lý hợp đồng, A4; trưởng bộ phận phân công theo SYS-CTR-10), không hiển thị người nhận giả định.
 
 ### A7 — Hồ sơ đã được phê duyệt (bước 5)
 

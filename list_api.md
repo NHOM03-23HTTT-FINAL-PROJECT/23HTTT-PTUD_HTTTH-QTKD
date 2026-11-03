@@ -6,7 +6,7 @@ Cập nhật 03/11/2026. Endpoint BE nằm trong `backend/src/QTKD.Api` (`Progra
 |---|---|
 | Xác thực, người dùng, phòng ban, vai trò, quyền (TASK-022/023) | Đã có theo [hợp đồng API đã chốt](docs/specs/identity/list_api-auth.md); [plan](docs/specs/identity/TASK-022-023-PLAN.md) ghi trạng thái kiểm chứng |
 | Rà soát, phê duyệt hợp đồng SYS-CTR-07 → 09 và thông báo | Đã có, xem [list_api-contract.md](docs/specs/contracts/list_api-contract.md) |
-| Cấu hình người tham gia SYS-CTR-10 | Đã có; FE còn dùng mock |
+| Phân công người duyệt SYS-CTR-10 | Đã có; FE đã nối (tab "Phân công người duyệt") |
 | Khách hàng, khu vực, hồ sơ hợp đồng SYS-CTR-01 → 06, tiến độ SYS-CTR-11 | Chưa có; endpoint là đề xuất từ lớp API FE (`frontend/src/features/*/api/*.ts`) và mock (`frontend/src/mocks/*Server.ts`) |
 
 > Endpoint ghi "đề xuất" được suy ra từ chữ ký hàm FE, chưa đối chiếu đặc tả UC chi tiết và chưa được nhóm BE chốt.
@@ -25,9 +25,9 @@ Cập nhật 03/11/2026. Endpoint BE nằm trong `backend/src/QTKD.Api` (`Progra
 - **Tiền tố:** `/api/v1`.
 - **Xác thực:** `Authorization: Bearer <JWT>` thay cho cặp `userId` + `signedInAt` mà mock FE đang dùng. BE tự kiểm tra phiên; phiên hết hạn hoặc bị thu hồi trả 401 kèm lý do (`expired`, `password-changed`, `locked`, `disabled`, `permissions-changed`). Role lỗi do data/config trong login trả SYSTEM_ERROR và không tạo phiên; role hợp lệ thiếu quyền thao tác trả 403.
 - **CSRF:** request ghi gửi `X-QTKD-CSRF: 1` từ Origin nằm trong `Cors:Origins`; sai trả 403 `CSRF_REJECTED`.
-- **Chống tạo trùng:** thao tác có `idempotencyKey` gửi qua header `Idempotency-Key`; thiếu key trả 400 `IDEMPOTENCY_KEY_REQUIRED`, dùng lại key với nội dung khác trả 409 (`IDEMPOTENCY_CONFLICT` ở phê duyệt, `IDEMPOTENCY_KEY_REUSED` ở cấu hình quy trình); gửi lại đúng nội dung trả kết quả cũ (`replayed`).
+- **Chống tạo trùng:** thao tác có `idempotencyKey` gửi qua header `Idempotency-Key`; thiếu key trả 400 `IDEMPOTENCY_KEY_REQUIRED`, dùng lại key với nội dung khác trả 409 `IDEMPOTENCY_CONFLICT`; gửi lại đúng nội dung trả kết quả cũ (`replayed`).
 - **Ghi đè đồng thời:** `baseVersion` / `viewedVersion` đi trong body; lệch phiên bản trả 409.
-- **Dạng lỗi:** `{code, traceId}`; lỗi kiểm tra cấu hình quy trình có thêm `errors` theo từng trường và giai đoạn.
+- **Dạng lỗi:** `{code, traceId}`.
 - **Mã lỗi → HTTP:**
   - `VALIDATION` → 400/422
   - `SESSION_ENDED` → 401

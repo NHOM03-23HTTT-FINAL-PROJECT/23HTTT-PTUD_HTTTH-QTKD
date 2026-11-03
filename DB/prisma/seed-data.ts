@@ -16,15 +16,16 @@ export const ids = {
   board: id(1, 5), adminDepartment: id(1, 6),
   salesStaff: id(2), salesManager: id(2, 2), operationsStaff: id(2, 3),
   operationsManager: id(2, 4), accountant: id(2, 5), accountingReviewer: id(2, 6),
-  legalStaff: id(2, 7), boardMember: id(2, 8), admin: id(2, 9),
+  legalStaff: id(2, 7), boardMember: id(2, 8), admin: id(2, 9), legalManager: id(2, 10), boardChair: id(2, 11),
   customer: id(8), suspendedCustomer: id(8, 2),
   port: id(10), yard: id(10, 2), block: id(10, 3), warehouse: id(10, 4), suspendedBlock: id(10, 5),
   lifting: id(11), storage: id(11, 2),
   contract: id(14), submittedContract: id(14, 2), draftContract: id(14, 3), appendix: id(14, 4),
+  assignSalesContract: id(14, 5), assignLegalContract: id(14, 6), assignBoardContract: id(14, 7),
   item: id(15), price: id(16), liftingPrice: id(17), storagePrice: id(17, 2),
   volume: id(18), liftingVolume: id(19), storageVolume: id(19, 2), statement: id(20),
   contractRound: id(24), currentRound: id(24, 2), paymentRound: id(24, 3),
-  contractWorkflow: id(27),
+  assignSalesRound: id(24, 4), assignLegalRound: id(24, 5), assignBoardRound: id(24, 6),
   contractFile: id(7), paymentFile: id(7, 2),
 } as const;
 
@@ -34,8 +35,8 @@ export function buildSeedData(passwordHash: string) {
     { departmentId: ids.sales, code: "KD", departmentName: "Kinh doanh", managerId: ids.salesManager },
     { departmentId: ids.operations, code: "KT", departmentName: "Khai thác", managerId: ids.operationsManager },
     { departmentId: ids.accounting, code: "KTOAN", departmentName: "Kế toán", managerId: ids.accountingReviewer },
-    { departmentId: ids.legal, code: "PC", departmentName: "Pháp chế", managerId: ids.legalStaff },
-    { departmentId: ids.board, code: "BGD", departmentName: "Ban Giám đốc", managerId: ids.boardMember },
+    { departmentId: ids.legal, code: "PC", departmentName: "Pháp chế", managerId: ids.legalManager },
+    { departmentId: ids.board, code: "BGD", departmentName: "Ban Giám đốc", managerId: ids.boardChair },
     { departmentId: ids.adminDepartment, code: "QTHT", departmentName: "Quản trị hệ thống", managerId: ids.admin },
   ] satisfies Prisma.DepartmentCreateManyInput[];
 
@@ -48,13 +49,15 @@ export function buildSeedData(passwordHash: string) {
     { userId: ids.accountingReviewer, username: "demo.accountant.reviewer", fullName: "Đỗ Khang Demo", departmentId: ids.accounting, role: "Accountant" },
     { userId: ids.legalStaff, username: "demo.legal", fullName: "Bùi Lan Demo", departmentId: ids.legal, role: "LegalStaff" },
     { userId: ids.boardMember, username: "demo.board", fullName: "Hoàng Minh Demo", departmentId: ids.board, role: "BoardMember" },
+    { userId: ids.legalManager, username: "demo.legal.manager", fullName: "Đinh Quang Demo", departmentId: ids.legal, role: "LegalManager" },
+    { userId: ids.boardChair, username: "demo.board.chair", fullName: "Lý Tâm Demo", departmentId: ids.board, role: "BoardChair" },
     { userId: ids.admin, username: "demo.admin", fullName: "Đặng Nam Demo", departmentId: ids.adminDepartment, role: "SystemAdmin" },
   ].map((user) => ({
     ...user,
     role: user.role as Prisma.UserAccountCreateManyInput["role"],
     companyEmail: `${user.username}@example.invalid`, passwordHash,
     status: "Active" as const, failedLoginCount: 0, mustChangePassword: true,
-    canSign: user.userId === ids.boardMember,
+    canSign: user.userId === ids.boardMember || user.userId === ids.boardChair,
   })) satisfies Prisma.UserAccountCreateManyInput[];
 
   const customer = [
@@ -97,6 +100,10 @@ export function buildSeedData(passwordHash: string) {
     { ...contractBase, contractId: ids.submittedContract, documentType: "Contract", title: "Hợp đồng chờ rà soát Demo", status: "Submitted" },
     { ...contractBase, contractId: ids.draftContract, documentType: "Contract", title: "Hợp đồng dự thảo Demo", status: "Draft" },
     { ...contractBase, contractId: ids.appendix, documentType: "Appendix", parentContractId: ids.contract, title: "Phụ lục dự thảo Demo", status: "Draft" },
+    // SYS-CTR-10: hồ sơ để thử tab "Phân công người duyệt" của từng trưởng bộ phận.
+    { ...contractBase, contractId: ids.assignSalesContract, documentType: "Contract", title: "Chờ TP Kinh doanh phân công Demo", status: "Submitted" },
+    { ...contractBase, contractId: ids.assignLegalContract, documentType: "Contract", title: "Chờ TP Pháp chế phân công Demo", status: "UnderReview" },
+    { ...contractBase, contractId: ids.assignBoardContract, documentType: "Contract", title: "Chờ Tổng Giám đốc phân công Demo", status: "UnderReview" },
   ] satisfies Prisma.ContractCreateManyInput[];
 
   const contractItem = [
@@ -149,6 +156,10 @@ export function buildSeedData(passwordHash: string) {
       recordSnapshot: { ...paymentStatement[0], createdAt: sentAt.toISOString(), issuedAt: null,
         status: "Reconciled", isLocked: false, lines: paymentStatementLine.map((row) => ({ ...row })),
         workflow: { version: 1, stages: ["Accountant", "BoardMember"] } } },
+    // SYS-CTR-10: lượt đang chạy có bước chưa phân công (assignee_id trống, NotStarted).
+    ...([[ids.assignSalesRound, ids.assignSalesContract], [ids.assignLegalRound, ids.assignLegalContract], [ids.assignBoardRound, ids.assignBoardContract]] as const)
+      .map(([roundId, contractId]) => ({ roundId, recordType: "Contract" as const, contractId, recordVersion: 1, roundNo: 1,
+        submittedBy: ids.salesStaff, submittedAt: sentAt, result: "Running" as const, recordSnapshot: snapshot(contractId) })),
   ] satisfies Prisma.ApprovalRoundCreateManyInput[];
   const approvalStep: Prisma.ApprovalStepCreateManyInput[] = [];
   for (const [roundIndex, roundId, complete] of [[0, ids.contractRound, true], [1, ids.currentRound, false]] as const) {
@@ -169,6 +180,25 @@ export function buildSeedData(passwordHash: string) {
     decision: "Approve", comment: "Đồng ý số liệu demo.", decidedBy: assigneeId,
     decidedAt: at(`2026-11-01T0${index + 3}:00:00Z`),
   }));
+
+  // SYS-CTR-10 · dữ liệu thử phân công. Thứ tự bước: 1 Rà soát kinh doanh, 2 Pháp chế, 3 Ban Giám đốc.
+  const stepNames = ["Rà soát kinh doanh", "Rà soát pháp lý", "Phê duyệt"];
+  const unassigned = (roundId: string, row: number, order: number) =>
+    ({ stepId: id(25, row), roundId, stepName: stepNames[order - 1], stepOrder: order, stepStatus: "NotStarted" as const });
+  const salesApproved = (roundId: string, row: number) => ({ stepId: id(25, row), roundId, stepName: stepNames[0], stepOrder: 1,
+    assigneeId: ids.salesManager, assignedAt: sentAt, acceptedAt: sentAt, stepStatus: "Completed" as const, decision: "Approve" as const,
+    comment: "Đồng ý chuyển Pháp chế (dữ liệu thử phân công).", decidedBy: ids.salesManager, decidedAt: at("2026-11-01T04:00:00Z") });
+  approvalStep.push(
+    // A. Mọi bước chưa phân công → TP Kinh doanh gán bước 1, bước chuyển sang Chờ tiếp nhận.
+    unassigned(ids.assignSalesRound, 9, 1), unassigned(ids.assignSalesRound, 10, 2), unassigned(ids.assignSalesRound, 11, 3),
+    // B. Kinh doanh đã duyệt, Pháp chế chưa có người → TP Pháp chế gán, bước vào Đang rà soát ngay.
+    salesApproved(ids.assignLegalRound, 12), unassigned(ids.assignLegalRound, 13, 2), unassigned(ids.assignLegalRound, 14, 3),
+    // C. Pháp chế đang rà soát (không đổi người được), BGĐ chưa có người → Tổng Giám đốc gán, chờ Pháp chế bàn giao.
+    salesApproved(ids.assignBoardRound, 15),
+    { stepId: id(25, 16), roundId: ids.assignBoardRound, stepName: stepNames[1], stepOrder: 2, assigneeId: ids.legalStaff,
+      assignedAt: at("2026-11-01T04:00:00Z"), acceptedAt: at("2026-11-01T04:00:00Z"), stepStatus: "Reviewing" },
+    unassigned(ids.assignBoardRound, 17, 3),
+  );
 
   return {
     ...buildIdentitySeed(),
@@ -204,17 +234,6 @@ export function buildSeedData(passwordHash: string) {
       reason: "Đề nghị điều chỉnh dữ liệu demo; chưa có hiệu lực thay thế.", status: "Pending", requestedBy: ids.accountant,
       requestedAt: at("2026-11-02T03:00:00Z") }] satisfies Prisma.ChangeRequestCreateManyInput[],
     approvalRound, approvalStep,
-    // SYS-CTR-10 demo: one active participant configuration for contracts of the sales department.
-    workflowConfig: [{ configId: ids.contractWorkflow, code: "QT-HD-KD", version: 1, configName: "Hợp đồng – Phòng Kinh doanh (demo)",
-      docType: "contract", departmentId: ids.sales, changeSummary: "Khởi tạo 5 giai đoạn cho Hợp đồng · Kinh doanh (dữ liệu demo).",
-      isActive: true, activatedBy: ids.admin, activatedAt: createdAt,
-      stages: [
-        { key: "draft", enabled: true, role: "Nhân viên Kinh doanh", mode: "role-department", participants: [ids.salesStaff], backups: [], notify: [] },
-        { key: "sales", enabled: true, role: "Trưởng phòng Kinh doanh", mode: "specific", participants: [ids.salesManager], backups: [], notify: [] },
-        { key: "legal", enabled: true, role: "Nhân viên Pháp chế", mode: "rotation", participants: [ids.legalStaff], backups: [], notify: [] },
-        { key: "board", enabled: true, role: "Thành viên Ban Giám đốc", mode: "specific", participants: [ids.boardMember], backups: [], notify: [] },
-        { key: "signing", enabled: true, role: "Người ký đại diện công ty", mode: "specific", participants: [ids.boardMember], backups: [], notify: [ids.salesStaff] },
-      ] }] satisfies Prisma.WorkflowConfigCreateManyInput[],
     signingSession: [
       { signingSessionId: id(26), recordType: "Contract", contractId: ids.contract, providerSessionId: "DEMO-CONTRACT-SIGN-1",
         status: "Succeeded", companySignerId: ids.boardMember, companySignedAt: signedAt, customerSignerName: customer[0].legalRepresentative,

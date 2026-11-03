@@ -98,8 +98,7 @@ const routes = [
   ['/hop-dong/HD-2026-001/chinh-sua', 'contracts.create'], ['/hop-dong/HD-2026-001/tien-do', 'contracts.view'],
   ['/phe-duyet/cho-duyet', 'approvals.approve'], ['/phe-duyet/cho-ra-soat', 'approvals.review-legal'],
   ['/phe-duyet/da-ra-soat', 'approvals.review-legal'], ['/phe-duyet/cho-phe-duyet', 'approvals.approve'],
-  ['/phe-duyet/tien-do', 'approvals.track'], ['/quan-tri/quy-trinh', 'workflows.manage'],
-  ['/quan-tri/quy-trinh/tao-moi', 'workflows.manage'], ['/quan-tri/quy-trinh/WF-001/cap-nhat', 'workflows.manage'],
+  ['/phe-duyet/tien-do', 'approvals.track'], ['/phe-duyet/phan-cong', 'approvals.assign'],
 ];
 
 function ignoreStaticRedirectWarning(t) {
@@ -111,13 +110,17 @@ function ignoreStaticRedirectWarning(t) {
   });
 }
 
-test('API identity opens approval inboxes while other mock business routes remain isolated', () => {
+test('API identity opens approval inboxes and reviewer assignment while other mock business routes remain isolated', () => {
   api.acceptAuth(authResult);
   for (const [path, permission] of routes) {
     const html = api.renderRoute(path, { ...user, permissions: new Set([permission]) });
     if (['/phe-duyet/cho-duyet', '/phe-duyet/cho-ra-soat', '/phe-duyet/da-ra-soat', '/phe-duyet/cho-phe-duyet'].includes(path)) {
       assert.ok(!html.includes('Chức năng chưa sẵn sàng'), path);
       assert.ok(html.includes('Chỉ gồm hồ sơ mà bạn là người được giao chính thức'), path);
+    } else if (path === '/phe-duyet/phan-cong') {
+      // SYS-CTR-10 đã nối BE: render màn thật, không phải placeholder.
+      assert.ok(!html.includes('Chức năng chưa sẵn sàng'), path);
+      assert.ok(html.includes('Phân công người duyệt'), path);
     } else {
       assert.ok(html.includes('Chức năng chưa sẵn sàng'), path);
       assert.ok(html.includes('Bạn vẫn đang đăng nhập'), path);

@@ -9,22 +9,24 @@ public sealed class ContractApprovalService(IContractApprovalEngine engine, IIde
         "sales" or "board" => "approvals.approve", "legal" => "approvals.review-legal",
         _ => throw new ReviewFailure(400, "VALIDATION")
     };
-    private static string Role(string step) => step switch
+
+    public static IReadOnlyList<string> RoleCodes(string step) => step switch
     {
-        "sales" => "TP_KD", "legal" => "NV_PC", "board" => "GD",
+        "sales" => ["TP_KD"], "legal" => ["NV_PC", "TP_PC"], "board" => ["GD", "TGD"],
         _ => throw new ReviewFailure(400, "VALIDATION")
     };
     private async Task<ReviewActor> Actor(Guid id, string step, CancellationToken ct)
     {
         var permission = Permission(step);
         var user = await identity.User(id, ct);
-        if (user.Status != "Active" || user.MustChangePassword || !user.Roles.Contains(Role(step))
+        var role = user.Roles.FirstOrDefault(RoleCodes(step).Contains);
+        if (user.Status != "Active" || user.MustChangePassword || role is null
             || !await identity.HasPermission(id, permission, ct)) throw new ReviewFailure(403, "FORBIDDEN");
-        return new(id, Role(step), user.Department, permission);
+        return new(id, role, user.Department, permission);
     }
     public static bool InScope(ReviewActor actor, ReviewDocument document) =>
         (actor.Role != "TP_KD" || actor.Department == document.Department)
-        && document.Steps.Any(x => x.AssigneeId == actor.Id && Role(x.Key) == actor.Role);
+        && document.Steps.Any(x => x.AssigneeId == actor.Id && RoleCodes(x.Key).Contains(actor.Role));
 
     public async Task<IReadOnlyList<ReviewDocument>> Inbox(Guid actorId, string step, bool done, CancellationToken ct)
     {

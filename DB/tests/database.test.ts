@@ -15,7 +15,7 @@ test("all 26 source tables and all 239 active columns are mapped", () => {
     tables: Record<string, string[]>; foreignKeys: { table: string; column: string; target: string }[];
   };
   const models = readSchema();
-  assert.deepEqual(models.filter(model => !["role_definition", "permission", "role_permission", "workflow_config"].includes(model.table)).map((model) => model.table).sort(), Object.keys(source.tables).sort());
+  assert.deepEqual(models.filter(model => !["role_definition", "permission", "role_permission"].includes(model.table)).map((model) => model.table).sort(), Object.keys(source.tables).sort());
   assert.equal(Object.values(source.tables).flat().length, 239);
   for (const model of models) {
     if (!source.tables[model.table]) continue;
@@ -35,8 +35,8 @@ test("all 26 source tables and all 239 active columns are mapped", () => {
 
 test("valid complete fixture passes without any connection", () => {
   const counts = validateSeedData(fixture());
-  assert.equal(Object.keys(counts).length, 30);
-  assert.equal(counts.userAccount, 9);
+  assert.equal(Object.keys(counts).length, 29);
+  assert.equal(counts.userAccount, 11);
   assert.equal(counts.department, 6);
 });
 

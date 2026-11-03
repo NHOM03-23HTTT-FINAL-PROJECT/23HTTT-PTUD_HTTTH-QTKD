@@ -24,7 +24,7 @@ public sealed class ContractCoordinationService(IApprovalDbSessions sessions, II
     public async Task<IReadOnlyList<ReviewCoordination>> List(Guid actorId, Guid? id, CancellationToken ct)
     {
         var user = await identity.User(actorId, ct);
-        var legal = user.Roles.Contains("NV_PC") && await identity.HasPermission(actorId, "approvals.review-legal", ct);
+        var legal = user.Roles.Any(ContractApprovalService.RoleCodes("legal").Contains) && await identity.HasPermission(actorId, "approvals.review-legal", ct);
         if (user.Status != "Active" || user.MustChangePassword) throw new ReviewFailure(403, "FORBIDDEN");
         await using var session = await sessions.Open(false, ct); var c = session.Connection;
         var values = await Load(c, session.Transaction, id, ct);
@@ -45,7 +45,7 @@ public sealed class ContractCoordinationService(IApprovalDbSessions sessions, II
         await using var session = await sessions.Open(true, ct); var c = session.Connection; var tx = session.Transaction!;
         await Lock(c, tx, id, ct);
         var stored = await PostgresApprovalStore.Load(c, tx, id, ct) ?? throw new ReviewFailure(404, "NOT_FOUND");
-        var actor = new ReviewActor(actorId, "NV_PC", user.Department, "approvals.review-legal");
+        var actor = new ReviewActor(actorId, user.Roles.FirstOrDefault(ContractApprovalService.RoleCodes("legal").Contains) ?? "", user.Department, "approvals.review-legal");
         await new PostgresApprovalTransaction(c, tx, stored.Document, stored.OwnerId).AssertActor(actor, ct);
         ContractApprovalService.Validate(actor, stored.Document, request.Expected, false);
         await using (var dept = PostgresApprovalStore.Command(c, tx, "SELECT 1 FROM qtkd.department WHERE code=@dept", ("dept", request.Department)))
