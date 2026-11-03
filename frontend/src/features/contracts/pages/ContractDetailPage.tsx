@@ -216,7 +216,6 @@ function SubmitDialog({ contract, check, actor, onClose, onDone, onError }: { co
           <div><dt>Khách hàng</dt><dd>{contract.customerName}</dd></div>
           <div><dt>Tuyến duyệt</dt><dd>Trưởng phòng Kinh doanh → Pháp chế → Ban Giám đốc</dd></div>
           <div><dt>Bước đầu giao cho</dt><dd>{check.salesReviewer}</dd></div>
-          <div><dt>Cấu hình áp dụng</dt><dd>{check.configLabel}</dd></div>
         </dl>
         <p>{check.resubmit ? 'Hệ thống tạo lượt duyệt mới bắt đầu lại từ Trưởng phòng Kinh doanh; kết quả các lượt trước được giữ trong lịch sử.' : 'Sau khi trình, hồ sơ chuyển sang Đã trình và không được chỉnh sửa trực tiếp.'}</p>
       </div>

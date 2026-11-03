@@ -150,7 +150,7 @@ public sealed class PostgresApprovalTransaction(NpgsqlConnection connection, Npg
             """, ("permission", actor.Permission), ("actor", actor.Id));
         await using var r = await cmd.ExecuteReaderAsync(ct);
         if (!await r.ReadAsync(ct)) throw new ReviewFailure(403, "FORBIDDEN");
-        var role = r.GetString(0) switch { "SalesManager" => "TP_KD", "LegalStaff" => "NV_PC", "BoardMember" => "GD", _ => "" };
+        var role = r.GetString(0) switch { "SalesManager" => "TP_KD", "LegalStaff" => "NV_PC", "LegalManager" => "TP_PC", "BoardMember" => "GD", "BoardChair" => "TGD", _ => "" };
         if (role != actor.Role || r.GetString(1) != actor.Department) throw new ReviewFailure(403, "FORBIDDEN");
     }
     public async Task<ApprovalReceipt?> Receipt(Guid actorId, string key, CancellationToken ct)

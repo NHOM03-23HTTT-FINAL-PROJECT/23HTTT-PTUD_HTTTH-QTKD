@@ -30,6 +30,8 @@ export type Permission =
   | 'approvals.track'
   | 'approvals.review-legal'
   | 'approvals.approve'
+  /** Phân công người duyệt cho bước của bộ phận mình (SYS-CTR-10) – trưởng bộ phận; BE kiểm tra department.manager_id. */
+  | 'approvals.assign'
   | 'areas.view'
   /** Tạo mới khu vực (UC-ARE-01) – Trưởng phòng và Nhân viên Khai thác được phân quyền. */
   | 'areas.create'
@@ -45,7 +47,11 @@ export type Permission =
   | 'audit.view'
   | 'catalogs.manage';
 
-export type RoleCode = 'NV_KD' | 'TP_KD' | 'TP_KT' | 'NV_KT' | 'NV_KTOAN' | 'NV_PC' | 'GD' | 'QTHT';
+export type RoleCode = 'NV_KD' | 'TP_KD' | 'TP_KT' | 'NV_KT' | 'NV_KTOAN' | 'NV_PC' | 'TP_PC' | 'GD' | 'TGD' | 'QTHT';
+
+/** Vai trò duyệt từng bước: nhân viên và trưởng phòng của bộ phận đó (trưởng phòng có thêm tab phân công). */
+export const LEGAL_ROLES: RoleCode[] = ['NV_PC', 'TP_PC'];
+export const BOARD_ROLES: RoleCode[] = ['GD', 'TGD'];
 
 export type Role = {
   code: RoleCode;
@@ -76,6 +82,7 @@ export const ROLES: Record<RoleCode, Role> = {
       'contracts.view',
       'approvals.track',
       'approvals.approve',
+      'approvals.assign',
       'areas.view',
     ],
   },
@@ -105,11 +112,25 @@ export const ROLES: Record<RoleCode, Role> = {
     department: 'PC',
     permissions: ['contracts.view', 'approvals.track', 'approvals.review-legal'],
   },
+  TP_PC: {
+    code: 'TP_PC',
+    name: 'Trưởng phòng Pháp chế',
+    department: 'PC',
+    // Giao diện như Nhân viên Pháp chế, thêm tab "Phân công người duyệt" (SYS-CTR-10).
+    permissions: ['contracts.view', 'approvals.track', 'approvals.review-legal', 'approvals.assign'],
+  },
   GD: {
     code: 'GD',
     name: 'Giám đốc',
     department: 'BGD',
     permissions: ['contracts.view', 'approvals.track', 'approvals.approve'],
+  },
+  TGD: {
+    code: 'TGD',
+    name: 'Tổng Giám đốc',
+    department: 'BGD',
+    // Giao diện như thành viên Ban Giám đốc, thêm tab "Phân công người duyệt" (SYS-CTR-10).
+    permissions: ['contracts.view', 'approvals.track', 'approvals.approve', 'approvals.assign'],
   },
   QTHT: {
     code: 'QTHT',

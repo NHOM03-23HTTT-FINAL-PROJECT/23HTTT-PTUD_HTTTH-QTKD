@@ -26,10 +26,14 @@ builder.Logging.AddJsonConsole(options => options.IncludeScopes = true);
 builder.Services.AddOptions<TokenOptions>().BindConfiguration("Jwt").ValidateDataAnnotations().ValidateOnStart();
 builder.Services.AddOptions<DatabaseOptions>().BindConfiguration("ConnectionStrings").ValidateDataAnnotations().ValidateOnStart();
 builder.Services.AddSingleton(TimeProvider.System);
+// One translator for the whole app. The options lambda runs per request scope; a new translator each time
+// makes EF build a new internal service provider per request and throw ManyServiceProvidersCreatedWarning
+// after 20, which turned every later request into 500 SYSTEM_ERROR.
+var enumNames = new NpgsqlNullNameTranslator();
 builder.Services.AddDbContext<IdentityDbContext>((sp, options) => options.UseNpgsql(
     sp.GetRequiredService<IConfiguration>().GetConnectionString("Identity") ?? throw new InvalidOperationException("ConnectionStrings:Identity is required."),
-    pg => { var names = new NpgsqlNullNameTranslator(); pg.MapEnum<UserRole>("user_role", "qtkd", names);
-        pg.MapEnum<UserStatus>("user_status", "qtkd", names); pg.MapEnum<SessionEndReason>("session_end_reason", "qtkd", names); }));
+    pg => { pg.MapEnum<UserRole>("user_role", "qtkd", enumNames);
+        pg.MapEnum<UserStatus>("user_status", "qtkd", enumNames); pg.MapEnum<SessionEndReason>("session_end_reason", "qtkd", enumNames); }));
 builder.Services.AddIdentityCore<UserAccount>(options =>
 {
     options.User.RequireUniqueEmail = true;
@@ -44,7 +48,7 @@ builder.Services.AddSingleton<WorkflowEngine>();
 builder.Services.AddScoped<PostgresApprovalStore>();
 builder.Services.AddScoped<IApprovalDbSessions, ApprovalDbSessions>();
 builder.Services.AddScoped<ContractCoordinationService>();
-builder.Services.AddScoped<WorkflowAssignmentService>();
+builder.Services.AddScoped<ApprovalAssignmentService>();
 builder.Services.AddScoped<IApprovalStore>(sp => sp.GetRequiredService<PostgresApprovalStore>());
 builder.Services.AddScoped<IContractApprovalEngine, ContractApprovalEngine>();
 builder.Services.AddHttpContextAccessor();

@@ -20,6 +20,11 @@ export type ReviewCoordination = { id: string; documentId: string; roundId: stri
 export type ReviewRequest = { roundId: string; stepId: string; viewedVersion: number; step: ApprovalStepKey };
 export type ReviewOutcome = { document: ReviewDocument; pendingTask?: string | null };
 
+/** SYS-CTR-10 · Hồ sơ trong tab phân công, kèm các bước người gọi (trưởng bộ phận) được phân công. */
+export type AssignmentItem = { document: ReviewDocument; managedSteps: ApprovalStepKey[] };
+export type AssignmentCandidate = { id: string; name: string; title: string; department: string };
+export type AssignRequest = { roundId: string; stepId: string; viewedVersion: number; assigneeId: string };
+
 const path = (id: string) => `/approvals/contracts/${encodeURIComponent(id)}`;
 const write = <T>(url: string, body: unknown, key: string) => apiRequest<T>(url, {
   method: 'POST', headers: { 'Idempotency-Key': key }, body: JSON.stringify(body),
@@ -39,5 +44,10 @@ export const approvalApi = {
     write<ReviewCoordination>(`${path(id)}/coordination`, { expected, department, content }, key),
   reply: (id: string, coordination: string, reply: string, key: string) =>
     write<ReviewCoordination>(`${path(id)}/coordination/${encodeURIComponent(coordination)}/reply`, { reply }, key),
+  // SYS-CTR-10 · Phân công người duyệt (quyền approvals.assign; BE kiểm tra trưởng bộ phận của bước).
+  assignments: () => apiRequest<AssignmentItem[]>('/approvals/assignments'),
+  candidates: (id: string, step: ApprovalStepKey) => apiRequest<AssignmentCandidate[]>(`${path(id)}/candidates?step=${step}`),
+  assign: (id: string, request: AssignRequest) =>
+    apiRequest<ReviewDocument>(`${path(id)}/assignment`, { method: 'POST', body: JSON.stringify(request) }),
 };
 export const approvalReviewPath = (id: string, step: ApprovalStepKey) => `/phe-duyet/ho-so/${encodeURIComponent(id)}?step=${step}`;

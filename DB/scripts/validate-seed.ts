@@ -93,7 +93,12 @@ export function validateSeedData(data: SeedData) {
     assert(steps.length, "Approval round has no steps");
     if (round.result === "Running") {
       assert(!running.has(source!), "Duplicate running approval round"); running.add(source!);
-      assert.equal(steps.filter((step) => ["Pending", "Reviewing"].includes(step.stepStatus!)).length, 1, "Round must have one current step");
+      const current = steps.filter((step) => ["Pending", "Reviewing"].includes(step.stepStatus!));
+      // A due step may wait for assignment (SYS-CTR-08 A4, SYS-CTR-10): then no step is current, and the first
+      // unfinished step must be NotStarted with no assignee.
+      const due = steps.find((step) => step.stepStatus !== "Completed");
+      assert(current.length === 1 || (current.length === 0 && due?.stepStatus === "NotStarted" && !due.assigneeId),
+        "Round must have one current step or a due step waiting for assignment");
     }
     if (round.result === "Completed") {
       assert(steps.every((step) => step.stepStatus === "Completed" && step.decision === "Approve"), "Approval completed before every step approved");

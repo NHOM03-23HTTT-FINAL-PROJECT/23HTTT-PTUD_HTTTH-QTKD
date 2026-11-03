@@ -64,8 +64,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
                 if (!(parsed.Host.EndsWith("supabase.co") || parsed.Host.EndsWith("supabase.com")) || parsed.Port != 5432 || parsed.SslMode < SslMode.Require)
                     throw new InvalidOperationException("A dedicated Supabase direct/session test connection with TLS is required.");
                 PostgreSql = true;
+                var names = new NpgsqlNullNameTranslator(); // shared: see Program.cs
                 services.AddDbContext<IdentityDbContext>(options => options.UseNpgsql(connection, pg =>
-                { var names = new NpgsqlNullNameTranslator(); pg.MapEnum<UserRole>("user_role", "qtkd", names); pg.MapEnum<UserStatus>("user_status", "qtkd", names); pg.MapEnum<SessionEndReason>("session_end_reason", "qtkd", names); }));
+                { pg.MapEnum<UserRole>("user_role", "qtkd", names); pg.MapEnum<UserStatus>("user_status", "qtkd", names); pg.MapEnum<SessionEndReason>("session_end_reason", "qtkd", names); }));
             }
             else
             {
@@ -87,13 +88,13 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
                 var departmentCodes = new[] { "KD", "KT", "KTOAN", "PC", "BGD", "QTHT" };
                 db.Departments.AddRange(departmentCodes.Select(code => new Department { Code = code, DepartmentName = code }));
                 db.Roles.AddRange(Enum.GetValues<UserRole>().Select(role => new RoleDefinition { Code = role, Name = role.ToString(), DepartmentCode = role switch
-                { UserRole.SalesStaff or UserRole.SalesManager => "KD", UserRole.OperationsStaff or UserRole.OperationsManager => "KT", UserRole.Accountant => "KTOAN", UserRole.LegalStaff => "PC", UserRole.BoardMember => "BGD", _ => "QTHT" } }));
+                { UserRole.SalesStaff or UserRole.SalesManager => "KD", UserRole.OperationsStaff or UserRole.OperationsManager => "KT", UserRole.Accountant => "KTOAN", UserRole.LegalStaff or UserRole.LegalManager => "PC", UserRole.BoardMember or UserRole.BoardChair => "BGD", _ => "QTHT" } }));
                 db.Permissions.AddRange(PermissionCatalog.Codes.Select(code => new Permission { Code = code, Name = code }));
                 db.Grants.AddRange(new[] { "users.manage", "roles.manage", "departments.manage" }.Select(code => new RolePermission { Role = UserRole.SystemAdmin, PermissionCode = code }));
                 db.Grants.Add(new RolePermission { Role = UserRole.SalesStaff, PermissionCode = "contracts.create" });
                 await db.SaveChangesAsync();
             }
-            else if (await db.Roles.CountAsync() != 8) throw new InvalidOperationException("Apply Prisma migrations to the dedicated test DB first.");
+            else if (await db.Roles.CountAsync() != 10) throw new InvalidOperationException("Apply Prisma migrations to the dedicated test DB first.");
             var departments = await db.Departments.ToDictionaryAsync(x => x.Code, x => x.DepartmentId);
             SalesDepartment = departments["KD"];
             string hash = BCrypt.Net.BCrypt.HashPassword(Password, 12);

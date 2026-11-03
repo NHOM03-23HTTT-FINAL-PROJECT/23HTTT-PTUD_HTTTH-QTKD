@@ -2,7 +2,7 @@ import "dotenv/config";
 import { hash } from "bcryptjs";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../generated/prisma/client.ts";
-import { buildSeedData } from "./seed-data.js";
+import { buildSeedData, ids } from "./seed-data.js";
 import { validateSeedData } from "../scripts/validate-seed.js";
 import { requireSupabaseUrl } from "../scripts/supabase.js";
 import { readSchema } from "../scripts/schema-info.js";
@@ -34,6 +34,10 @@ async function main() {
       for (const row of data.department) {
         await tx.department.updateMany({ where: { departmentId: row.departmentId, managerId: null }, data: { managerId: row.managerId } });
       }
+      // SYS-CTR-10: Pháp chế và BGĐ có vai trò trưởng riêng. Chỉ chuyển khi trưởng hiện tại vẫn là tài khoản demo cũ,
+      // không ghi đè trưởng bộ phận do quản trị đặt.
+      await tx.department.updateMany({ where: { departmentId: ids.legal, managerId: ids.legalStaff }, data: { managerId: ids.legalManager } });
+      await tx.department.updateMany({ where: { departmentId: ids.board, managerId: ids.boardMember }, data: { managerId: ids.boardChair } });
       await tx.service.createMany({ data: data.service, skipDuplicates: true });
       // Parents precede children; rows are deliberately inserted in separate statements.
       for (const row of data.area) await tx.area.createMany({ data: [row], skipDuplicates: true });

@@ -20,7 +20,9 @@ enum UserRole {
   OperationsManager
   Accountant
   LegalStaff
+  LegalManager
   BoardMember
+  BoardChair
   SystemAdmin
 
   @@map("user_role")

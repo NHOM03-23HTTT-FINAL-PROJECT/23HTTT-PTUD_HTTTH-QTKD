@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { migrationColumns, migrationPrimaryKeys, normalizeMigrationSql, normalizeSqlWhitespace as normalize } from "./migration-shape.ts";
+import { migrationColumns, migrationEnums, migrationPrimaryKeys, normalizeMigrationSql, normalizeSqlWhitespace as normalize } from "./migration-shape.ts";
 
 const result = spawnSync(process.execPath, [
   fileURLToPath(new URL("../node_modules/prisma/build/index.js", import.meta.url)),
@@ -22,6 +22,5 @@ for (const fk of expected.matchAll(/ALTER TABLE "\w+" ADD CONSTRAINT [^;]+FOREIG
 for (const index of expected.matchAll(/CREATE (?:UNIQUE )?INDEX [^;]+;/g))
   assert(normalize(migrations).includes(normalize(index[0])), "Missing or changed model index: " + index[0]);
 assert.deepEqual(migrationPrimaryKeys(migrations), migrationPrimaryKeys(expected), "Migration primary keys differ from schema.");
-const enums = (sql: string) => [...sql.matchAll(/CREATE TYPE "\w+" AS ENUM \([^;]+;/g)].map(x => normalize(x[0])).sort();
-assert.deepEqual(enums(migrations), enums(expected), "Migration enum definitions differ from schema.");
+assert.deepEqual(migrationEnums(migrations), migrationEnums(expected), "Migration enum definitions differ from schema.");
 console.log("PASS: static migration columns/types/nullability/defaults, PK/FK and model indexes. PostgreSQL replay NOT checked.");
