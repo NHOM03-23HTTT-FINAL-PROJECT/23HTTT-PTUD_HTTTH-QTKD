@@ -20,7 +20,6 @@ import {
   formatChangeAfter,
   formatChangeBefore,
   formatFieldValue,
-  truncate,
   type CustomerCatalogs,
 } from '../components/customerFormat';
 import { useCustomerRecords, type CustomerRecordsState } from '../hooks/useCustomerRecords';
@@ -527,7 +526,7 @@ function HistoryItem({ entry, latest, catalogs }: { entry: CustomerHistoryEntry;
               {CUSTOMER_FIELD_LABELS[change.field]}:{' '}
               {change.field === 'serviceGroups'
                 ? formatChangeAfter(change, catalogs)
-                : `${truncate(formatChangeBefore(change, catalogs))} → ${truncate(formatChangeAfter(change, catalogs))}`}
+                : `${formatChangeBefore(change, catalogs)} → ${formatChangeAfter(change, catalogs)}`}
             </p>
           ))}
           {entry.reason && <p>Lý do: {entry.reason}</p>}

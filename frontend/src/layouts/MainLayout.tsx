@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth, type CurrentUser } from '@/app/providers/AuthProvider';
 import { SessionProvider } from '@/app/providers/SessionProvider';
+import { IS_MOCK_AUTH } from '@/features/auth/api/authApi';
 import { Icon } from '@/components/icon/Icon';
 import { WORKSPACE_NAV, WORKSPACE_SEARCH_PLACEHOLDER, type NavItem } from '@/constants/navigation';
 import { ROUTES } from '@/constants/routes';
@@ -31,7 +32,7 @@ export function MainLayout() {
 
 function Topbar({ user }: { user: CurrentUser }) {
   const workspace = user.departmentInfo.workspace;
-  const hasUnread = getUnreadCount(workspace) > 0;
+  const hasUnread = IS_MOCK_AUTH && getUnreadCount(workspace) > 0;
 
   return (
     <header className="topbar">
@@ -141,7 +142,7 @@ function SidebarLink({
     >
       <Icon name={item.icon} />
       <span className="sidebar__label">{item.label}</span>
-      {item.badge ? <span className="sidebar__badge">{item.badge}</span> : null}
+      {IS_MOCK_AUTH && item.badge ? <span className="sidebar__badge">{item.badge}</span> : null}
     </NavLink>
   );
 }

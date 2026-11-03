@@ -23,15 +23,21 @@ async function login(user) {
 }
 try {
   const { page, context } = await login(staff);
+  await page.getByText('Bảng điều khiển chưa có dữ liệu thực tế').waitFor();
+  assert.equal(await page.locator('.sidebar__badge, .topbar__unread').count(), 0);
+  assert((await page.getByRole('link', { name: 'Tạo khách hàng', exact: true }).count()) > 0);
   await page.goto(`${url}/khach-hang/tao-moi`);
   await page.getByRole('button', { name: 'Lưu', exact: true }).click();
   await page.getByText('Chưa thể lưu hồ sơ').waitFor();
   const tax = '0' + String(randomInt(1000000000)).padStart(9, '0');
   const name = `Công ty Giao diện Ánh Dương ${tax}`;
+  const originalContact = 'Nguyễn Văn Liên Hệ Ban Đầu Cũ';
+  const updatedContact = 'Nguyễn Văn Liên Hệ Ban Đầu Mới';
   await page.getByPlaceholder('Tên đầy đủ theo đăng ký kinh doanh').fill(name);
   await page.getByPlaceholder('Nhập 10 hoặc 13 chữ số').fill(tax);
   await page.getByPlaceholder('Số nhà, đường, phường/xã, tỉnh/thành phố').fill('Địa chỉ kiểm thử');
   await page.getByPlaceholder('Họ và tên người đại diện').fill('Nguyễn Văn Thử');
+  await page.getByPlaceholder('Họ và tên người liên hệ').fill(originalContact);
   await page.getByPlaceholder('VD: 0901234567 hoặc +84901234567').fill('0901234567');
   await page.getByRole('button', { name: 'Lưu', exact: true }).click();
   await page.waitForURL(/\/khach-hang\/KH-\d+$/);
@@ -39,10 +45,12 @@ try {
   const customerPath = new URL(page.url()).pathname;
   assert.match(customerPath, /\/KH-\d{6,}$/);
   await page.getByRole('link', { name: 'Chỉnh sửa thông tin', exact: true }).click();
-  await page.getByPlaceholder('Họ và tên người liên hệ').fill('Liên hệ kiểm thử');
+  await page.getByPlaceholder('Họ và tên người liên hệ').fill(updatedContact);
   await page.getByPlaceholder('Nhập lý do hoặc căn cứ thay đổi').fill('Cập nhật đầu mối liên hệ');
   await page.getByRole('button', { name: 'Lưu thay đổi', exact: true }).click();
   await page.getByText('Đã cập nhật thông tin khách hàng').waitFor();
+  await page.getByRole('tab', { name: 'Lịch sử', exact: true }).click();
+  await page.getByText(`${originalContact} → ${updatedContact}`, { exact: false }).waitFor();
   await page.goto(`${url}/khach-hang/tao-moi`);
   await page.getByPlaceholder('Tên đầy đủ theo đăng ký kinh doanh').fill('Khách thử trùng mã số thuế');
   await page.getByPlaceholder('Nhập 10 hoặc 13 chữ số').fill(tax);
@@ -71,6 +79,8 @@ try {
   await colleague.context.close();
 
   const lead = await login(manager);
+  await lead.page.getByText('Bảng điều khiển chưa có dữ liệu thực tế').waitFor();
+  assert.equal(await lead.page.getByRole('link', { name: 'Tạo khách hàng', exact: true }).count(), 0);
   await lead.page.goto(url + customerPath);
   await lead.page.getByRole('button', { name: 'Thao tác khác' }).click();
   await lead.page.getByText('Tạm ngưng khách hàng', { exact: true }).click();
