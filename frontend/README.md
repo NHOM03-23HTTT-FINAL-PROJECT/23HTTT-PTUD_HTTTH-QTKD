@@ -256,3 +256,6 @@ features/customers/types/       customer
 - Feature chỉ import từ feature khác qua phần được công khai (ví dụ component của `approvals`), không import file nội bộ.
 - Ẩn menu/nút theo quyền chỉ để hiển thị; BE vẫn là nơi quyết định quyền.
 - Không ghi URL môi trường thật hay token vào source; dùng `.env.example` khi có cấu hình.
+
+
+Contracts CRUD and cancellation integration: [setup](../backend/GETTING-STARTED.md).

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ContractDraft, ContractFieldErrors, ContractServiceItem } from '../types/contract';
 import { validateContractDraft } from '../utils/contractValidation';
 import { contractsApi } from '../api/contractsApi';
@@ -12,7 +12,29 @@ export function newId() {
  * chọn mẫu, đổi cách lập, thêm/sửa hạng mục và gộp lỗi phía máy khách với lỗi BE trả về.
  */
 export function useContractDraftForm(initial: ContractDraft) {
-  const options = useMemo(() => contractsApi.getFormOptions(), []);
+  const [options, setOptions] = useState(() => contractsApi.getFormOptions());
+  const [optionsLoading, setOptionsLoading] = useState(true);
+  const [optionsError, setOptionsError] = useState(false);
+  const [optionsAttempt, setOptionsAttempt] = useState(0);
+  useEffect(() => {
+    let active = true;
+    setOptionsLoading(true);
+    setOptionsError(false);
+    contractsApi
+      .loadFormOptions()
+      .then((next) => {
+        if (active) setOptions(next);
+      })
+      .catch(() => {
+        if (active) setOptionsError(true);
+      })
+      .finally(() => {
+        if (active) setOptionsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [optionsAttempt]);
   const [values, setValues] = useState<ContractDraft>(initial);
   const [attempted, setAttempted] = useState(false);
   const [serverErrors, setServerErrors] = useState<ContractFieldErrors>({});
@@ -43,7 +65,11 @@ export function useContractDraftForm(initial: ContractDraft) {
       contractType: template.contractType,
       paymentTerm: template.paymentTerm,
       content: template.content,
-      services: template.services.map((service, index) => ({ ...service, id: `${template.code}-${index}`, areaCode: '' })),
+      services: template.services.map((service, index) => ({
+        ...service,
+        id: `${template.code}-${index}`,
+        areaCode: '',
+      })),
     }));
     setServerErrors({});
   }
@@ -51,23 +77,39 @@ export function useContractDraftForm(initial: ContractDraft) {
   function changeSourceMode(sourceMode: ContractDraft['sourceMode']) {
     if (sourceMode === values.sourceMode) return;
     if (sourceMode === 'blank') {
-      setValues((current) => ({ ...current, sourceMode, templateCode: '', title: '', contractType: '', paymentTerm: '', services: [], content: '' }));
+      setValues((current) => ({
+        ...current,
+        sourceMode,
+        templateCode: '',
+        title: '',
+        contractType: '',
+        paymentTerm: '',
+        services: [],
+        content: '',
+      }));
     } else setValues((current) => ({ ...current, sourceMode }));
     setServerErrors({});
   }
 
   function addService() {
-    const unused = options.services.find((option) => !values.services.some((item) => item.serviceCode === option.serviceCode));
+    const unused = options.services.find(
+      (option) => !values.services.some((item) => item.serviceCode === option.serviceCode),
+    );
     const service = unused ?? options.services[0];
     if (!service) return;
     setField('services', [...values.services, { ...service, id: newId(), areaCode: '' }]);
   }
 
   function updateService(id: string, patch: Partial<ContractServiceItem>) {
-    setField('services', values.services.map((item) => (item.id === id ? { ...item, ...patch } : item)));
+    setField(
+      'services',
+      values.services.map((item) => (item.id === id ? { ...item, ...patch } : item)),
+    );
     setServerErrors((current) => ({
       ...current,
-      serviceAreas: Object.fromEntries(Object.entries(current.serviceAreas ?? {}).filter(([key]) => key !== id)),
+      serviceAreas: Object.fromEntries(
+        Object.entries(current.serviceAreas ?? {}).filter(([key]) => key !== id),
+      ),
     }));
   }
 
@@ -77,11 +119,17 @@ export function useContractDraftForm(initial: ContractDraft) {
   }
 
   function removeService(id: string) {
-    setField('services', values.services.filter((item) => item.id !== id));
+    setField(
+      'services',
+      values.services.filter((item) => item.id !== id),
+    );
   }
 
   return {
     options,
+    optionsLoading,
+    optionsError,
+    reloadOptions: () => setOptionsAttempt((n) => n + 1),
     values,
     setValues,
     errors,

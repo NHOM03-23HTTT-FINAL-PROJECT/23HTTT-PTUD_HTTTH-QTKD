@@ -1,3 +1,4 @@
+import { BACKEND_ENABLED as CONTRACTS_API_ENABLED } from '@/features/contracts/config/backend';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { IS_MOCK_AUTH } from '@/features/auth/api/authApi';
 import { ACCOUNT_NAV, WORKSPACE_NAV } from '@/constants/navigation';
@@ -182,7 +183,7 @@ export function AppRoutes() {
             <Route
               path={ROUTES.contractCreate}
               element={
-                <BusinessRoute permission="contracts.create" label="Tạo hợp đồng">
+                <BusinessRoute permission="contracts.create" label="Tạo hợp đồng" apiReady={CONTRACTS_API_ENABLED}>
                   <ContractCreatePage />
                 </BusinessRoute>
               }
@@ -190,7 +191,7 @@ export function AppRoutes() {
             <Route
               path={ROUTES.contracts}
               element={
-                <BusinessRoute permission="contracts.view" label="Danh sách hợp đồng">
+                <BusinessRoute permission="contracts.view" label="Danh sách hợp đồng" apiReady={CONTRACTS_API_ENABLED}>
                   <ContractListPage key="all" />
                 </BusinessRoute>
               }
@@ -198,7 +199,7 @@ export function AppRoutes() {
             <Route
               path={ROUTES.contractRevision}
               element={
-                <BusinessRoute permission="contracts.create" label="Hợp đồng cần chỉnh sửa">
+                <BusinessRoute permission="contracts.create" label="Hợp đồng cần chỉnh sửa" apiReady={CONTRACTS_API_ENABLED}>
                   <ContractListPage key="revision" variant="revision" />
                 </BusinessRoute>
               }
@@ -206,7 +207,7 @@ export function AppRoutes() {
             <Route
               path="/hop-dong/:code"
               element={
-                <BusinessRoute permission="contracts.view" label="Hồ sơ hợp đồng">
+                <BusinessRoute permission="contracts.view" label="Hồ sơ hợp đồng" apiReady={CONTRACTS_API_ENABLED}>
                   <ContractDetailPage />
                 </BusinessRoute>
               }
@@ -214,7 +215,7 @@ export function AppRoutes() {
             <Route
               path="/hop-dong/:code/chinh-sua"
               element={
-                <BusinessRoute permission="contracts.create" label="Chỉnh sửa hợp đồng">
+                <BusinessRoute permission="contracts.create" label="Chỉnh sửa hợp đồng" apiReady={CONTRACTS_API_ENABLED}>
                   <ContractEditPage />
                 </BusinessRoute>
               }

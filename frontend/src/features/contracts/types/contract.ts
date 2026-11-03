@@ -1,4 +1,4 @@
-import type { UploadedFile } from '@/components/file-upload/FileUploadField';
+import type { UploadedFile } from '@/features/contracts/components/ContractFileUpload';
 import type { SessionCheck } from '@/features/auth/types/auth';
 
 export type ContractSourceMode = 'template' | 'blank';
@@ -10,6 +10,7 @@ export type ContractServiceItem = {
   unit: string;
   requiresArea: boolean;
   areaCode: string;
+  areaActive?: boolean;
 };
 
 /** Dữ liệu người dùng nhập trong SYS-CTR-01; giá trị hợp đồng giữ dạng chuỗi để báo lỗi đúng dữ liệu gốc. */
@@ -40,6 +41,7 @@ export type ContractStatus =
   | 'revision-requested'
   | 'rejected'
   | 'approved'
+  | 'active'
   | 'cancelled';
 
 /** Tuyến duyệt hợp đồng: Trưởng phòng Kinh doanh → Pháp chế → Ban Giám đốc. */
@@ -49,7 +51,14 @@ export type ApprovalStepKey = 'sales' | 'legal' | 'board';
  * Tình trạng một bước trong lượt (SYS-CTR-11 bước 5–7): Chờ tiếp nhận, Đang rà soát, Đang chờ phân công,
  * Đã hoàn thành, Chưa đến lượt hoặc Không thực hiện khi lượt đã dừng ở bước trước.
  */
-export type ApprovalStepState = 'waiting' | 'pending-accept' | 'reviewing' | 'unassigned' | 'done' | 'stopped' | 'skipped';
+export type ApprovalStepState =
+  | 'waiting'
+  | 'pending-accept'
+  | 'reviewing'
+  | 'unassigned'
+  | 'done'
+  | 'stopped'
+  | 'skipped';
 
 export type ApprovalDecision = 'approve' | 'revision' | 'reject';
 
@@ -124,6 +133,9 @@ export type ApprovalRound = {
 };
 
 export type Contract = Omit<ContractDraft, 'value'> & {
+  customerSnapshot?: import('@/features/customers/types/customer').Customer;
+  cancellationRequests?: ContractCancellationRequest[];
+  history?: { at: string; action: string; byName: string; note?: string }[];
   code: string;
   value: number;
   status: ContractStatus;
@@ -146,9 +158,39 @@ export type Contract = Omit<ContractDraft, 'value'> & {
   pendingTask?: string;
 };
 
+export type ContractCancellationRequest = {
+  id: string;
+  party: 'company' | 'customer';
+  reason: string;
+  status: 'pending-sales' | 'pending-board' | 'approved' | 'rejected';
+  version: number;
+  requestedByName: string;
+  requestedAt: string;
+  salesAssigneeId: string;
+  salesAssigneeName: string;
+  salesApproved?: boolean;
+  salesReason?: string;
+  salesDecidedAt?: string;
+  boardAssigneeId?: string;
+  boardAssigneeName?: string;
+  boardApproved?: boolean;
+  boardReason?: string;
+  boardDecidedAt?: string;
+  notificationStatus?: 'Pending' | 'Sent' | 'Failed';
+};
+
 export type ContractListItem = Pick<
   Contract,
-  'code' | 'title' | 'contractType' | 'customerCode' | 'customerName' | 'effectiveFrom' | 'effectiveTo' | 'status' | 'ownerName' | 'updatedAt'
+  | 'code'
+  | 'title'
+  | 'contractType'
+  | 'customerCode'
+  | 'customerName'
+  | 'effectiveFrom'
+  | 'effectiveTo'
+  | 'status'
+  | 'ownerName'
+  | 'updatedAt'
 > & { stepLabel?: string; areaCodes: string[] };
 
 export type ContractScope = 'own' | 'department' | 'granted' | 'assigned';
@@ -162,7 +204,13 @@ export type ContractListQuery = {
   size: number;
 };
 
-export type ContractListResult = { items: ContractListItem[]; total: number; page: number; size: number; scope: ContractScope };
+export type ContractListResult = {
+  items: ContractListItem[];
+  total: number;
+  page: number;
+  size: number;
+  scope: ContractScope;
+};
 
 export type ApprovalInboxItem = ContractListItem & {
   value: number;
@@ -190,7 +238,12 @@ export type ContractActionErrorCode =
   | 'NO_APPROVER'
   | 'STEP_NOT_READY'
   | 'STEP_DONE'
-  | 'VERSION_MISMATCH';
+  | 'VERSION_MISMATCH'
+  | 'CUSTOMER_INACTIVE'
+  | 'CANCELLATION_PENDING'
+  | 'IDEMPOTENCY_CONFLICT'
+  | 'SIGNING_CANCELLATION_REQUIRED'
+  | 'INVALID_FILE';
 
 /** Lỗi chung cho thao tác trên hồ sơ đã có mã (xem, sửa, trình, hủy, rà soát, phê duyệt). */
 export class ContractActionError extends Error {
@@ -220,7 +273,12 @@ type Actor = { userId: string; signedInAt: string };
 
 export type UpdateContractRequest = Actor & { code: string; baseVersion: number; draft: ContractDraft };
 export type SubmitContractRequest = Actor & { code: string; idempotencyKey: string };
-export type CancelContractRequest = Actor & { code: string; reason: string };
+export type CancelContractRequest = Actor & {
+  code: string;
+  reason: string;
+  baseVersion?: number;
+  idempotencyKey?: string;
+};
 export type AcceptReviewRequest = Actor & { code: string };
 export type DecideReviewRequest = Actor & {
   code: string;
@@ -251,9 +309,11 @@ export type SetContractAttachmentsRequest = {
   signedInAt: string;
   code: string;
   attachments: UploadedFile[];
+  baseVersion?: number;
 };
 
 export type CreateContractErrorCode =
+  | 'IDEMPOTENCY_CONFLICT'
   | 'VALIDATION'
   | 'CUSTOMER_INACTIVE'
   | 'AREA_INACTIVE'

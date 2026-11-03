@@ -2,13 +2,30 @@
 
 Nguồn: `frontend/src/features/contracts/api/contractsApi.ts`, `approvalApi.ts`, `frontend/src/mocks/contractsServer.ts` và `backend/src/QTKD.Api/Endpoints/ContractApprovalEndpoints.cs`. Quy ước chung (tiền tố, JWT, Idempotency-Key, mã lỗi) xem [list_api.md](../../../list_api.md).
 
+> Sau khi ghép main: CRUD hợp đồng (SYS-CTR-01/02/03/05/06), tệp và US-CTR-19 có controller .NET; rà soát/phê duyệt và phân công người duyệt sử dụng implementation từ main. Luồng submit hợp đồng chưa được triển khai trong phần CRUD. Xem [cách chạy và giới hạn](../../../backend/GETTING-STARTED.md).
+
+## Endpoint thực thi bổ sung / điều chỉnh
+
+Mọi endpoint cần Bearer JWT. Lệnh tạo, hủy, tải/xóa tệp và quyết định đề nghị hủy cần `Idempotency-Key`. BE không dùng `userId`/role từ body.
+
+| Method | Endpoint | Body / quy tắc |
+|---|---|---|
+| POST | `/contracts/{code}/attachments` | multipart `file`, `baseVersion`; tối đa 20 MiB |
+| GET | `/contracts/{code}/attachments/{id}` | Download có kiểm tra phạm vi hợp đồng |
+| DELETE | `/contracts/{code}/attachments/{id}?baseVersion=` | Xóa liên kết ở Draft/RevisionRequested |
+| POST | `/contracts/{code}/cancel` | `{baseVersion, reason}`; hủy nháp trực tiếp |
+| POST | `/contracts/{code}/cancellation-requests` | `{baseVersion, party: company\|customer, reason}` |
+| POST | `/contracts/{code}/cancellation-requests/{id}/decision` | `{baseVersion, approve, reason}`; version của đề nghị, lý do bắt buộc khi từ chối |
+
+GET chi tiết trả thêm `customerSnapshot`, `history`, `cancellationRequests`. PUT tệp theo toàn bộ danh sách trong bảng đề xuất cũ không được triển khai. Thay bằng các endpoint tệp ở trên. Đợt này chỉ xử lý document_type Contract.
 Trạng thái 03/11/2026:
 
 | Phần | BE | FE |
 |---|---|---|
 | Rà soát, phê duyệt SYS-CTR-07 → 09 | Đã có (`ContractApprovalEndpoints.cs`) | `approvalApi.ts` gọi BE |
 | Phân công người duyệt SYS-CTR-10 | Đã có (`ContractApprovalEndpoints.cs`, `ApprovalAssignmentService.cs`) | `approvalApi.ts` gọi BE (tab "Phân công người duyệt") |
-| Hồ sơ SYS-CTR-01 → 06, tiến độ SYS-CTR-11 | Chưa có | `contractsApi.ts` dùng mock |
+| CRUD hồ sơ SYS-CTR-01/02/03/05/06, tệp và US-CTR-19 | Đã có (`ContractsController.cs`) | `contractsApi.ts` gọi BE khi bật `VITE_CONTRACTS_USE_BACKEND` |
+| Submit SYS-CTR-04, tiến độ SYS-CTR-11 | Chưa nối hoàn chỉnh | Giữ ranh giới mock/API theo từng route |
 
 > Bảng "Hồ sơ hợp đồng" bên dưới vẫn là đề xuất từ chữ ký hàm FE, chưa được nhóm BE chốt.
 
