@@ -11,6 +11,7 @@ import { ROUTES } from '@/constants/routes';
 import { formatDateTime, formatMoney } from '@/utils/format';
 import { contractsApi } from '../api/contractsApi';
 import { approvalApi, approvalReviewPath } from '../api/approvalApi';
+import { APPROVALS_CHANGED } from '../api/approvalEvents';
 import { approvalError } from '../utils/approvalReview';
 import { ContractActionError, type ApprovalInboxItem, type ApprovalStepKey } from '../types/contract';
 import { CONTRACT_STATUS_BADGE, DECISION_LABELS } from '../utils/contractStatus';
@@ -33,6 +34,22 @@ export function ApprovalInboxPage({ step, done = false }: { step: ApprovalStepKe
   const [retry, setRetry] = useState(0);
   const copy = COPY[step];
   const title = done ? 'Hồ sơ đã rà soát' : copy.title;
+
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState !== 'hidden') setRetry(value => value + 1);
+    };
+    window.addEventListener(APPROVALS_CHANGED, refresh);
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    const timer = window.setInterval(refresh, 30000);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener(APPROVALS_CHANGED, refresh);
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, []);
 
   useEffect(() => {
     if (!user) return;
