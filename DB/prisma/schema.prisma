@@ -20,7 +20,9 @@ enum UserRole {
   OperationsManager
   Accountant
   LegalStaff
+  LegalManager
   BoardMember
+  BoardChair
   SystemAdmin
 
   @@map("user_role")
@@ -248,31 +250,34 @@ model UserAccount {
   passwordChangedAt  DateTime?  @map("password_changed_at") @db.Timestamptz(6)
   roleRef            RoleDefinition @relation(fields: [role], references: [code], onDelete: Restrict, onUpdate: Restrict)
 
-  departmentByManagerId               Department[]             @relation("Department_managerId")
-  departmentRef                       Department               @relation("UserAccount_departmentId", fields: [departmentId], references: [departmentId], onDelete: Restrict, onUpdate: Restrict)
-  loginSessionByUserId                LoginSession[]           @relation("LoginSession_userId")
-  passwordOtpByUserId                 PasswordOtp[]            @relation("PasswordOtp_userId")
-  notificationByRecipientId           Notification[]           @relation("Notification_recipientId")
-  auditLogByActorId                   AuditLog[]               @relation("AuditLog_actorId")
-  attachmentByUploadedBy              Attachment[]             @relation("Attachment_uploadedBy")
-  customerByAccountManagerId          Customer[]               @relation("Customer_accountManagerId")
-  customerProfileCreated              CustomerProfileData[]    @relation("CustomerProfileCreatedBy")
-  customerOperations                  CustomerOperation[]
-  customerStatusDecisionByConfirmedBy CustomerStatusDecision[] @relation("CustomerStatusDecision_confirmedBy")
-  areaAssignmentByUserId              AreaAssignment[]         @relation("AreaAssignment_userId")
-  contractByOwnerId                   Contract[]               @relation("Contract_ownerId")
-  priceListByCreatedBy                PriceList[]              @relation("PriceList_createdBy")
-  volumePeriodByLockedBy              VolumePeriod[]           @relation("VolumePeriod_lockedBy")
-  paymentStatementByCreatedBy         PaymentStatement[]       @relation("PaymentStatement_createdBy")
-  reconciliationByVolumeConfirmedBy   Reconciliation[]         @relation("Reconciliation_volumeConfirmedBy")
-  reconciliationByReconciledBy        Reconciliation[]         @relation("Reconciliation_reconciledBy")
-  changeRequestByRequestedBy          ChangeRequest[]          @relation("ChangeRequest_requestedBy")
-  changeRequestByApprovedBy           ChangeRequest[]          @relation("ChangeRequest_approvedBy")
-  approvalRoundBySubmittedBy          ApprovalRound[]          @relation("ApprovalRound_submittedBy")
-  approvalStepByAssigneeId            ApprovalStep[]           @relation("ApprovalStep_assigneeId")
-  approvalStepByDecidedBy             ApprovalStep[]           @relation("ApprovalStep_decidedBy")
-  signingSessionByCompanySignerId     SigningSession[]         @relation("SigningSession_companySignerId")
-  signingSessionBySentBy              SigningSession[]         @relation("SigningSession_sentBy")
+  departmentByManagerId               Department[]                  @relation("Department_managerId")
+  departmentRef                       Department                    @relation("UserAccount_departmentId", fields: [departmentId], references: [departmentId], onDelete: Restrict, onUpdate: Restrict)
+  loginSessionByUserId                LoginSession[]                @relation("LoginSession_userId")
+  passwordOtpByUserId                 PasswordOtp[]                 @relation("PasswordOtp_userId")
+  notificationByRecipientId           Notification[]                @relation("Notification_recipientId")
+  auditLogByActorId                   AuditLog[]                    @relation("AuditLog_actorId")
+  attachmentByUploadedBy              Attachment[]                  @relation("Attachment_uploadedBy")
+  customerByAccountManagerId          Customer[]                    @relation("Customer_accountManagerId")
+  customerProfileCreated CustomerProfileData[] @relation("CustomerProfileCreatedBy")
+  customerOperations CustomerOperation[]
+  customerStatusDecisionByConfirmedBy CustomerStatusDecision[]      @relation("CustomerStatusDecision_confirmedBy")
+  areaAssignmentByUserId              AreaAssignment[]              @relation("AreaAssignment_userId")
+  contractByOwnerId                   Contract[]                    @relation("Contract_ownerId")
+  priceListByCreatedBy                PriceList[]                   @relation("PriceList_createdBy")
+  volumePeriodByLockedBy              VolumePeriod[]                @relation("VolumePeriod_lockedBy")
+  paymentStatementByCreatedBy         PaymentStatement[]            @relation("PaymentStatement_createdBy")
+  reconciliationByVolumeConfirmedBy   Reconciliation[]              @relation("Reconciliation_volumeConfirmedBy")
+  reconciliationByReconciledBy        Reconciliation[]              @relation("Reconciliation_reconciledBy")
+  changeRequestByRequestedBy          ChangeRequest[]               @relation("ChangeRequest_requestedBy")
+  changeRequestByApprovedBy           ChangeRequest[]               @relation("ChangeRequest_approvedBy")
+  approvalRoundBySubmittedBy          ApprovalRound[]               @relation("ApprovalRound_submittedBy")
+  approvalStepByAssigneeId            ApprovalStep[]                @relation("ApprovalStep_assigneeId")
+  approvalStepByDecidedBy             ApprovalStep[]                @relation("ApprovalStep_decidedBy")
+  signingSessionByCompanySignerId     SigningSession[]              @relation("SigningSession_companySignerId")
+  signingSessionBySentBy              SigningSession[]              @relation("SigningSession_sentBy")
+  requestedCancellations              ContractCancellationRequest[] @relation("CancellationRequester")
+  salesCancellations                  ContractCancellationRequest[] @relation("CancellationSales")
+  boardCancellations                  ContractCancellationRequest[] @relation("CancellationBoard")
 
   @@index([departmentId])
   @@map("user_account")
@@ -389,6 +394,8 @@ model AuditLog {
 }
 
 model Attachment {
+  fileSize     BigInt             @default(0) @map("file_size")
+  contentType  String             @default("application/octet-stream") @map("content_type") @db.VarChar(200)
   attachmentId String             @id @default(dbgenerated("gen_random_uuid()")) @map("attachment_id") @db.Uuid
   recordType   DocumentRecordType @map("record_type")
   contractId   String?            @map("contract_id") @db.Uuid
@@ -411,8 +418,8 @@ model Attachment {
 }
 
 model Customer {
+  customerCode        String       @unique @default(dbgenerated("('KH-'::text || lpad((nextval('qtkd.customer_code_seq'::regclass))::text, 6, '0'::text))")) @map("customer_code") @db.VarChar(50)
   customerId          String       @id @default(dbgenerated("gen_random_uuid()")) @map("customer_id") @db.Uuid
-  customerCode        String       @unique @default(dbgenerated("qtkd.next_customer_code()")) @map("customer_code") @db.VarChar(30)
   customerName        String       @map("customer_name") @db.VarChar(250)
   taxCode             String       @unique @map("tax_code") @db.VarChar(13)
   address             String       @map("address") @db.Text
@@ -519,10 +526,12 @@ model Area {
 }
 
 model Service {
-  serviceId   String  @id @default(dbgenerated("gen_random_uuid()")) @map("service_id") @db.Uuid
-  serviceName String  @map("service_name") @db.VarChar(200)
-  unit        String  @map("unit") @db.VarChar(50)
-  isMandatory Boolean @default(false) @map("is_mandatory")
+  serviceCode  String  @unique @default(dbgenerated("('DV-'::text || lpad((nextval('qtkd.service_code_seq'::regclass))::text, 6, '0'::text))")) @map("service_code") @db.VarChar(50)
+  requiresArea Boolean @default(true) @map("requires_area")
+  serviceId    String  @id @default(dbgenerated("gen_random_uuid()")) @map("service_id") @db.Uuid
+  serviceName  String  @map("service_name") @db.VarChar(200)
+  unit         String  @map("unit") @db.VarChar(50)
+  isMandatory  Boolean @default(false) @map("is_mandatory")
 
   areaServiceByServiceId   AreaService[]   @relation("AreaService_serviceId")
   contractItemByServiceId  ContractItem[]  @relation("ContractItem_serviceId")
@@ -564,35 +573,45 @@ model AreaAssignment {
 }
 
 model Contract {
-  contractId       String               @id @default(dbgenerated("gen_random_uuid()")) @map("contract_id") @db.Uuid
-  documentType     ContractDocumentType @default(Contract) @map("document_type")
-  parentContractId String?              @map("parent_contract_id") @db.Uuid
-  customerId       String               @map("customer_id") @db.Uuid
-  title            String               @map("title") @db.VarChar(500)
-  contractType     String               @map("contract_type") @db.VarChar(100)
-  startDate        DateTime             @map("start_date") @db.Date
-  endDate          DateTime             @map("end_date") @db.Date
-  contractValue    Decimal              @map("contract_value") @db.Decimal(19, 2)
-  paymentTerms     String               @map("payment_terms") @db.Text
-  content          String               @map("content") @db.Text
-  status           ContractStatus       @default(Draft) @map("status")
-  ownerId          String               @map("owner_id") @db.Uuid
-  version          Int                  @default(1) @map("version")
-  createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt        DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  contractCode       String               @unique @default(dbgenerated("('HD-'::text || lpad((nextval('qtkd.contract_code_seq'::regclass))::text, 6, '0'::text))")) @map("contract_code") @db.VarChar(50)
+  sourceMode         String               @default("blank") @map("source_mode") @db.VarChar(20)
+  templateCode       String?              @map("template_code") @db.VarChar(80)
+  customerSnapshot   Json                 @default("{}") @map("customer_snapshot") @db.JsonB
+  owningDepartmentId String?              @map("owning_department_id") @db.Uuid
+  cancelledBy        String?              @map("cancelled_by") @db.Uuid
+  cancelledAt        DateTime?            @map("cancelled_at") @db.Timestamptz(6)
+  cancellationReason String?              @map("cancellation_reason") @db.Text
+  contractId         String               @id @default(dbgenerated("gen_random_uuid()")) @map("contract_id") @db.Uuid
+  documentType       ContractDocumentType @default(Contract) @map("document_type")
+  parentContractId   String?              @map("parent_contract_id") @db.Uuid
+  customerId         String               @map("customer_id") @db.Uuid
+  title              String               @map("title") @db.VarChar(500)
+  contractType       String               @map("contract_type") @db.VarChar(100)
+  startDate          DateTime             @map("start_date") @db.Date
+  endDate            DateTime             @map("end_date") @db.Date
+  contractValue      Decimal              @map("contract_value") @db.Decimal(19, 2)
+  paymentTerms       String               @map("payment_terms") @db.Text
+  content            String               @map("content") @db.Text
+  status             ContractStatus       @default(Draft) @map("status")
+  ownerId            String               @map("owner_id") @db.Uuid
+  version            Int                  @default(1) @map("version")
+  createdAt          DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  attachmentByContractId       Attachment[]       @relation("Attachment_contractId")
-  parentContractRef            Contract?          @relation("Contract_parentContractId", fields: [parentContractId], references: [contractId], onDelete: Restrict, onUpdate: Restrict)
-  contractByParentContractId   Contract[]         @relation("Contract_parentContractId")
-  customerRef                  Customer           @relation("Contract_customerId", fields: [customerId], references: [customerId], onDelete: Restrict, onUpdate: Restrict)
-  ownerRef                     UserAccount        @relation("Contract_ownerId", fields: [ownerId], references: [userId], onDelete: Restrict, onUpdate: Restrict)
-  contractItemByContractId     ContractItem[]     @relation("ContractItem_contractId")
-  priceListByContractId        PriceList[]        @relation("PriceList_contractId")
-  volumePeriodByContractId     VolumePeriod[]     @relation("VolumePeriod_contractId")
-  paymentStatementByContractId PaymentStatement[] @relation("PaymentStatement_contractId")
-  changeRequestByContractId    ChangeRequest[]    @relation("ChangeRequest_contractId")
-  approvalRoundByContractId    ApprovalRound[]    @relation("ApprovalRound_contractId")
-  signingSessionByContractId   SigningSession[]   @relation("SigningSession_contractId")
+  attachmentByContractId       Attachment[]                  @relation("Attachment_contractId")
+  parentContractRef            Contract?                     @relation("Contract_parentContractId", fields: [parentContractId], references: [contractId], onDelete: Restrict, onUpdate: Restrict)
+  contractByParentContractId   Contract[]                    @relation("Contract_parentContractId")
+  customerRef                  Customer                      @relation("Contract_customerId", fields: [customerId], references: [customerId], onDelete: Restrict, onUpdate: Restrict)
+  ownerRef                     UserAccount                   @relation("Contract_ownerId", fields: [ownerId], references: [userId], onDelete: Restrict, onUpdate: Restrict)
+  contractItemByContractId     ContractItem[]                @relation("ContractItem_contractId")
+  priceListByContractId        PriceList[]                   @relation("PriceList_contractId")
+  volumePeriodByContractId     VolumePeriod[]                @relation("VolumePeriod_contractId")
+  paymentStatementByContractId PaymentStatement[]            @relation("PaymentStatement_contractId")
+  changeRequestByContractId    ChangeRequest[]               @relation("ChangeRequest_contractId")
+  approvalRoundByContractId    ApprovalRound[]               @relation("ApprovalRound_contractId")
+  signingSessionByContractId   SigningSession[]              @relation("SigningSession_contractId")
+  cancellationRequests         ContractCancellationRequest[]
+  deliveries                   ContractDelivery[]
 
   @@index([parentContractId])
   @@index([customerId])
@@ -603,15 +622,15 @@ model Contract {
 }
 
 model ContractItem {
-  itemId           String @id @default(dbgenerated("gen_random_uuid()")) @map("item_id") @db.Uuid
-  contractId       String @map("contract_id") @db.Uuid
-  serviceId        String @map("service_id") @db.Uuid
-  areaId           String @map("area_id") @db.Uuid
-  areaNameSnapshot String @map("area_name_snapshot") @db.VarChar(200)
+  itemId           String  @id @default(dbgenerated("gen_random_uuid()")) @map("item_id") @db.Uuid
+  contractId       String  @map("contract_id") @db.Uuid
+  serviceId        String  @map("service_id") @db.Uuid
+  areaId           String? @map("area_id") @db.Uuid
+  areaNameSnapshot String  @map("area_name_snapshot") @db.VarChar(200)
 
   contractRef Contract @relation("ContractItem_contractId", fields: [contractId], references: [contractId], onDelete: Restrict, onUpdate: Restrict)
   serviceRef  Service  @relation("ContractItem_serviceId", fields: [serviceId], references: [serviceId], onDelete: Restrict, onUpdate: Restrict)
-  areaRef     Area     @relation("ContractItem_areaId", fields: [areaId], references: [areaId], onDelete: Restrict, onUpdate: Restrict)
+  areaRef     Area?    @relation("ContractItem_areaId", fields: [areaId], references: [areaId], onDelete: Restrict, onUpdate: Restrict)
 
   @@unique([contractId, serviceId, areaId])
   @@index([contractId])
@@ -848,7 +867,7 @@ model ApprovalStep {
   roundId         String             @map("round_id") @db.Uuid
   stepName        String             @map("step_name") @db.VarChar(200)
   stepOrder       Int                @map("step_order")
-  assigneeId      String             @map("assignee_id") @db.Uuid
+  assigneeId      String?            @map("assignee_id") @db.Uuid
   assignedAt      DateTime?          @map("assigned_at") @db.Timestamptz(6)
   acceptedAt      DateTime?          @map("accepted_at") @db.Timestamptz(6)
   stepStatus      ApprovalStepStatus @default(NotStarted) @map("step_status")
@@ -859,7 +878,7 @@ model ApprovalStep {
   decidedAt       DateTime?          @map("decided_at") @db.Timestamptz(6)
 
   roundRef     ApprovalRound @relation("ApprovalStep_roundId", fields: [roundId], references: [roundId], onDelete: Restrict, onUpdate: Restrict)
-  assigneeRef  UserAccount   @relation("ApprovalStep_assigneeId", fields: [assigneeId], references: [userId], onDelete: Restrict, onUpdate: Restrict)
+  assigneeRef  UserAccount?  @relation("ApprovalStep_assigneeId", fields: [assigneeId], references: [userId], onDelete: Restrict, onUpdate: Restrict)
   decidedByRef UserAccount?  @relation("ApprovalStep_decidedBy", fields: [decidedBy], references: [userId], onDelete: Restrict, onUpdate: Restrict)
 
   @@unique([roundId, stepOrder])
@@ -867,6 +886,67 @@ model ApprovalStep {
   @@index([assigneeId])
   @@index([decidedBy])
   @@map("approval_step")
+  @@schema("qtkd")
+}
+
+model ContractCancellationRequest {
+  deliveries      ContractDelivery[]
+  requestId       String             @id @default(dbgenerated("gen_random_uuid()")) @map("request_id") @db.Uuid
+  contractId      String             @map("contract_id") @db.Uuid
+  requestedBy     String             @map("requested_by") @db.Uuid
+  requestedAt     DateTime           @default(now()) @map("requested_at") @db.Timestamptz(6)
+  party           String             @db.VarChar(20)
+  reason          String             @db.Text
+  originalStatus  ContractStatus     @map("original_status")
+  contractVersion Int                @map("contract_version")
+  status          String             @default("pending-sales") @db.VarChar(30)
+  salesAssigneeId String             @map("sales_assignee_id") @db.Uuid
+  salesDecidedAt  DateTime?          @map("sales_decided_at") @db.Timestamptz(6)
+  salesApproved   Boolean?           @map("sales_approved")
+  salesReason     String?            @map("sales_reason") @db.Text
+  boardAssigneeId String?            @map("board_assignee_id") @db.Uuid
+  boardDecidedAt  DateTime?          @map("board_decided_at") @db.Timestamptz(6)
+  boardApproved   Boolean?           @map("board_approved")
+  boardReason     String?            @map("board_reason") @db.Text
+  version         Int                @default(1)
+  contract        Contract           @relation(fields: [contractId], references: [contractId], onDelete: Restrict)
+  requester       UserAccount        @relation("CancellationRequester", fields: [requestedBy], references: [userId], onDelete: Restrict)
+  salesAssignee   UserAccount        @relation("CancellationSales", fields: [salesAssigneeId], references: [userId], onDelete: Restrict)
+  boardAssignee   UserAccount?       @relation("CancellationBoard", fields: [boardAssigneeId], references: [userId], onDelete: Restrict)
+
+  @@index([contractId])
+  @@map("contract_cancellation_request")
+  @@schema("qtkd")
+}
+
+model ContractDelivery {
+  deliveryId  String                      @id @default(dbgenerated("gen_random_uuid()")) @map("delivery_id") @db.Uuid
+  contractId  String                      @map("contract_id") @db.Uuid
+  requestId   String                      @map("request_id") @db.Uuid
+  destination String                      @db.VarChar(254)
+  payload     Json                        @db.JsonB
+  status      String                      @default("Pending") @db.VarChar(20)
+  createdAt   DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
+  attempts    Int                         @default(0)
+  deliveredAt DateTime?                   @map("delivered_at") @db.Timestamptz(6)
+  contract    Contract                    @relation(fields: [contractId], references: [contractId], onDelete: Restrict)
+  request     ContractCancellationRequest @relation(fields: [requestId], references: [requestId], onDelete: Restrict)
+
+  @@unique([requestId])
+  @@map("contract_delivery")
+  @@schema("qtkd")
+}
+
+model IdempotencyRequest {
+  actorId     String   @map("actor_id") @db.Uuid
+  operation   String   @db.VarChar(180)
+  key         String   @db.VarChar(128)
+  fingerprint String   @db.VarChar(64)
+  response    Json     @db.JsonB
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@id([actorId, operation, key])
+  @@map("idempotency_request")
   @@schema("qtkd")
 }
 

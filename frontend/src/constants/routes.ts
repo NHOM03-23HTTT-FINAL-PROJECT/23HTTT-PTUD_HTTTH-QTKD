@@ -27,9 +27,7 @@ export const ROUTES = {
   approvalLegalDone: '/phe-duyet/da-ra-soat',
   approvalBoard: '/phe-duyet/cho-phe-duyet',
   approvalTracking: '/phe-duyet/tien-do',
-  workflows: '/quan-tri/quy-trinh',
-  workflowCreate: '/quan-tri/quy-trinh/tao-moi',
-  workflowEdit: (code: string) => `/quan-tri/quy-trinh/${code}/cap-nhat`,
+  approvalAssignments: '/phe-duyet/phan-cong',
   paymentDetail: (code: string) => `/bang-thanh-toan/${code}`,
 } as const;
 
@@ -38,7 +36,7 @@ export const REDIRECT_PARAM = 'redirect';
 
 /** Loại hồ sơ mở được bằng đường dẫn trực tiếp (ví dụ link trong email thông báo). */
 const RECORD_ROUTES = [
-  { prefix: '/hop-dong/', name: 'Hợp đồng', pattern: /^HD-\d{4}-\d{3,}$/ },
+  { prefix: '/hop-dong/', name: 'Hợp đồng', pattern: /^HD-(?:\d{4}-)?\d{3,}$/ },
   { prefix: '/bang-thanh-toan/', name: 'Bảng thanh toán', pattern: /^BTT-\d{4}-\d{3,}$/ },
 ] as const;
 

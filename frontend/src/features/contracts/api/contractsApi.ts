@@ -30,6 +30,9 @@ import type {
   SubmitContractRequest,
   UpdateContractRequest,
 } from '../types/contract';
+import { ContractActionError } from '../types/contract';
+import { BACKEND_ENABLED } from '@/features/contracts/config/backend';
+import { serverContractsApi } from './serverContractsApi';
 
 const SAVE_LATENCY_MS = 700;
 const LOAD_LATENCY_MS = 300;
@@ -41,7 +44,7 @@ function delay(ms: number) {
 type Actor = { userId: string; signedInAt: string };
 
 /** Ranh giới API của Hợp đồng; khi có BE chỉ thay phần thân bằng HTTP và giữ nguyên chữ ký. */
-export const contractsApi = {
+const mockContractsApi = {
   getFormOptions: mockGetContractFormOptions,
   getListFilterOptions: mockGetListFilterOptions,
   getContract: mockGetContract,
@@ -102,3 +105,26 @@ export const contractsApi = {
     return mockListApprovalInbox(request);
   },
 };
+
+// Deferred workflow actions never fall back to mock while the contract is backed by the real database.
+const deferred = async (): Promise<never> => {
+  throw new ContractActionError('FORBIDDEN');
+};
+export const contractsApi = BACKEND_ENABLED
+  ? {
+      ...mockContractsApi,
+      ...serverContractsApi,
+      checkSubmit: deferred,
+      submit: deferred,
+      acceptReview: deferred,
+      decide: deferred,
+      retryPendingTask: deferred,
+      requestCoordination: deferred,
+      replyCoordination: deferred,
+      inbox: deferred,
+    }
+  : {
+      ...mockContractsApi,
+      loadFormOptions: async () => mockContractsApi.getFormOptions(),
+      loadListFilterOptions: async () => mockContractsApi.getListFilterOptions(),
+    };

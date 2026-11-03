@@ -6,6 +6,7 @@ import { Button, ButtonLink } from '@/components/button/Button';
 import { Alert } from '@/components/feedback/Alert';
 import { Icon } from '@/components/icon/Icon';
 import { StatusBadge } from '@/components/status-badge/StatusBadge';
+import { LEGAL_ROLES } from '@/constants/roles';
 import { ROUTES } from '@/constants/routes';
 import { useNow } from '@/hooks/useNow';
 import { formatDateTime, formatTime } from '@/utils/format';
@@ -116,7 +117,7 @@ export function ContractProgressPage() {
               </div>
             </section>
           )}
-          {round && <RoundView contract={contract} round={round} isLatest={round.no === latestNo} canSeeInternal={user.roles.includes('NV_PC')} filter={filter} onFilter={setFilter} />}
+          {round && <RoundView contract={contract} round={round} isLatest={round.no === latestNo} canSeeInternal={user.roles.some((role) => LEGAL_ROLES.includes(role))} filter={filter} onFilter={setFilter} />}
         </div>
       )}
     </>
@@ -143,7 +144,7 @@ function RoundView({ contract, round, isLatest, canSeeInternal, filter, onFilter
 
       <div className="contract-layout">
         <section className="contract-card">
-          <div className="contract-section__heading"><h2>Tuyến duyệt · lượt {round.no}</h2><p>Theo cấu hình {round.configCode} phiên bản {round.configVersion} gắn lúc trình.</p></div>
+          <div className="contract-section__heading"><h2>Tuyến duyệt · lượt {round.no}</h2><p>Người duyệt từng bước do trưởng bộ phận phụ trách phân công.</p></div>
           <StepTimeline round={round} />
         </section>
         <aside className="contract-layout__side">
@@ -152,7 +153,6 @@ function RoundView({ contract, round, isLatest, canSeeInternal, filter, onFilter
             <div className="side-card__item"><span className="side-card__label">Thứ tự lượt</span><span className="side-card__value">Lượt {round.no}</span></div>
             <div className="side-card__item"><span className="side-card__label">Người trình · thời điểm</span><span className="side-card__value">{round.submittedByName} · {formatDateTime(round.submittedAt)}</span></div>
             <div className="side-card__item"><span className="side-card__label">Phiên bản hồ sơ được trình</span><span className="side-card__value">Phiên bản {round.contractVersion}</span></div>
-            <div className="side-card__item"><span className="side-card__label">Cấu hình quy trình</span><span className="side-card__value">{round.configCode} · phiên bản {round.configVersion}</span></div>
             <div className="side-card__item"><span className="side-card__label">Trạng thái hồ sơ</span><StatusBadge label={CONTRACT_STATUS_BADGE[contract.status].label} tone={CONTRACT_STATUS_BADGE[contract.status].tone} /></div>
             <div className="side-card__item"><span className="side-card__label">Kết quả lượt</span><StatusBadge label={result.label} tone={result.tone} /></div>
           </section>

@@ -25,3 +25,5 @@ TestResults/
 .DS_Store
 Thumbs.db
 .codegraph
+.packages/
+.data/

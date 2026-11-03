@@ -18,13 +18,16 @@ export const CONTRACT_STATUS_BADGE: Record<ContractStatus, { label: string; tone
   'revision-requested': { label: 'Yêu cầu chỉnh sửa', tone: 'warning' },
   rejected: { label: 'Bị từ chối', tone: 'danger' },
   approved: { label: 'Đã duyệt', tone: 'success' },
+  active: { label: 'Có hiệu lực', tone: 'success' },
   cancelled: { label: 'Đã hủy', tone: 'neutral' },
 };
 
-export const CONTRACT_STATUS_OPTIONS = (Object.keys(CONTRACT_STATUS_BADGE) as ContractStatus[]).map((value) => ({
-  value,
-  label: CONTRACT_STATUS_BADGE[value].label,
-}));
+export const CONTRACT_STATUS_OPTIONS = (Object.keys(CONTRACT_STATUS_BADGE) as ContractStatus[]).map(
+  (value) => ({
+    value,
+    label: CONTRACT_STATUS_BADGE[value].label,
+  }),
+);
 
 export const STEP_LABELS: Record<ApprovalStepKey, string> = {
   sales: 'Trưởng phòng Kinh doanh',
@@ -82,7 +85,9 @@ export function latestRound(contract: Contract): ApprovalRound | undefined {
 /** Bước đang giữ hồ sơ trong lượt đang chạy; không có khi lượt đã kết thúc. */
 export function activeStep(round?: ApprovalRound): ApprovalStep | undefined {
   if (!round || round.result !== 'in-progress') return undefined;
-  return round.steps.find((step) => step.state === 'pending-accept' || step.state === 'reviewing' || step.state === 'unassigned');
+  return round.steps.find(
+    (step) => step.state === 'pending-accept' || step.state === 'reviewing' || step.state === 'unassigned',
+  );
 }
 
 /** Nhãn ngắn hiển thị cạnh trạng thái trong danh sách, ví dụ "Pháp chế". */

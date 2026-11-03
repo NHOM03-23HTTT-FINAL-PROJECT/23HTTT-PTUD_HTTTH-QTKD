@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><IsTestProject>true</IsTestProject><IsPackable>false</IsPackable></PropertyGroup>
   <ItemGroup>
+    <None Include="../../../DB/prisma/migrations/202611030001_approval_unassigned/migration.sql" Link="approval-unassigned.sql" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../../DB/prisma/migrations/202611030004_approval_assignment/migration.sql" Link="approval-assignment.sql" CopyToOutputDirectory="PreserveNewest" />
     <ProjectReference Include="../../src/QTKD.Api/QTKD.Api.csproj" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.14" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.14" />

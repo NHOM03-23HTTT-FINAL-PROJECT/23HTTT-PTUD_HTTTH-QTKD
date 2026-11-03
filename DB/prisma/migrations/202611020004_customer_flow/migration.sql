@@ -1,14 +1,6 @@
 BEGIN;
 
-CREATE SEQUENCE qtkd.customer_code_seq;
-CREATE FUNCTION qtkd.next_customer_code() RETURNS text LANGUAGE sql VOLATILE
-SET search_path = pg_catalog, qtkd AS $$
-  SELECT 'KH-' || CASE WHEN length(n) < 6 THEN lpad(n, 6, '0') ELSE n END
-  FROM (SELECT nextval('qtkd.customer_code_seq'::regclass)::text AS n) sequence_value
-$$;
--- ALTER TABLE fills existing rows without firing the customer update trigger.
-ALTER TABLE "qtkd"."customer" ADD COLUMN "customer_code" VARCHAR(30) NOT NULL DEFAULT qtkd.next_customer_code();
-CREATE UNIQUE INDEX "customer_customer_code_key" ON "qtkd"."customer"("customer_code");
+-- The contracts migration already creates customer_code, its sequence and index.
 CREATE OR REPLACE FUNCTION qtkd.guard_customer() RETURNS trigger LANGUAGE plpgsql
 SET search_path = pg_catalog, qtkd AS $$
 BEGIN
@@ -55,8 +47,6 @@ ALTER TABLE "qtkd"."customer_operation" ADD CONSTRAINT "customer_operation_custo
 ALTER TABLE qtkd.customer_profile_data ENABLE ROW LEVEL SECURITY;
 ALTER TABLE qtkd.customer_operation ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON qtkd.customer_profile_data, qtkd.customer_operation FROM PUBLIC;
-REVOKE ALL ON SEQUENCE qtkd.customer_code_seq FROM PUBLIC;
-REVOKE ALL ON FUNCTION qtkd.next_customer_code() FROM PUBLIC;
 DO $$ DECLARE r text; BEGIN
   FOREACH r IN ARRAY ARRAY['anon', 'authenticated'] LOOP
     IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = r) THEN

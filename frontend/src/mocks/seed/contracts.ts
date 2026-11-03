@@ -9,7 +9,6 @@ import type {
   ContractStatus,
   ContractTemplate,
 } from '@/features/contracts/types/contract';
-import type { WorkflowConfig, WorkflowPerson, WorkflowStage } from '@/features/contracts/types/workflowConfig';
 import { STEP_LABELS } from '@/features/contracts/utils/contractStatus';
 
 export const CONTRACT_TYPES = [
@@ -63,13 +62,13 @@ export const SIMULATED_CONFLICT_PREFIX = 'XUNG-DOT';
 export const SIMULATED_NOTIFY_ERROR_PREFIX = 'LOI-TB';
 export const SIMULATED_LOAD_ERROR_CODE = 'HD-2026-500';
 
-/** Phạm vi cấu hình quy trình ứng với phòng ban quản lý hồ sơ. */
-export const DEPARTMENT_WORKFLOW_SCOPE: Record<string, string> = { KD: 'Phòng Kinh doanh 1' };
 
 export const COORDINATION_DEPARTMENTS = ['Phòng Khai thác', 'Phòng Kế toán', 'Phòng Kinh doanh'];
 
-/** Danh mục người dùng kèm thẩm quyền ký dùng cho cấu hình người tham gia (SYS-CTR-10). */
-export const WORKFLOW_PEOPLE: WorkflowPerson[] = [
+type ReviewerPerson = { id: string; name: string; title: string; department: string; active: boolean; canSign: boolean };
+
+/** Người duyệt trong prototype. Ở chế độ api, trưởng bộ phận phân công trên tab "Phân công người duyệt" (SYS-CTR-10). */
+export const WORKFLOW_PEOPLE: ReviewerPerson[] = [
   { id: 'u-an-nv', name: 'Nguyễn Văn An', title: 'Nhân viên Kinh doanh', department: 'Phòng Kinh doanh 1', active: true, canSign: false },
   { id: 'u-khoa-dm', name: 'Đỗ Minh Khoa', title: 'Nhân viên Kinh doanh', department: 'Phòng Kinh doanh 1', active: true, canSign: false },
   { id: 'u-tuan-lv', name: 'Lê Văn Tuấn', title: 'Nhân viên Kinh doanh', department: 'Phòng Kinh doanh 1', active: false, canSign: false },
@@ -80,34 +79,14 @@ export const WORKFLOW_PEOPLE: WorkflowPerson[] = [
   { id: 'u-huong-dtt', name: 'Đỗ Thị Thu Hương', title: 'Phó Giám đốc (được ủy quyền ký)', department: 'Ban Giám đốc', active: true, canSign: true },
 ];
 
-const CONTRACT_STAGES_V2: WorkflowStage[] = [
-  { key: 'draft', enabled: true, role: 'Nhân viên Kinh doanh', mode: 'role-department', participants: ['u-an-nv', 'u-khoa-dm'], backups: [], notify: ['u-hong-lt'] },
-  { key: 'sales', enabled: true, role: 'Trưởng phòng Kinh doanh', mode: 'specific', participants: ['u-hong-lt'], backups: [], notify: [] },
-  { key: 'legal', enabled: true, role: 'Nhân viên Pháp chế', mode: 'rotation', participants: ['u-duc-pm', 'u-vy-nt'], backups: [], notify: [] },
-  { key: 'board', enabled: true, role: 'Thành viên Ban Giám đốc', mode: 'specific', participants: ['u-bao-tq'], backups: ['u-huong-dtt'], notify: [] },
-  { key: 'signing', enabled: true, role: 'Người ký đại diện công ty', mode: 'specific', participants: ['u-bao-tq'], backups: ['u-huong-dtt'], notify: ['u-an-nv'] },
-];
+/** Người được phân công mặc định cho từng bước trong prototype: người đầu tiên còn hoạt động. */
+export const DEFAULT_REVIEWERS: Record<ApprovalStepKey, string[]> = {
+  sales: ['u-hong-lt'],
+  legal: ['u-duc-pm', 'u-vy-nt'],
+  board: ['u-bao-tq'],
+};
 
-const CONTRACT_STAGES_V1 = CONTRACT_STAGES_V2.map((stage) =>
-  stage.key === 'legal' ? { ...stage, mode: 'specific' as const, participants: ['u-duc-pm'] } : stage,
-);
 
-export const SEED_WORKFLOW_CONFIGS: WorkflowConfig[] = [
-  {
-    code: 'QT-HD-KD1',
-    name: 'Hợp đồng dịch vụ – Phòng Kinh doanh 1',
-    docType: 'contract',
-    scope: 'Phòng Kinh doanh 1',
-    version: 2,
-    activatedAt: '2026-10-20T09:30:00+07:00',
-    activatedByName: 'Ngô Thị Lan',
-    stages: CONTRACT_STAGES_V2,
-    history: [
-      { version: 1, activatedAt: '2026-09-01T08:00:00+07:00', activatedByName: 'Ngô Thị Lan', summary: 'Khởi tạo 5 giai đoạn; Rà soát pháp lý chỉ định Phạm Minh Đức.', stages: CONTRACT_STAGES_V1 },
-      { version: 2, activatedAt: '2026-10-20T09:30:00+07:00', activatedByName: 'Ngô Thị Lan', summary: 'Rà soát pháp lý chuyển sang luân phiên Phạm Minh Đức, Ngô Thanh Vy.', stages: CONTRACT_STAGES_V2 },
-    ],
-  },
-];
 
 type Person = { id: string; name: string };
 const AN: Person = { id: 'u-an-nv', name: 'Nguyễn Văn An' };
@@ -140,7 +119,6 @@ function buildRound(no: number, owner: Person, submittedAt: string, version: num
   const log: ApprovalLogEntry[] = [{ at: submittedAt, stepKey: 'sales', actorName: owner.name, action: 'submit', from: 'draft', to: 'submitted', version }];
   const round = (result: ApprovalRound['result'], endedAt?: string): ApprovalRound => ({
     no, submittedById: owner.id, submittedByName: owner.name, submittedAt, contractVersion: version,
-    configCode: 'QT-HD-KD1', configVersion: Date.parse(submittedAt) < Date.parse('2026-10-20T09:30:00+07:00') ? 1 : 2,
     result, endedAt, steps: [steps.sales, steps.legal, steps.board], log, coordinations: [],
   });
   const approve = (key: ApprovalStepKey, person: Person, hours: number) => {

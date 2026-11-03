@@ -76,7 +76,10 @@ export function AccountMenu({ user }: { user: CurrentUser }) {
             </div>
           </div>
           <hr className="account-menu__divider" />
-          <Link to={ACCOUNT_NAV.profile.path} role="menuitem" className="account-menu__item" onClick={() => setOpen(false)}>
+            <Link to={ACCOUNT_NAV.coordination.path} role="menuitem" className="account-menu__item" onClick={() => setOpen(false)}>
+              <Icon name="users" />{ACCOUNT_NAV.coordination.label}
+            </Link>
+            <Link to={ACCOUNT_NAV.profile.path} role="menuitem" className="account-menu__item" onClick={() => setOpen(false)}>
             <Icon name="user" />
             {ACCOUNT_NAV.profile.label}
           </Link>

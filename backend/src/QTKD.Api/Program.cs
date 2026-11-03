@@ -8,7 +8,17 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Npgsql.NameTranslation;
+using Npgsql;
+using Microsoft.AspNetCore.Http.Features;
+using QTKD.Api.Authentication;
+using QTKD.Application.Common.Interfaces;
+using QTKD.Application.Features.Contracts;
+using QTKD.Domain.Contracts;
 using QTKD.Api.Authorization;
+using QTKD.Api.Endpoints;
+using QTKD.Application.Features.ContractApprovals;
+using QTKD.Application.Features.Workflows;
+using QTKD.Infrastructure.ContractApprovals;
 using QTKD.Application.Features.Identity;
 using QTKD.Application.Features.Customers;
 using QTKD.Domain.Identity;
@@ -19,7 +29,7 @@ using QTKD.Api.Customers;
 using TokenOptions = QTKD.Infrastructure.Identity.TokenOptions;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 16 * 1024);
+builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 21 * 1024 * 1024);
 builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true).AddEnvironmentVariables();
 builder.Logging.AddJsonConsole(options => options.IncludeScopes = true);
 builder.Services.AddOptions<TokenOptions>().BindConfiguration("Jwt").ValidateDataAnnotations().ValidateOnStart();
@@ -42,6 +52,14 @@ builder.Services.AddScoped<IPasswordHasher<UserAccount>, BcryptPasswordHasher>()
 builder.Services.AddScoped<TokenIssuer>();
 builder.Services.AddScoped<IIdentityService, IdentityService>();
 builder.Services.AddScoped<CustomerService>();
+builder.Services.AddScoped<ContractApprovalService>();
+builder.Services.AddSingleton<WorkflowEngine>();
+builder.Services.AddScoped<PostgresApprovalStore>();
+builder.Services.AddScoped<IApprovalDbSessions, ApprovalDbSessions>();
+builder.Services.AddScoped<ContractCoordinationService>();
+builder.Services.AddScoped<ApprovalAssignmentService>();
+builder.Services.AddScoped<IApprovalStore>(sp => sp.GetRequiredService<PostgresApprovalStore>());
+builder.Services.AddScoped<IContractApprovalEngine, ContractApprovalEngine>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
 builder.Services.AddSingleton<Microsoft.Extensions.Options.IOptionsChangeTokenSource<JwtBearerOptions>>(
@@ -103,6 +121,17 @@ var allowedOrigins = builder.Configuration.GetSection("Cors:Origins").Get<string
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy.WithOrigins(allowedOrigins)
     .WithMethods("GET", "POST", "PUT", "PATCH").WithHeaders("Content-Type", "Authorization", "X-QTKD-CSRF", "Idempotency-Key").AllowCredentials()));
 
+builder.Services.AddControllers();
+builder.Services.Configure<FormOptions>(o => o.MultipartBodyLengthLimit = 21 * 1024 * 1024);
+builder.Services.AddSingleton(sp => NpgsqlDataSource.Create(
+    sp.GetRequiredService<IConfiguration>().GetConnectionString("Identity")!));
+builder.Services.AddSingleton<PgDatabase>();
+builder.Services.AddScoped<ICurrentActor, CurrentActor>();
+builder.Services.AddScoped<IContractStore>(sp => new PostgresContractStore(
+    sp.GetRequiredService<PgDatabase>(),
+    Path.GetFullPath(builder.Configuration["Storage:Root"] ?? Path.Combine(builder.Environment.ContentRootPath, ".data", "uploads"))));
+builder.Services.AddScoped<ContractService>();
+
 var app = builder.Build();
 app.Use(async (context, next) =>
 {
@@ -110,6 +139,29 @@ app.Use(async (context, next) =>
     context.Response.Headers["Cache-Control"] = "no-store";
     context.Response.Headers["X-Correlation-ID"] = context.TraceIdentifier;
     try { await next(context); }
+    catch (BusinessException error)
+    {
+        context.Response.StatusCode = error.Status;
+        var body = System.Text.Json.JsonSerializer.SerializeToNode(error.Details ?? new { }, PgDatabase.Json)!.AsObject();
+        body["code"] = error.Code;
+        await context.Response.WriteAsJsonAsync(body);
+    }
+    catch (NpgsqlException error)
+    {
+        var conflict = (error as PostgresException)?.SqlState is "23505" or "40001" or "40P01" or "23514";
+        context.Response.StatusCode = conflict ? 409 : 503;
+        await context.Response.WriteAsJsonAsync(new { code = conflict ? "CONFLICT" : "DATABASE_UNAVAILABLE" });
+    }
+    catch (BadHttpRequestException)
+    {
+        context.Response.StatusCode = 400;
+        await context.Response.WriteAsJsonAsync(new { code = "VALIDATION", traceId = context.TraceIdentifier });
+    }
+    catch (ReviewFailure error)
+    {
+        context.Response.StatusCode = error.Status;
+        await context.Response.WriteAsJsonAsync(new { code = error.Code, traceId = context.TraceIdentifier });
+    }
     catch (IdentityFailure error)
     {
         context.Response.StatusCode = error.Status;
@@ -119,11 +171,6 @@ app.Use(async (context, next) =>
     {
         context.Response.StatusCode = error.Status;
         await context.Response.WriteAsJsonAsync(new { code = error.Code, detail = error.Detail, traceId = context.TraceIdentifier });
-    }
-    catch (BadHttpRequestException error) when (error.StatusCode == 400)
-    {
-        context.Response.StatusCode = 400;
-        await context.Response.WriteAsJsonAsync(new { code = "VALIDATION", traceId = context.TraceIdentifier });
     }
     catch (Exception error)
     {
@@ -151,6 +198,9 @@ app.Use(async (context, next) =>
 });
 app.UseRateLimiter();
 app.UseAuthorization();
+app.MapContractApprovals(allowedOrigins);
+app.MapGet("/api/v1/notifications", async (HttpContext context, PostgresApprovalStore store, CancellationToken ct)
+    => Results.Ok(await store.Notifications(Guid.Parse(context.User.FindFirstValue("sub")!), ct))).RequireAuthorization();
 
 const string cookieName = "__Host-qtkd-refresh";
 bool Csrf(HttpContext context) => context.Request.Headers["X-QTKD-CSRF"] == "1"
@@ -217,6 +267,8 @@ app.MapPut("/api/v1/roles/{code}/permissions", async (string code, GrantsRequest
 }).RequireAuthorization("roles.manage");
 app.MapGet("/api/v1/permissions", async (IIdentityService identity, CancellationToken ct) => Results.Ok(await identity.Permissions(ct))).RequireAuthorization("roles.manage");
 app.MapCustomerEndpoints();
+app.MapControllers();
+app.MapGet("/api/health", () => Results.Ok(new { status = "ok", database = "not-checked" })).AllowAnonymous();
 app.Run();
 
 public partial class Program;

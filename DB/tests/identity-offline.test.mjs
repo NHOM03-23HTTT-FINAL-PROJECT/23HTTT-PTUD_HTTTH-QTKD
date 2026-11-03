@@ -9,7 +9,7 @@ test('seed grants, FE role display and BE role codes match the accepted matrix',
   const seed = buildIdentitySeed();
   const contracts = text('../../backend/src/QTKD.Application/Features/Identity/Contracts.cs');
   const mapping = Object.fromEntries([...contracts.matchAll(/\[UserRole\.(\w+)\] = "(\w+)"/g)].map(match => [match[1], match[2]]));
-  assert.equal(seed.roleDefinition.length, 8);
+  assert.equal(seed.roleDefinition.length, 10);
   for (const role of seed.roleDefinition) {
     const frontend = ROLES[mapping[role.code]];
     assert.equal(frontend.department, role.departmentCode);
@@ -19,10 +19,11 @@ test('seed grants, FE role display and BE role codes match the accepted matrix',
 });
 test('migration bootstraps the same grants as seed; backend catalog contains those permissions', () => {
   const seed = buildIdentitySeed();
-  const sql = text('../prisma/migrations/202611020003_identity/migration.sql');
+  // Grants bootstrapped by 0003 plus grants added later in the same `SELECT 'Role', unnest(ARRAY[...])` form.
+  const sql = ['202611020003_identity', '202611030004_approval_assignment'].map(name => text('../prisma/migrations/' + name + '/migration.sql')).join('\n');
   for (const role of seed.roleDefinition) {
-    const match = sql.match(new RegExp("SELECT '" + role.code + "', unnest\\(ARRAY\\[([^\\]]*)\\]"));
-    const permissions = match ? [...match[1].matchAll(/'([^']+)'/g)].map(value => value[1]) : [];
+    const matches = [...sql.matchAll(new RegExp("SELECT '" + role.code + "', unnest\\(ARRAY\\[([^\\]]*)\\]", 'g'))];
+    const permissions = matches.flatMap(match => [...match[1].matchAll(/'([^']+)'/g)].map(value => value[1]));
     assert.deepEqual(permissions.toSorted(), seed.rolePermission.filter(grant => grant.role === role.code).map(grant => grant.permissionCode).toSorted());
   }
   const policies = text('../../backend/src/QTKD.Api/Authorization/IdentityPolicies.cs');

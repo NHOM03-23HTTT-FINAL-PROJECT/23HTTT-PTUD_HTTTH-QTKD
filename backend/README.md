@@ -47,3 +47,6 @@ Chạy npm ci trong DB trước kiểm tra bcrypt hai chiều. Bộ test Postgre
 - ResourceAccess handler không thay việc module sở hữu kiểm tra scope, trạng thái và assignee trong transaction.
 - Logging vận hành có correlation/actor; audit interceptor append-only thuộc TASK-024, chưa triển khai ở đây.
 - Chưa có các controller nghiệp vụ khác, UI quản trị hoàn chỉnh, OTP/email, deployment hoặc CI.
+
+
+Contracts CRUD and cancellation integration: [setup](GETTING-STARTED.md).

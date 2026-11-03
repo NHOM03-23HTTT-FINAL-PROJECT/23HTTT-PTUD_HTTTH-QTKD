@@ -1,3 +1,4 @@
+import { BOARD_ROLES, LEGAL_ROLES } from '@/constants/roles';
 import { useState } from 'react';
 import type { CurrentUser } from '@/app/providers/AuthProvider';
 import { useSession } from '@/app/providers/SessionProvider';
@@ -17,8 +18,8 @@ export type PageNotice = { tone: AlertTone; title: string; body: string };
 /** Bước duyệt ứng với vai trò của người dùng. */
 export function reviewStepOf(user: CurrentUser): ApprovalStepKey | undefined {
   if (user.roles.includes('TP_KD')) return 'sales';
-  if (user.roles.includes('NV_PC')) return 'legal';
-  if (user.roles.includes('GD')) return 'board';
+  if (user.roles.some((role) => LEGAL_ROLES.includes(role))) return 'legal';
+  if (user.roles.some((role) => BOARD_ROLES.includes(role))) return 'board';
   return undefined;
 }
 
