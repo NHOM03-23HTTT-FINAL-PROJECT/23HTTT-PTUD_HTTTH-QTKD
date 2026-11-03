@@ -5,6 +5,8 @@ import { Icon } from '@/components/icon/Icon';
 import { WORKSPACE_NAV, WORKSPACE_SEARCH_PLACEHOLDER, type NavItem } from '@/constants/navigation';
 import { ROUTES } from '@/constants/routes';
 import { getUnreadCount } from '@/mocks/seed/dashboards';
+import { IS_MOCK_AUTH } from '@/features/auth/api/authApi';
+import { useApprovalInboxCount } from '@/features/contracts/hooks/useApprovalInboxCount';
 import { AccountMenu } from './AccountMenu';
 import './MainLayout.css';
 
@@ -72,6 +74,7 @@ function Topbar({ user }: { user: CurrentUser }) {
 
 /** "Đổi mật khẩu" và "Đăng xuất" nằm trong menu tài khoản trên Topbar, không lặp lại ở Sidebar. */
 function Sidebar({ user }: { user: CurrentUser }) {
+  const inbox = useApprovalInboxCount(user);
   const areaRecordNavPath = user.departmentInfo.workspace === 'khai-thac' ? ROUTES.areas : ROUTES.areaLookup;
   const groups = WORKSPACE_NAV[user.departmentInfo.workspace]
     .map((group) => ({
@@ -91,7 +94,9 @@ function Sidebar({ user }: { user: CurrentUser }) {
           {group.items.map((item) => (
             <SidebarLink
               key={item.path}
-              item={item}
+              item={{ ...item, badge: item.approvalStep
+                ? item.approvalStep === inbox.step ? inbox.count : undefined
+                : IS_MOCK_AUTH ? item.badge : undefined }}
               activeForAreaRecord={item.path === areaRecordNavPath}
               activeForContractRecord={item.path === ROUTES.contracts}
               activeForTrackedProgress={item.path === ROUTES.approvalTracking}
@@ -141,7 +146,7 @@ function SidebarLink({
     >
       <Icon name={item.icon} />
       <span className="sidebar__label">{item.label}</span>
-      {item.badge ? <span className="sidebar__badge">{item.badge}</span> : null}
+      {item.badge ? <span className="sidebar__badge" aria-label={`${item.badge} hồ sơ chờ xử lý`}>{item.badge}</span> : null}
     </NavLink>
   );
 }

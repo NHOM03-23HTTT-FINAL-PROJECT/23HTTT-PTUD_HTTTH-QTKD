@@ -1,4 +1,5 @@
 import { apiRequest } from '@/lib/http/client';
+import { notifyApprovalsChanged } from './approvalEvents';
 import type { ApprovalDecision, ApprovalStepKey, ContractStatus } from '../types/contract';
 
 export type ReviewStep = {
@@ -27,12 +28,15 @@ export type AssignmentCandidate = { id: string; name: string; title: string; dep
 export type AssignRequest = { roundId: string; stepId: string; viewedVersion: number; assigneeId: string };
 
 const path = (id: string) => `/approvals/contracts/${encodeURIComponent(id)}`;
+const changed = <T>(result: T): T => { notifyApprovalsChanged(); return result; };
 const write = <T>(url: string, body: unknown, key: string) => apiRequest<T>(url, {
   method: 'POST', headers: { 'Idempotency-Key': key }, body: JSON.stringify(body),
-});
+}).then(changed);
 // Actor identity is always supplied by the BE JWT/session, never by request JSON.
 export const approvalApi = {
-  inbox: (step: ApprovalStepKey, done = false) => apiRequest<ReviewDocument[]>(`/approvals/inbox?step=${step}&done=${done}`),
+  inbox: (step: ApprovalStepKey, done = false, signal?: AbortSignal) => apiRequest<ReviewDocument[]>(`/approvals/inbox?step=${step}&done=${done}`, {
+    signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(10000)]) : undefined,
+  }),
   read: (id: string, step: ApprovalStepKey, signal?: AbortSignal) => apiRequest<ReviewDocument>(`${path(id)}?step=${step}`, { signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(10000)]) : undefined }),
   accept: (id: string, request: ReviewRequest, key: string) => write<ReviewOutcome>(`${path(id)}/accept`, request, key),
   handoff: (id: string, request: ReviewRequest, key: string) => write<ReviewOutcome>(`${path(id)}/handoff`, request, key),
@@ -49,6 +53,6 @@ export const approvalApi = {
   assignments: () => apiRequest<AssignmentItem[]>('/approvals/assignments'),
   candidates: (id: string, step: ApprovalStepKey) => apiRequest<AssignmentCandidate[]>(`${path(id)}/candidates?step=${step}`),
   assign: (id: string, request: AssignRequest) =>
-    apiRequest<ReviewDocument>(`${path(id)}/assignment`, { method: 'POST', body: JSON.stringify(request) }),
+    apiRequest<ReviewDocument>(`${path(id)}/assignment`, { method: 'POST', body: JSON.stringify(request) }).then(changed),
 };
 export const approvalReviewPath = (id: string, step: ApprovalStepKey) => `/phe-duyet/ho-so/${encodeURIComponent(id)}?step=${step}`;

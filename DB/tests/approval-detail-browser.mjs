@@ -61,8 +61,21 @@ export async function approvalDetailBrowserCheck({ repo, apiPort, browserPort, a
       await page.getByRole('heading', { name: contract.title, exact: true }).waitFor();
       await page.waitForLoadState('networkidle');
     }
+    const inboxPaths = { sales: '/phe-duyet/cho-duyet', legal: '/phe-duyet/cho-ra-soat', board: '/phe-duyet/cho-phe-duyet' };
+    async function checkInboxBadge(page, step, actor) {
+      const inbox = await call(`/approvals/inbox?step=${step}&done=false`, actor.token);
+      assert.equal(inbox.status, 200);
+      const count = inbox.body.length;
+      await page.waitForFunction(({ path, count }) => {
+        const link = document.querySelector(`.sidebar a[href="${path}"]`);
+        const badge = link?.querySelector('.sidebar__badge');
+        return Boolean(link) && (count === 0 ? !badge : badge?.textContent === String(count));
+      }, { path: inboxPaths[step], count });
+      return count;
+    }
     // HTML section aria-label is a landmark region; the same selectors exercise the actual detail component.
     await detail(manager, submitted);
+    await checkInboxBadge(manager, 'sales', actors.manager);
     await manager.getByRole('button', { name: 'Tiếp nhận rà soát', exact: true }).waitFor();
     await manager.screenshot({ path: join(screenshotRoot, '01-sales-accept.png'), fullPage: true });
     await manager.getByRole('button', { name: 'Tiếp nhận rà soát', exact: true }).click();
@@ -98,9 +111,26 @@ export async function approvalDetailBrowserCheck({ repo, apiPort, browserPort, a
       });
       assert.equal(result.status, 200, JSON.stringify(result.body));
     }
-    await assign(submitted, 'legal', actors.legal);
     const legal = await pageFor(actors.legal);
     await legal.goto(`${origin}/phe-duyet/cho-ra-soat`);
+    await legal.getByRole('heading', { name: 'Hợp đồng chờ rà soát pháp lý', exact: true }).waitFor();
+    await legal.waitForLoadState('networkidle');
+    assert.equal(await checkInboxBadge(legal, 'legal', actors.legal), 0, 'A legal manager without actionable assignments must not see the prototype badge of 3');
+    await assign(submitted, 'legal', actors.legal);
+    // Changes made in another session are discovered when returning focus to the page.
+    await legal.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await checkInboxBadge(legal, 'legal', actors.legal);
+    await legal.goto(`${origin}/phe-duyet/cho-ra-soat`);
+    // Failed count requests hide the last value; recovery on focus restores the BE count.
+    await legal.waitForLoadState('networkidle');
+    await legal.route('**/api/v1/approvals/inbox?*', route => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ code: 'TEMPORARY' }) }));
+    await legal.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await legal.getByText('Không thể tải danh sách hồ sơ', { exact: true }).waitFor();
+    await legal.waitForLoadState('networkidle');
+    assert.equal(await legal.locator('.sidebar__badge').count(), 0, 'An unavailable API must not leave a misleading count');
+    await legal.unroute('**/api/v1/approvals/inbox?*');
+    await legal.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await checkInboxBadge(legal, 'legal', actors.legal);
     const row = legal.getByRole('row').filter({ hasText: submitted.title });
     await row.getByRole('link', { name: 'Rà soát', exact: true }).click();
     await legal.getByLabel('Kết luận rà soát pháp lý').waitFor();
@@ -114,6 +144,7 @@ export async function approvalDetailBrowserCheck({ repo, apiPort, browserPort, a
     await legal.getByRole('alertdialog').getByRole('button', { name: 'Xác nhận quyết định' }).click();
     await legal.getByRole('button', { name: 'Trình hồ sơ lên Ban Giám đốc', exact: true }).waitFor();
     await legal.waitForLoadState('networkidle');
+    await checkInboxBadge(legal, 'legal', actors.legal);
     await assign(submitted, 'board', actors.board);
     const board = await pageFor(actors.board);
     await detail(board, submitted);
@@ -124,12 +155,14 @@ export async function approvalDetailBrowserCheck({ repo, apiPort, browserPort, a
     await legal.waitForLoadState('networkidle');
     await detail(board, submitted);
     await board.getByLabel('Ý kiến phê duyệt').waitFor();
+    await checkInboxBadge(board, 'board', actors.board);
     await board.screenshot({ path: join(screenshotRoot, '04-board-review.png'), fullPage: true });
     await board.getByLabel('Ý kiến phê duyệt').fill('Phê duyệt đúng phiên bản đã rà soát.');
     await board.getByRole('button', { name: 'Phê duyệt', exact: true }).click();
     await board.getByRole('alertdialog').getByRole('button', { name: 'Xác nhận quyết định' }).click();
     await board.locator('.page-header').getByText('Đã duyệt', { exact: true }).waitFor();
     await board.waitForLoadState('networkidle');
+    await checkInboxBadge(board, 'board', actors.board);
     assert.equal(await board.getByRole('button', { name: 'Phê duyệt', exact: true }).count(), 0);
     const final = await call(`/contracts/${submitted.code}`, actors.manager.token);
     assert.equal(final.body.status, 'approved'); assert.equal(final.body.rounds.at(-1).result, 'completed');
@@ -161,7 +194,7 @@ export async function approvalDetailBrowserCheck({ repo, apiPort, browserPort, a
     assert(await narrow.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'Review detail should not overflow at 1024px');
     await narrow.screenshot({ path: join(screenshotRoot, '07-tablet-detail.png'), fullPage: true });
     assert.deepEqual(errors, [], 'Browser must report no uncaught component errors');
-    console.log('PASS browser approval detail: role CTAs, required comments, confirmation, stable retries, real three-level workflow, revision/reject, legacy links and narrow layout');
+    console.log('PASS browser approval detail: real sidebar counts, empty/unassigned inbox, focus refresh, API failure recovery, role CTAs, required comments, confirmation, stable retries, real three-level workflow, revision/reject, legacy links and narrow layout');
   } catch (error) {
     console.error('Approval browser errors:', errors);
     if (browser) {
