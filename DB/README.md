@@ -73,3 +73,6 @@ Tài khoản seed mới dùng bcrypt cost 12 từ biến môi trường, bật b
 ID cố định, `skipDuplicates`, khóa transaction và kiểm tra ID được dùng để thiết kế seed chạy lại mà không xóa dữ liệu hoặc đổi mật khẩu đã có. Natural key trùng với ID khác làm transaction thất bại. **Tính chất chạy lại vẫn cần được kiểm thử trên Supabase thật.**
 
 Các lựa chọn kiểu dữ liệu, xử lý comment và khoảng trống so với spec nằm trong [data-dictionary/DECISIONS.md](data-dictionary/DECISIONS.md). Chưa coi các task/API Sprint 1/2/3 hoàn tất chỉ từ bộ schema này.
+
+
+Contracts CRUD and cancellation integration: [setup](../backend/GETTING-STARTED.md).

@@ -144,3 +144,6 @@ Lệnh kiểm tra offline, integration và các giới hạn bằng chứng nằ
 - [Phạm vi Sprint 1](context/SPRINT-1.md), [quy tắc nghiệp vụ](context/BUSINESS-RULES.md), [tài liệu nguồn](docs/sources/).
 
 Agent đọc [AGENTS.md](AGENTS.md) và [skill qtkd-sprint1](.agents/skills/qtkd-sprint1/SKILL.md) trước khi thay đổi. Thư mục giữ chỗ hoặc source có sẵn không chứng minh task đã hoàn tất; xác định đúng TASK/US và kiểm chứng phần được giao.
+
+
+Contracts CRUD and cancellation integration: [setup](backend/GETTING-STARTED.md).

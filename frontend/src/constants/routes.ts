@@ -38,7 +38,7 @@ export const REDIRECT_PARAM = 'redirect';
 
 /** Loại hồ sơ mở được bằng đường dẫn trực tiếp (ví dụ link trong email thông báo). */
 const RECORD_ROUTES = [
-  { prefix: '/hop-dong/', name: 'Hợp đồng', pattern: /^HD-\d{4}-\d{3,}$/ },
+  { prefix: '/hop-dong/', name: 'Hợp đồng', pattern: /^HD-(?:\d{4}-)?\d{3,}$/ },
   { prefix: '/bang-thanh-toan/', name: 'Bảng thanh toán', pattern: /^BTT-\d{4}-\d{3,}$/ },
 ] as const;
 

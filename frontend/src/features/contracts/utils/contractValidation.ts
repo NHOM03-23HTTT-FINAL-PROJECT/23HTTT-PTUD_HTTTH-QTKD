@@ -35,13 +35,15 @@ export function validateContractDraft(draft: ContractDraft): ContractFieldErrors
     errors.effectiveTo = 'Ngày kết thúc phải bằng hoặc sau ngày bắt đầu.';
   }
   if (!draft.value.trim()) errors.value = 'Nhập giá trị hợp đồng.';
-  else if (!Number.isFinite(parseContractValue(draft.value)) || parseContractValue(draft.value) <= 0) {
+  else if (!Number.isSafeInteger(parseContractValue(draft.value)) || parseContractValue(draft.value) <= 0) {
     errors.value = 'Giá trị hợp đồng phải là số dương.';
   }
   if (!draft.paymentTerm.trim()) errors.paymentTerm = 'Nhập điều khoản thanh toán.';
   if (draft.services.length === 0) errors.services = 'Thêm ít nhất một hạng mục dịch vụ.';
   const serviceAreas = Object.fromEntries(
-    draft.services.filter((item) => item.requiresArea && !item.areaCode).map((item) => [item.id, 'Chọn khu vực đang Hoạt động.']),
+    draft.services
+      .filter((item) => item.requiresArea && !item.areaCode)
+      .map((item) => [item.id, 'Chọn khu vực đang Hoạt động.']),
   );
   if (Object.keys(serviceAreas).length > 0) errors.serviceAreas = serviceAreas;
   if (!draft.content.trim()) errors.content = 'Nhập nội dung hợp đồng.';
@@ -49,7 +51,10 @@ export function validateContractDraft(draft: ContractDraft): ContractFieldErrors
 }
 
 export function countContractErrors(errors: ContractFieldErrors): number {
-  return Object.keys(errors).filter((key) => key !== 'serviceAreas').length + Object.keys(errors.serviceAreas ?? {}).length;
+  return (
+    Object.keys(errors).filter((key) => key !== 'serviceAreas').length +
+    Object.keys(errors.serviceAreas ?? {}).length
+  );
 }
 
 export function isContractDraftEmpty(draft: ContractDraft): boolean {

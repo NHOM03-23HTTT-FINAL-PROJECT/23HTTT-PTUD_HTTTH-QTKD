@@ -2,7 +2,22 @@
 
 Nguồn: `frontend/src/features/contracts/api/contractsApi.ts`, `workflowApi.ts` và `frontend/src/mocks/contractsServer.ts`, `workflowServer.ts`. Quy ước chung (tiền tố, JWT, Idempotency-Key, mã lỗi) xem [list_api.md](../../../list_api.md).
 
-> Endpoint là đề xuất từ chữ ký hàm FE, chưa đối chiếu đặc tả UC chi tiết và chưa được nhóm BE chốt.
+> CRUD hợp đồng (SYS-CTR-01/02/03/05/06), tệp và US-CTR-19 đã có controller .NET. Submit, rà soát/phê duyệt và cấu hình workflow trong bảng dưới vẫn là đề xuất, được để đợt sau theo lựa chọn người dùng. Xem [cách chạy và giới hạn](../../../backend/GETTING-STARTED.md).
+
+## Endpoint thực thi bổ sung / điều chỉnh
+
+Mọi endpoint cần Bearer JWT. Lệnh tạo, hủy, tải/xóa tệp và quyết định đề nghị hủy cần `Idempotency-Key`. BE không dùng `userId`/role từ body.
+
+| Method | Endpoint | Body / quy tắc |
+|---|---|---|
+| POST | `/contracts/{code}/attachments` | multipart `file`, `baseVersion`; tối đa 20 MiB |
+| GET | `/contracts/{code}/attachments/{id}` | Download có kiểm tra phạm vi hợp đồng |
+| DELETE | `/contracts/{code}/attachments/{id}?baseVersion=` | Xóa liên kết ở Draft/RevisionRequested |
+| POST | `/contracts/{code}/cancel` | `{baseVersion, reason}`; hủy nháp trực tiếp |
+| POST | `/contracts/{code}/cancellation-requests` | `{baseVersion, party: company\|customer, reason}` |
+| POST | `/contracts/{code}/cancellation-requests/{id}/decision` | `{baseVersion, approve, reason}`; version của đề nghị, lý do bắt buộc khi từ chối |
+
+GET chi tiết trả thêm `customerSnapshot`, `history`, `cancellationRequests`. PUT tệp theo toàn bộ danh sách trong bảng đề xuất cũ không được triển khai. Thay bằng các endpoint tệp ở trên. Đợt này chỉ xử lý document_type Contract.
 
 ## Hồ sơ hợp đồng và rà soát (SYS-CTR-01 → 09, 11)
 
