@@ -117,7 +117,7 @@ select username, role, status, must_change_password
 from qtkd.user_account where username like 'demo.%' order by username;
 ```
 
-Sau khi migration và seed thành công trên project mới: 29 bảng app, 6 phòng ban, 8 role, 9 tài khoản demo. Database đã có dữ liệu khác có thể nhiều hơn. Trong Table Editor chọn schema qtkd. Không công khai schema/quyền cho anon để xem từ FE; backend dùng kết nối PostgreSQL server.
+Sau khi migration và seed thành công trên project mới: 30 bảng app (gồm `workflow_config`), 6 phòng ban, 8 role, 9 tài khoản demo. Database đã có dữ liệu khác có thể nhiều hơn. Trong Table Editor chọn schema qtkd. Không công khai schema/quyền cho anon để xem từ FE; backend dùng kết nối PostgreSQL server.
 
 ## 6. Chạy hai terminal
 

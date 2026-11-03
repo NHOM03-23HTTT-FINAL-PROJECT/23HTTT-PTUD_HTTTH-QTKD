@@ -24,6 +24,7 @@ export const ids = {
   item: id(15), price: id(16), liftingPrice: id(17), storagePrice: id(17, 2),
   volume: id(18), liftingVolume: id(19), storageVolume: id(19, 2), statement: id(20),
   contractRound: id(24), currentRound: id(24, 2), paymentRound: id(24, 3),
+  contractWorkflow: id(27),
   contractFile: id(7), paymentFile: id(7, 2),
 } as const;
 
@@ -203,6 +204,17 @@ export function buildSeedData(passwordHash: string) {
       reason: "Đề nghị điều chỉnh dữ liệu demo; chưa có hiệu lực thay thế.", status: "Pending", requestedBy: ids.accountant,
       requestedAt: at("2026-11-02T03:00:00Z") }] satisfies Prisma.ChangeRequestCreateManyInput[],
     approvalRound, approvalStep,
+    // SYS-CTR-10 demo: one active participant configuration for contracts of the sales department.
+    workflowConfig: [{ configId: ids.contractWorkflow, code: "QT-HD-KD", version: 1, configName: "Hợp đồng – Phòng Kinh doanh (demo)",
+      docType: "contract", departmentId: ids.sales, changeSummary: "Khởi tạo 5 giai đoạn cho Hợp đồng · Kinh doanh (dữ liệu demo).",
+      isActive: true, activatedBy: ids.admin, activatedAt: createdAt,
+      stages: [
+        { key: "draft", enabled: true, role: "Nhân viên Kinh doanh", mode: "role-department", participants: [ids.salesStaff], backups: [], notify: [] },
+        { key: "sales", enabled: true, role: "Trưởng phòng Kinh doanh", mode: "specific", participants: [ids.salesManager], backups: [], notify: [] },
+        { key: "legal", enabled: true, role: "Nhân viên Pháp chế", mode: "rotation", participants: [ids.legalStaff], backups: [], notify: [] },
+        { key: "board", enabled: true, role: "Thành viên Ban Giám đốc", mode: "specific", participants: [ids.boardMember], backups: [], notify: [] },
+        { key: "signing", enabled: true, role: "Người ký đại diện công ty", mode: "specific", participants: [ids.boardMember], backups: [], notify: [ids.salesStaff] },
+      ] }] satisfies Prisma.WorkflowConfigCreateManyInput[],
     signingSession: [
       { signingSessionId: id(26), recordType: "Contract", contractId: ids.contract, providerSessionId: "DEMO-CONTRACT-SIGN-1",
         status: "Succeeded", companySignerId: ids.boardMember, companySignedAt: signedAt, customerSignerName: customer[0].legalRepresentative,

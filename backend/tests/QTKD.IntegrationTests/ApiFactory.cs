@@ -12,6 +12,7 @@ using Npgsql;
 using Npgsql.NameTranslation;
 using QTKD.Api.Authorization;
 using QTKD.Application.Features.ContractApprovals;
+using QTKD.Application.Features.WorkflowConfigs;
 using QTKD.Domain.Identity;
 using QTKD.Infrastructure.Persistence;
 
@@ -23,6 +24,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
 {
     public IContractApprovalEngine? ApprovalEngine { get; init; }
     public IApprovalStore? ApprovalStore { get; init; }
+    public IWorkflowConfigStore? WorkflowConfigStore { get; init; }
     private readonly SqliteConnection sqlite = new("Data Source=:memory:");
     public readonly string Key = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48));
     public readonly string Password = "Identity.Test@2026";
@@ -46,6 +48,11 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
             {
                 services.RemoveAll<IApprovalStore>();
                 services.AddSingleton(ApprovalStore);
+            }
+            if (WorkflowConfigStore is not null)
+            {
+                services.RemoveAll<IWorkflowConfigStore>();
+                services.AddSingleton(WorkflowConfigStore);
             }
             if (ApprovalEngine is not null)
             {

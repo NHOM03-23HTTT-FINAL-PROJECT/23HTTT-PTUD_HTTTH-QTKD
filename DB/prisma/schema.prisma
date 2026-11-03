@@ -226,6 +226,7 @@ model Department {
 
   managerRef                UserAccount?  @relation("Department_managerId", fields: [managerId], references: [userId], onDelete: Restrict, onUpdate: Restrict)
   userAccountByDepartmentId UserAccount[] @relation("UserAccount_departmentId")
+  workflowConfigByDepartmentId WorkflowConfig[] @relation("WorkflowConfig_departmentId")
 
   @@index([managerId])
   @@map("department")
@@ -271,6 +272,7 @@ model UserAccount {
   approvalStepByDecidedBy             ApprovalStep[]           @relation("ApprovalStep_decidedBy")
   signingSessionByCompanySignerId     SigningSession[]         @relation("SigningSession_companySignerId")
   signingSessionBySentBy              SigningSession[]         @relation("SigningSession_sentBy")
+  workflowConfigByActivatedBy         WorkflowConfig[]         @relation("WorkflowConfig_activatedBy")
 
   @@index([departmentId])
   @@map("user_account")
@@ -862,5 +864,30 @@ model SigningSession {
   @@index([signedFileId])
   @@index([sentBy])
   @@map("signing_session")
+  @@schema("qtkd")
+}
+
+// SYS-CTR-10: one row per participant-configuration version. Rows are immutable except deactivation;
+// approval rounds pin their own snapshot, so later versions never change a running round.
+model WorkflowConfig {
+  configId      String   @id @default(dbgenerated("gen_random_uuid()")) @map("config_id") @db.Uuid
+  code          String   @map("code") @db.VarChar(32)
+  version       Int      @map("version")
+  configName    String   @map("config_name") @db.VarChar(200)
+  docType       String   @map("doc_type") @db.VarChar(32)
+  departmentId  String   @map("department_id") @db.Uuid
+  stages        Json     @map("stages") @db.JsonB
+  changeSummary String   @map("change_summary") @db.Text
+  isActive      Boolean  @default(true) @map("is_active")
+  activatedBy   String   @map("activated_by") @db.Uuid
+  activatedAt   DateTime @default(now()) @map("activated_at") @db.Timestamptz(6)
+
+  departmentRef  Department  @relation("WorkflowConfig_departmentId", fields: [departmentId], references: [departmentId], onDelete: Restrict, onUpdate: Restrict)
+  activatedByRef UserAccount @relation("WorkflowConfig_activatedBy", fields: [activatedBy], references: [userId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([code, version])
+  @@index([departmentId])
+  @@index([activatedBy])
+  @@map("workflow_config")
   @@schema("qtkd")
 }

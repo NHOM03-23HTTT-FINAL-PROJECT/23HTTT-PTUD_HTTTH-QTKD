@@ -7,7 +7,7 @@ export function validateSeedData(data: SeedData) {
   const records = data as unknown as Record<string, Record<string, unknown>[]>;
   const models = readSchema();
   const modelByName = new Map(models.map((model) => [model.name, model]));
-  assert.equal(Object.keys(data).length, 29, "The demo must cover 26 dictionary tables and 3 Identity tables.");
+  assert.equal(Object.keys(data).length, 30, "The demo must cover 26 dictionary tables, 3 Identity tables and workflow_config.");
   for (const model of models) {
     const rows = records[model.delegate];
     assert(rows?.length, `Missing fixtures: ${model.name}`);

@@ -34,6 +34,7 @@ async function main() {
       for (const row of data.department) {
         await tx.department.updateMany({ where: { departmentId: row.departmentId, managerId: null }, data: { managerId: row.managerId } });
       }
+      await tx.workflowConfig.createMany({ data: data.workflowConfig, skipDuplicates: true });
       await tx.service.createMany({ data: data.service, skipDuplicates: true });
       // Parents precede children; rows are deliberately inserted in separate statements.
       for (const row of data.area) await tx.area.createMany({ data: [row], skipDuplicates: true });

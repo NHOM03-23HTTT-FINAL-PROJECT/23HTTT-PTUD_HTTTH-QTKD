@@ -12,11 +12,13 @@ using QTKD.Api.Authorization;
 using QTKD.Api.Endpoints;
 using QTKD.Application.Features.ContractApprovals;
 using QTKD.Application.Features.Workflows;
+using QTKD.Application.Features.WorkflowConfigs;
 using QTKD.Infrastructure.ContractApprovals;
 using QTKD.Application.Features.Identity;
 using QTKD.Domain.Identity;
 using QTKD.Infrastructure.Identity;
 using QTKD.Infrastructure.Persistence;
+using QTKD.Infrastructure.WorkflowConfigs;
 using TokenOptions = QTKD.Infrastructure.Identity.TokenOptions;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -47,6 +49,8 @@ builder.Services.AddScoped<ContractCoordinationService>();
 builder.Services.AddScoped<WorkflowAssignmentService>();
 builder.Services.AddScoped<IApprovalStore>(sp => sp.GetRequiredService<PostgresApprovalStore>());
 builder.Services.AddScoped<IContractApprovalEngine, ContractApprovalEngine>();
+builder.Services.AddScoped<IWorkflowConfigStore, PostgresWorkflowConfigStore>();
+builder.Services.AddScoped<WorkflowConfigService>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
 builder.Services.AddSingleton<Microsoft.Extensions.Options.IOptionsChangeTokenSource<JwtBearerOptions>>(
@@ -125,6 +129,11 @@ app.Use(async (context, next) =>
         context.Response.StatusCode = error.Status;
         await context.Response.WriteAsJsonAsync(new { code = error.Code, traceId = context.TraceIdentifier });
     }
+    catch (WorkflowConfigFailure error)
+    {
+        context.Response.StatusCode = error.Status;
+        await context.Response.WriteAsJsonAsync(new { code = error.Code, errors = error.Errors, traceId = context.TraceIdentifier });
+    }
     catch (IdentityFailure error)
     {
         context.Response.StatusCode = error.Status;
@@ -157,6 +166,7 @@ app.Use(async (context, next) =>
 app.UseRateLimiter();
 app.UseAuthorization();
 app.MapContractApprovals(allowedOrigins);
+app.MapWorkflowConfigs(allowedOrigins);
 app.MapGet("/api/v1/notifications", async (HttpContext context, PostgresApprovalStore store, CancellationToken ct)
     => Results.Ok(await store.Notifications(Guid.Parse(context.User.FindFirstValue("sub")!), ct))).RequireAuthorization();
 
