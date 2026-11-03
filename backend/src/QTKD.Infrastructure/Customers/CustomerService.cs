@@ -16,7 +16,8 @@ namespace QTKD.Infrastructure.Customers;
 
 // The database connection is deliberately the same configured backend identity
 // connection; no request may choose a database, actor, department or owner.
-public sealed class CustomerService(IdentityDbContext identity, IOptions<DatabaseOptions> database, IOptionsMonitor<TokenOptions> tokens)
+public sealed partial class CustomerService(IdentityDbContext identity, IOptions<DatabaseOptions> database,
+    IOptionsMonitor<TokenOptions> tokens, ICustomerStatusSource statusSource)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private static readonly HashSet<string> Groups = ["XNK", "HANG_TAU", "SAN_XUAT", "FORWARDER", "THUONG_MAI"];

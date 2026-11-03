@@ -36,6 +36,7 @@ export type SuspensionReview = {
   /** Nhóm dữ liệu không tải được (A4.4); còn nhóm lỗi thì không cho xác nhận. */
   failedKinds: ImpactKind[];
   failedAt?: string;
+  missingSources?: string[] | null;
 };
 
 export type SuspensionRecord = {
@@ -50,7 +51,7 @@ export type SuspensionRecord = {
   notices: DepartmentNotice[];
 };
 
-export type ReactivationCheckStatus = 'met' | 'unmet' | 'exception';
+export type ReactivationCheckStatus = 'met' | 'unmet' | 'exception' | 'unknown';
 
 /** Điều kiện kích hoạt lại theo nguyên nhân tạm ngưng: công nợ, vận hành, tranh chấp (frame 04.1). */
 export type ReactivationCheck = {
@@ -78,6 +79,10 @@ export type ClosedRecord = { code: string; title: string; note: string; status: 
 export type ReactivationContext = {
   suspension: SuspensionRecord;
   checks: ReactivationCheck[];
+  /** Căn cứ do nguồn có thẩm quyền xác minh; không lấy từ nội dung người dùng tự nhập. */
+  verifiedBasis?: string | null;
+  canReactivate?: boolean;
+  missingSources?: string[] | null;
 };
 
 type StatusRequestBase = {

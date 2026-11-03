@@ -45,20 +45,14 @@ public static class CustomerEndpoints
             Results.Ok(await service.Update(Actor(context), Session(context), code, Key(context), Parse<UpdateCustomerRequest>(body, ["baseVersion", "draft", "reason"], UpdateFields), ct)))
             .RequireAuthorization("customers.update", "customers.view");
 
-        // The related systems have not supplied a reliable completeness contract. Never
-        // interpret an unavailable source as an empty list or an approved exception.
-        foreach (var suffix in new[] { "suspension-review", "reactivation-context" })
-            api.MapGet("/{code}/" + suffix, async (string code, HttpContext context, CustomerService service, CancellationToken ct) =>
-            {
-                await service.EnsureStatusScope(Actor(context), code, ct);
-                throw new CustomerFailure(503, "REVIEW_INCOMPLETE", new { sources = new[] { "operations", "debt", "disputes" } });
-            }).RequireAuthorization("customers.change-status", "customers.view");
-        foreach (var suffix in new[] { "suspend", "reactivate" })
-            api.MapPost("/{code}/" + suffix, async (string code, HttpContext context, CustomerService service, CancellationToken ct) =>
-            {
-                await service.EnsureStatusScope(Actor(context), code, ct);
-                throw new CustomerFailure(503, "REVIEW_INCOMPLETE", new { sources = new[] { "operations", "debt", "disputes" } });
-            }).RequireAuthorization("customers.change-status", "customers.view");
+        api.MapGet("/{code}/suspension-review", async (string code, HttpContext context, CustomerService service, CancellationToken ct) =>
+            Results.Ok(await service.GetSuspensionReview(Actor(context), code, ct))).RequireAuthorization("customers.change-status", "customers.view");
+        api.MapGet("/{code}/reactivation-context", async (string code, HttpContext context, CustomerService service, CancellationToken ct) =>
+            Results.Ok(await service.GetReactivationContext(Actor(context), code, ct))).RequireAuthorization("customers.change-status", "customers.view");
+        api.MapPost("/{code}/suspend", async (string code, SuspendCustomerRequest request, HttpContext context, CustomerService service, CancellationToken ct) =>
+            Results.Ok(await service.Suspend(Actor(context), Session(context), code, Key(context), request, ct))).RequireAuthorization("customers.change-status", "customers.view");
+        api.MapPost("/{code}/reactivate", async (string code, ReactivateCustomerRequest request, HttpContext context, CustomerService service, CancellationToken ct) =>
+            Results.Ok(await service.Reactivate(Actor(context), Session(context), code, Key(context), request, ct))).RequireAuthorization("customers.change-status", "customers.view");
         api.MapGet("/{code}/records/{group}", async (string code, string group, HttpContext context, CustomerService service, IIdentityService identity, CancellationToken ct) =>
         {
             await service.Get(Actor(context), code, ct);

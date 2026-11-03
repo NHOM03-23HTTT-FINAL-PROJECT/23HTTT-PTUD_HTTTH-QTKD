@@ -29,6 +29,8 @@ function statusError(error: unknown): never {
     if (error.status === 403) throw new StatusChangeError('FORBIDDEN');
     if (error.status === 404) throw new StatusChangeError('NOT_FOUND');
     if (error.code === 'REVIEW_INCOMPLETE') throw new StatusChangeError('REVIEW_INCOMPLETE');
+    if (error.code === 'ALREADY_IN_STATUS') throw new StatusChangeError('ALREADY_IN_STATUS');
+    if (error.code === 'CONDITIONS_NOT_MET') throw new StatusChangeError('CONDITIONS_NOT_MET');
     if (error.status === 409) throw new StatusChangeError('CONFLICT');
     throw new StatusChangeError('LOAD_FAILED');
   }

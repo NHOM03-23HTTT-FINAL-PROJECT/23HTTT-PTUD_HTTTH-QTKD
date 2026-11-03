@@ -130,13 +130,36 @@ try {
     body: { baseVersion: legacyView.data.version, draft: legacyDraft, reason: 'Cập nhật thông tin khách cũ' } });
   expect(legacyUpdate, 200); assert.equal(legacyUpdate.data.customer.status, 'suspended');
   assert.equal(legacyUpdate.data.customer.legacyInterestedServices, 'Dịch vụ cũ');
-  expect(await call(`/customers/${legacyCode}/reactivate`, { token: tokens.manager, method: 'POST', key: randomUUID(), body: {} }), 503, 'REVIEW_INCOMPLETE');
+  expect(await call(`/customers/${legacyCode}/reactivate`, { token: tokens.manager, method: 'POST', key: randomUUID(),
+    body: { baseVersion: legacyUpdate.data.customer.version, reason: 'Kiểm tra kích hoạt', evidence: [] } }), 503, 'REVIEW_INCOMPLETE');
   assert.equal((await call(`/customers/${legacyCode}`, { token: tokens.staff })).data.status, 'suspended');
   await assert.rejects(() => db.query('UPDATE qtkd.customer SET customer_code=$1 WHERE customer_code=$2', ['KH-999999', legacyCode]), e => e.code === '23514');
   await assert.rejects(() => db.query('UPDATE qtkd.customer SET tax_code=$1 WHERE customer_code=$2', ['9999999999', legacyCode]), e => e.code === '23514');
+  const contractCodes = [];
+  for (const [owner, title] of [[names.staff, 'Hợp đồng của người phụ trách'], [names.other, 'Hợp đồng ngoài quyền nhân viên']]) {
+    const contract = await db.query(`INSERT INTO qtkd.contract(customer_id,title,contract_type,start_date,end_date,contract_value,payment_terms,content,status,owner_id,owning_department_id)
+      SELECT c.customer_id,$1,'Logistics','2026-01-01','2027-01-01',1000,'30 ngày','Nội dung thử','Approved',u.user_id,u.department_id
+      FROM qtkd.customer c JOIN qtkd.user_account u ON u.username=$2 WHERE c.customer_code=$3 RETURNING contract_code`, [title, owner, created.code]);
+    contractCodes.push(contract.rows[0].contract_code);
+  }
   expect(await call(`/customers/${created.code}/suspension-review`, { token: tokens.staff }), 403);
-  expect(await call(`/customers/${created.code}/suspension-review`, { token: tokens.manager }), 503, 'REVIEW_INCOMPLETE');
-  expect(await call(`/customers/${created.code}/suspend`, { token: tokens.manager, method: 'POST', key: randomUUID(), body: {} }), 503, 'REVIEW_INCOMPLETE');
+  const review = await call(`/customers/${created.code}/suspension-review`, { token: tokens.manager });
+  expect(review, 200);
+  assert(review.data.failedKinds.includes('job') && review.data.missingSources.includes('debt'));
+  assert.deepEqual(review.data.items.map(item => item.code).sort(), contractCodes.sort());
+  try {
+    // A temporary role grant is used only to verify contract scope in this disposable database.
+    await db.query("INSERT INTO qtkd.role_permission(role,permission_code) VALUES ('SalesStaff','customers.change-status') ON CONFLICT DO NOTHING");
+    const scoped = await call(`/customers/${created.code}/suspension-review`, { token: tokens.staff });
+    expect(scoped, 200); assert(scoped.data.failedKinds.includes('contract'));
+    assert.equal(scoped.data.items.length, 1);
+    assert.equal(scoped.data.items[0].title, 'Hợp đồng của người phụ trách');
+  } finally {
+    await db.query("DELETE FROM qtkd.role_permission WHERE role='SalesStaff' AND permission_code='customers.change-status'");
+  }
+  const statusVersion = (await call(`/customers/${created.code}`, { token: tokens.manager })).data.version;
+  expect(await call(`/customers/${created.code}/suspend`, { token: tokens.manager, method: 'POST', key: randomUUID(),
+    body: { baseVersion: statusVersion, reasonGroup: 'CONG_NO', reason: 'Kiểm tra công nợ', evidence: [], plan: [], coordinationNote: '' } }), 503, 'REVIEW_INCOMPLETE');
   expect(await call(`/customers/${created.code}/records/payments`, { token: tokens.staff }), 403, 'FORBIDDEN');
   expect(await call(`/customers/${created.code}/records/contracts`, { token: tokens.staff }), 503, 'SOURCE_UNAVAILABLE');
   assert.equal((await call(`/customers/${created.code}`, { token: tokens.staff })).data.status, 'active');
@@ -162,4 +185,5 @@ try {
   console.log(`Local browser test user: ${names.staff}`);
   console.log(`Local browser test manager: ${names.manager}`);
   console.log(`Local suspended test customer: ${legacyCode}`);
+  console.log(`Local customer with review contracts: ${created.code}`);
 } finally { await db.end(); }

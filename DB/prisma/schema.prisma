@@ -487,13 +487,27 @@ model CustomerStatusDecision {
   followUpPlan String?              @map("follow_up_plan") @db.Text
   confirmedBy  String               @map("confirmed_by") @db.Uuid
   decidedAt    DateTime             @default(now()) @map("decided_at") @db.Timestamptz(6)
+  reviewMetadata Json?              @map("review_metadata") @db.JsonB
 
   customerRef    Customer    @relation("CustomerStatusDecision_customerId", fields: [customerId], references: [customerId], onDelete: Restrict, onUpdate: Restrict)
   confirmedByRef UserAccount @relation("CustomerStatusDecision_confirmedBy", fields: [confirmedBy], references: [userId], onDelete: Restrict, onUpdate: Restrict)
+  outbox         CustomerStatusOutbox?
 
   @@index([customerId])
   @@index([confirmedBy])
   @@map("customer_status_decision")
+  @@schema("qtkd")
+}
+
+model CustomerStatusOutbox {
+  decisionId String   @id @map("decision_id") @db.Uuid
+  payload    Json     @db.JsonB
+  status     String   @default("Pending") @db.VarChar(20)
+  attempts   Int      @default(0)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  decision   CustomerStatusDecision @relation(fields: [decisionId], references: [decisionId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@map("customer_status_outbox")
   @@schema("qtkd")
 }
 

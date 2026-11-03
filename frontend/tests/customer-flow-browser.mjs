@@ -87,10 +87,20 @@ try {
   await lead.page.getByLabel('Nhóm lý do').selectOption('CONG_NO');
   await lead.page.getByPlaceholder('Mô tả cụ thể lý do, kỳ công nợ, sự việc…').fill('Kiểm tra công nợ');
   await lead.page.getByRole('button', { name: 'Tiếp tục rà soát' }).click();
-  await lead.page.getByText('Chưa đủ dữ liệu để rà soát').waitFor();
+  await lead.page.getByText('Không tải được danh sách', { exact: false }).waitFor();
   assert((await lead.page.locator('body').innerText()).includes('Khách hàng vẫn giữ nguyên trạng thái'));
   assert(await lead.page.getByRole('button', { name: 'Xác nhận tạm ngưng' }).isDisabled());
   if (process.env.QTKD_UI_SCREENSHOT) await lead.page.screenshot({ path: process.env.QTKD_UI_SCREENSHOT, fullPage: true });
+  if (process.env.QTKD_UI_REVIEW_CODE) {
+    await lead.page.goto(`${url}/khach-hang/${encodeURIComponent(process.env.QTKD_UI_REVIEW_CODE)}/tam-ngung`);
+    await lead.page.getByLabel('Nhóm lý do').selectOption('CONG_NO');
+    await lead.page.getByPlaceholder('Mô tả cụ thể lý do, kỳ công nợ, sự việc…').fill('Kiểm tra hồ sơ liên quan');
+    await lead.page.getByRole('button', { name: 'Tiếp tục rà soát' }).click();
+    await lead.page.getByText('Hợp đồng của người phụ trách', { exact: true }).waitFor();
+    await lead.page.getByText('Hợp đồng ngoài quyền nhân viên', { exact: true }).waitFor();
+    assert(await lead.page.getByRole('button', { name: 'Xác nhận tạm ngưng' }).isDisabled());
+    assert((await lead.page.locator('.impact-card').boundingBox()).height > 200);
+  }
   await lead.page.goto(`${url}/khach-hang/${encodeURIComponent(suspendedCode)}`);
   await lead.page.getByText('Lý do thử nghiệm', { exact: true }).waitFor();
   await lead.page.goto(`${url}/khach-hang/${encodeURIComponent(suspendedCode)}/kich-hoat-lai`);

@@ -117,7 +117,7 @@ function SuspendFlow({ customer }: { customer: Customer }) {
     reason: attempted && !reason.trim() ? 'Vui lòng nhập nội dung cụ thể (không chỉ gồm khoảng trắng).' : undefined,
   };
   const reasonLabel = reasonGroups.find((g) => g.value === reasonGroup)?.label ?? '';
-  const reviewFailed = (review?.failedKinds.length ?? 0) > 0;
+  const reviewFailed = (review?.failedKinds.length ?? 0) > 0 || (review?.missingSources?.length ?? 0) > 0;
   const backToDetail = () => navigate(ROUTES.customerDetail(customer.code));
 
   async function loadReview(retry: boolean) {
@@ -255,9 +255,13 @@ function SuspendFlow({ customer }: { customer: Customer }) {
             </button>
           }
         >
-          Không tải được danh sách {review.failedKinds.map((k) => KIND_META[k].stat.toLowerCase()).join(', ')} từ{' '}
-          {review.failedKinds.map((k) => KIND_META[k].source).join(', ')}. Hệ thống không cho xác nhận tạm ngưng dựa trên kết
-          quả chưa đầy đủ.
+          {review.failedKinds.length > 0 && (
+            <>Không tải được danh sách {review.failedKinds.map((k) => KIND_META[k].stat.toLowerCase()).join(', ')} từ{' '}
+              {review.failedKinds.map((k) => KIND_META[k].source).join(', ')}. </>
+          )}
+          {review.missingSources?.some((source) => source === 'debt' || source === 'disputes') &&
+            'Công nợ hoặc tranh chấp chưa được xác minh. '}
+          Hệ thống không cho xác nhận tạm ngưng dựa trên kết quả chưa đầy đủ. Khách hàng vẫn giữ nguyên trạng thái.
         </Alert>
       )}
       {serverAlert && (
@@ -506,7 +510,9 @@ function SuspendFlow({ customer }: { customer: Customer }) {
             )}
             <li>
               <Icon name="check" className="icon-tone--success" />
-              {(noticeDepartments.length ? noticeDepartments : ['Kế toán']).join(', ')} nhận thông báo quyết định và phương án.
+              {IS_MOCK_AUTH
+                ? `${(noticeDepartments.length ? noticeDepartments : ['Kế toán']).join(', ')} nhận thông báo quyết định và phương án.`
+                : 'Yêu cầu thông báo được ghi nhận để xử lý; chưa xác nhận đã gửi.'}
             </li>
           </ul>
         </Dialog>

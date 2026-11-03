@@ -35,10 +35,11 @@ const AFTER_REACTIVATION = [
   'Giao dịch mới vẫn phải đáp ứng điều kiện của từng phân hệ.',
 ];
 
-const CHECK_VIEW: Record<ReactivationCheck['status'], { icon: IconName; tone: string; badge: string; badgeTone: 'success' | 'danger' | 'warning' }> = {
+const CHECK_VIEW: Record<ReactivationCheck['status'], { icon: IconName; tone: string; badge: string; badgeTone: 'success' | 'danger' | 'warning' | 'neutral' }> = {
   met: { icon: 'check', tone: 'success', badge: 'Đạt', badgeTone: 'success' },
   unmet: { icon: 'x-circle', tone: 'danger', badge: 'Chưa đạt', badgeTone: 'danger' },
   exception: { icon: 'alert', tone: 'warning', badge: 'Ngoại lệ', badgeTone: 'warning' },
+  unknown: { icon: 'info', tone: 'neutral', badge: 'Chưa xác minh', badgeTone: 'neutral' },
 };
 
 type ServerAlert = 'save-failed' | 'network' | 'conflict' | 'forbidden' | 'conditions';
@@ -135,13 +136,16 @@ function ReactivateFlow({ customer }: { customer: Customer }) {
   // Only a verified decision returned by the source may mark a check as an exception.
   const checks = useMemo(() => context?.checks ?? [], [context]);
   const unmet = checks.filter((c) => c.status === 'unmet');
+  const unknown = checks.some((c) => c.status === 'unknown');
+  const verifiedException = checks.some((c) => c.status === 'exception');
   const debtUnmet = unmet.some((c) => c.id === 'debt');
-  const blocked = unmet.length > 0;
+  const blocked = unmet.length > 0 || (!IS_MOCK_AUTH && Boolean(context) && context?.canReactivate !== true);
   const canConfirm = Boolean(context) && !loadFailedAt && !blocked && !loading;
 
   const errors = {
     reason: attempted && !reason.trim() ? 'Vui lòng nhập lý do kích hoạt lại.' : undefined,
-    evidence: attempted && evidence.length === 0 ? 'Vui lòng tải căn cứ xác nhận đủ điều kiện tiếp tục hợp tác.' : undefined,
+    evidence: attempted && (IS_MOCK_AUTH ? evidence.length === 0 : !context?.verifiedBasis)
+      ? 'Chưa có căn cứ được xác minh để tiếp tục hợp tác.' : undefined,
   };
   const backToDetail = () => navigate(ROUTES.customerDetail(customer.code));
 
@@ -149,7 +153,7 @@ function ReactivateFlow({ customer }: { customer: Customer }) {
     if (inFlight.current || !user || !canConfirm) return;
     setAttempted(true);
     // A5: thiếu lý do hoặc căn cứ bắt buộc.
-    if (!reason.trim() || evidence.length === 0) return;
+    if (!reason.trim() || (IS_MOCK_AUTH ? evidence.length === 0 : !context?.verifiedBasis)) return;
     inFlight.current = true;
     setSubmitting(true);
     setServerAlert(null);
@@ -174,7 +178,7 @@ function ReactivateFlow({ customer }: { customer: Customer }) {
         navigate(ROUTES.customerDetail(customer.code), { replace: true, state });
       } else if (code === 'CONFLICT' || code === 'NOT_FOUND') setServerAlert('conflict');
       else if (code === 'FORBIDDEN') setServerAlert('forbidden');
-      else if (code === 'CONDITIONS_NOT_MET') setServerAlert('conditions');
+      else if (code === 'CONDITIONS_NOT_MET' || code === 'REVIEW_INCOMPLETE') setServerAlert('conditions');
       else if (code !== 'VALIDATION') setServerAlert(code === 'SAVE_FAILED' ? 'save-failed' : 'network');
     } finally {
       inFlight.current = false;
@@ -247,22 +251,21 @@ function ReactivateFlow({ customer }: { customer: Customer }) {
       {!loadFailedAt && blocked && (
         <Alert
           tone="warning"
-          title="Chưa thể kích hoạt lại"
-          action={
+          title={unknown ? 'Chưa đủ dữ liệu xác minh' : 'Chưa thể kích hoạt lại'}
+          action={IS_MOCK_AUTH ? (
             <button type="button" className="alert__link" onClick={requestEvidence}>
               Yêu cầu bổ sung căn cứ
             </button>
-          }
+          ) : undefined}
         >
-          {debtUnmet
+          {unknown ? 'Chưa xác minh được điều kiện bắt buộc từ bộ phận liên quan. Khách hàng vẫn Tạm ngưng.' : debtUnmet
             ? 'Nguyên nhân tạm ngưng là công nợ nhưng chưa có xác nhận xử lý hợp lệ. Bổ sung xác nhận của Kế toán hoặc quyết định chấp thuận ngoại lệ; khách hàng giữ Tạm ngưng.'
-            : 'Vấn đề vận hành hoặc tranh chấp là nguyên nhân tạm ngưng chưa được giải quyết. Cần bổ sung xác nhận của bộ phận phụ trách; khách hàng giữ Tạm ngưng.'}
+            : 'Điều kiện bắt buộc chưa được bộ phận có thẩm quyền xác nhận; khách hàng giữ Tạm ngưng.'}
         </Alert>
       )}
-      {!loadFailedAt && exception && !blocked && (
+      {!loadFailedAt && verifiedException && !blocked && (
         <Alert tone="info" title="Kích hoạt theo quyết định ngoại lệ">
-          Khách hàng chưa hoàn thành toàn bộ nghĩa vụ nhưng được phép tiếp tục hợp tác. Quyết định ngoại lệ được ghi nhận làm căn cứ
-          kích hoạt lại.
+          Nguồn có thẩm quyền đã xác minh quyết định ngoại lệ để xem xét kích hoạt lại.
         </Alert>
       )}
 
@@ -322,7 +325,7 @@ function ReactivateFlow({ customer }: { customer: Customer }) {
                         <span className="check-list__label">{check.label}</span>
                         <span className="check-list__detail">{check.detail}</span>
                         {/* A4.3: chỉ nghĩa vụ công nợ được chấp thuận ngoại lệ; vận hành/tranh chấp phải được xử lý (A4.2). */}
-                        {check.id === 'debt' && check.status !== 'met' && (
+                        {check.id === 'debt' && check.status !== 'met' && IS_MOCK_AUTH && (
                           <>
                             <button type="button" className="link-button" onClick={() => setExceptionOpen(true)}>
                               {exception ? 'Sửa thông tin ngoại lệ' : 'Ghi nhận quyết định ngoại lệ'}
@@ -360,7 +363,7 @@ function ReactivateFlow({ customer }: { customer: Customer }) {
               error={errors.evidence}
               disabled={submitting}
               onChange={setEvidence}
-            /> : <p>Chức năng lưu tệp căn cứ chưa sẵn sàng.</p>}
+            /> : <p>{context?.verifiedBasis ? `Căn cứ đã xác minh: ${context.verifiedBasis}` : 'Chưa có căn cứ được xác minh.'}</p>}
           </section>
         </div>
 

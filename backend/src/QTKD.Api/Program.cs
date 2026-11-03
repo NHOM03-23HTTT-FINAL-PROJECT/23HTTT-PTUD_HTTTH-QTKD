@@ -51,6 +51,7 @@ builder.Services.AddIdentityCore<UserAccount>(options =>
 builder.Services.AddScoped<IPasswordHasher<UserAccount>, BcryptPasswordHasher>();
 builder.Services.AddScoped<TokenIssuer>();
 builder.Services.AddScoped<IIdentityService, IdentityService>();
+builder.Services.AddScoped<ICustomerStatusSource, PostgresCustomerStatusSource>();
 builder.Services.AddScoped<CustomerService>();
 builder.Services.AddScoped<ContractApprovalService>();
 builder.Services.AddSingleton<WorkflowEngine>();

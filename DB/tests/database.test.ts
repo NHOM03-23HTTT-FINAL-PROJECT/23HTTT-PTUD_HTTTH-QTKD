@@ -24,7 +24,7 @@ test('all 26 source tables and all 239 active columns are mapped', () => {
       .filter((model) => !(model.table in source.tables))
       .map((model) => model.table)
       .sort(),
-    ['contract_cancellation_request', 'contract_delivery', 'customer_operation', 'customer_profile_data', 'idempotency_request', 'permission', 'role_definition', 'role_permission'],
+    ['contract_cancellation_request', 'contract_delivery', 'customer_operation', 'customer_profile_data', 'customer_status_outbox', 'idempotency_request', 'permission', 'role_definition', 'role_permission'],
   );
   assert.deepEqual(models.map((model) => model.table).sort(), Object.keys(source.tables).sort());
   assert.equal(Object.values(source.tables).flat().length, 239);
@@ -40,6 +40,7 @@ test('all 26 source tables and all 239 active columns are mapped', () => {
       LoginSession: ['logout_token_hash', 'last_activity_at', 'remember', 'revocation_reason'],
       Attachment: ['file_size', 'content_type'],
       Customer: ['customer_code', 'customer_updated_at', 'flow_revision'],
+      CustomerStatusDecision: ['review_metadata'],
       Service: ['service_code', 'requires_area'],
       Contract: [
         'updated_at',

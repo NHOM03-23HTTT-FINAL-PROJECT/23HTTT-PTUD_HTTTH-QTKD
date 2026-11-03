@@ -224,6 +224,8 @@ function groupCount(state: CustomerRecordsState, group: CustomerRecordGroup): nu
 }
 
 function ActionBanners({ customer, state }: { customer: Customer; state: CustomerDetailState | null }) {
+  const latestSuspension = [...(customer.statusDecisions ?? [])].reverse().find((entry) => entry.type === 'Suspend');
+  const suspensionAt = customer.suspension?.at ?? latestSuspension?.at;
   return (
     <>
       {state?.created && (
@@ -239,11 +241,11 @@ function ActionBanners({ customer, state }: { customer: Customer; state: Custome
           điểm lập hoặc chốt.
         </Alert>
       )}
-      {state?.suspended && customer.suspension && (
+      {state?.suspended && customer.status === 'suspended' && (
         <Alert tone="success" title="Đã tạm ngưng khách hàng">
           {state.replayed && 'Quyết định đã được ghi nhận ở lần gửi trước, hệ thống không ghi thêm lịch sử. '}
-          Từ {formatDateTime(customer.suspension.at)} khách hàng không thể phát sinh hợp đồng hoặc bảng giá cho giao dịch mới. Hồ sơ
-          đã phát sinh giữ nguyên trạng thái và được xử lý theo phương án.
+          {suspensionAt && `Thời điểm quyết định: ${formatDateTime(suspensionAt)}. `}
+          Hồ sơ đã phát sinh giữ nguyên trạng thái và được xử lý theo phương án. Giao dịch mới cần được kiểm tra tại phân hệ liên quan.
         </Alert>
       )}
       {state?.alreadySuspended && customer.suspension && (
@@ -279,7 +281,7 @@ function ActionBanners({ customer, state }: { customer: Customer; state: Custome
           đổi trạng thái hay mở lại quyền giao dịch.
         </Alert>
       )}
-      {customer.status === 'suspended' && !customer.suspension && (
+      {customer.status === 'suspended' && !customer.suspension && !state?.suspended && (
         <Alert tone="warning" title="Khách hàng đang Tạm ngưng">
           Việc xem hoặc cập nhật hồ sơ không thay đổi trạng thái. Giao dịch mới cần được kiểm tra tại phân hệ liên quan.
         </Alert>
