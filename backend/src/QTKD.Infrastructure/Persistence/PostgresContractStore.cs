@@ -265,6 +265,7 @@ public partial class PostgresContractStore : IContractStore
 
         var data = new JsonObject
         {
+            ["id"] = id.ToString(),
             ["code"] = code,
             ["title"] = json["title"]!.DeepClone(),
             ["contractType"] = json["contract_type"]!.DeepClone(),
@@ -392,6 +393,7 @@ public partial class PostgresContractStore : IContractStore
     private static async Task<JsonArray> Rounds(NpgsqlConnection c, NpgsqlTransaction? tx, Guid id, Actor actor, CancellationToken ct) =>
         await Array(c, tx, """
             SELECT coalesce(jsonb_agg(jsonb_build_object(
+                'id', ar.round_id,
                 'no', ar.round_no,
                 'submittedById', ar.submitted_by,
                 'submittedByName', u.full_name,
@@ -409,6 +411,7 @@ public partial class PostgresContractStore : IContractStore
                 'coordinations', '[]'::jsonb,
                 'steps', (
                     SELECT coalesce(jsonb_agg(jsonb_build_object(
+                        'id', st.step_id,
                         'key', CASE config.stage_key
                             WHEN 'SalesManager' THEN 'sales'
                             WHEN 'sales' THEN 'sales'
@@ -435,6 +438,7 @@ public partial class PostgresContractStore : IContractStore
                         END,
                         'decidedByName', du.full_name,
                         'decidedAt', st.decided_at,
+                        'reviewedVersion', CASE WHEN st.decision IS NOT NULL THEN ar.record_version ELSE NULL END,
                         'comment', CASE WHEN config.stage_key IN ('LegalStaff', 'legal') AND $2 NOT IN ('LegalStaff', 'LegalManager') THEN NULL ELSE st.comment END
                     ) ORDER BY st.step_order), '[]')
                     FROM qtkd.approval_step st

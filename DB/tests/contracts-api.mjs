@@ -91,6 +91,7 @@ try {
   );
   const dbPort = await freePort(),
     apiPort = await freePort();
+  const approvalUiPort = await freePort();
   server = new PGLiteSocketServer({ db, port: dbPort, host: '127.0.0.1' });
   await server.start();
   child = spawn(
@@ -111,6 +112,7 @@ try {
         Jwt__SigningKey: signingKey,
         Jwt__Issuer: 'contract-test-identity',
         Jwt__Audience: 'contract-test-api',
+        Cors__Origins__3: `http://127.0.0.1:${approvalUiPort}`,
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     },
@@ -129,9 +131,18 @@ try {
     if (child.exitCode !== null) throw new Error(`API exited: ${logs}`);
     await new Promise((r) => setTimeout(r, 100));
   }
+  let httpTurn = Promise.resolve();
+  async function serialHttp(action) {
+    const previous = httpTurn; let release;
+    httpTurn = new Promise(resolve => { release = resolve; });
+    await previous;
+    try { return await action(); } finally { release(); }
+  }
   async function call(path, token, method = 'GET', body, key) {
+    return serialHttp(async () => {
     const headers = new Headers();
     if (token) headers.set('Authorization', `Bearer ${token}`);
+    if (method !== 'GET') { headers.set('X-QTKD-CSRF', '1'); headers.set('Origin', `http://127.0.0.1:${approvalUiPort}`); }
     if (key) headers.set('Idempotency-Key', key);
     if (body && !(body instanceof FormData)) headers.set('Content-Type', 'application/json');
     const response = await fetch(base + path, {
@@ -141,6 +152,7 @@ try {
     });
     const result = response.status === 204 ? null : await response.json().catch(() => null);
     return { status: response.status, body: result };
+    });
   }
   const fixtureSessions = new Map();
   for (const username of [
@@ -206,6 +218,13 @@ try {
     ),
   );
   pass('main manager roles preserve scope and unassigned approval stages remain visible in contract details');
+  assert.match(unassignedContract.body.id, /^[0-9a-f-]{36}$/i);
+  assert.match(shownRound.id, /^[0-9a-f-]{36}$/i);
+  assert(shownRound.steps.every(step => /^[0-9a-f-]{36}$/i.test(step.id)));
+  const approvalInbox = await call('/approvals/inbox?step=sales', manager);
+  assert.equal(approvalInbox.status, 200, JSON.stringify(approvalInbox.body));
+  assert(approvalInbox.body.every(row => /^HD-/.test(row.code)));
+  pass('detail UUIDs and human-readable approval inbox codes connect the two APIs');
   const options = (await call('/contracts/form-options', sales)).body;
   const emptyFilters = await call(
     '/contracts?keyword=&status=&areaCode=&contractType=&page=1&size=10&view=all',
@@ -541,7 +560,31 @@ try {
     originalName,
   ]);
   pass('audit actor names remain historical after live account names change');
-  if (process.env.QTKD_PLAYWRIGHT_MODULE) {
+  if (process.env.QTKD_APPROVAL_BROWSER === 'true') {
+    assert(process.env.QTKD_PLAYWRIGHT_MODULE, 'Set QTKD_PLAYWRIGHT_MODULE for the optional approval browser checks');
+    const { approvalDetailBrowserCheck } = await import('./approval-detail-browser.mjs');
+    let sequence = 0;
+    const createSubmitted = async () => {
+      const created = await call('/contracts', sales, 'POST', { draft: { ...draft, title: `Kiểm thử UI phê duyệt ${++sequence}` } }, randomUUID());
+      assert.equal(created.status, 200, JSON.stringify(created.body));
+      const record = created.body.contract;
+      const upload = new FormData(); upload.set('baseVersion', String(record.version)); upload.set('file', new Blob(['approval UI attachment']), 'approval.pdf');
+      assert.equal((await call(`/contracts/${record.code}/attachments`, sales, 'POST', upload, randomUUID())).status, 200);
+      const submitted = await call(`/contracts/${record.code}/submit`, sales, 'POST', {}, randomUUID());
+      assert.equal(submitted.status, 200, JSON.stringify(submitted.body));
+      return submitted.body.contract;
+    };
+    const actors = {
+      sales: { user: data.userAccount.find(u => u.userId === ids.salesStaff), role: 'NV_KD', token: sales, department: 'KD', permissions: ['contracts.view', 'contracts.create', 'approvals.track'] },
+      manager: { user: data.userAccount.find(u => u.userId === ids.salesManager), role: 'TP_KD', token: manager, department: 'KD', permissions: ['contracts.view', 'approvals.approve', 'approvals.track', 'approvals.assign'] },
+      legal: { user: data.userAccount.find(u => u.userId === ids.legalManager), role: 'TP_PC', token: tokenFor('demo.legal.manager'), department: 'PC', permissions: ['contracts.view', 'approvals.review-legal', 'approvals.assign'] },
+      board: { user: data.userAccount.find(u => u.userId === ids.boardChair), role: 'TGD', token: board, department: 'BGD', permissions: ['contracts.view', 'approvals.approve', 'approvals.assign'] },
+    };
+    await approvalDetailBrowserCheck({ repo, apiPort, browserPort: approvalUiPort, actors, createSubmitted, call, serialHttp,
+      screenshotRoot: process.env.QTKD_APPROVAL_SCREENSHOTS ?? tempRoot });
+    pass('browser: canonical detail supports acceptance, legal review, handoff and final approval with real workflow APIs');
+  }
+  if (process.env.QTKD_PLAYWRIGHT_MODULE && process.env.QTKD_APPROVAL_BROWSER !== 'true') {
     const browserFixture = await call(
       '/contracts',
       sales,

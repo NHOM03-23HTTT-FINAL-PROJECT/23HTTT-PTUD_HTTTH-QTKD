@@ -19,6 +19,7 @@ import {
   RecordNotice,
 } from '../components/ContractDetailParts';
 import { ReviewPanel, type PageNotice } from '../components/ReviewPanel';
+import { ContractApprovalPanel } from '../components/ContractApprovalPanel';
 import { newId } from '../hooks/useContractDraftForm';
 import { ContractActionError, CreateContractError, type Contract, type SubmitCheck } from '../types/contract';
 import { CONTRACT_STATUS_BADGE, EDITABLE_STATUSES, STEP_LABELS } from '../utils/contractStatus';
@@ -61,6 +62,7 @@ export function ContractDetailPage() {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [retryingTask, setRetryingTask] = useState(false);
+  const detailTarget = useRef(''); detailTarget.current = `${code}|${user?.id}`;
 
   useEffect(() => {
     if (!user) return;
@@ -131,6 +133,14 @@ export function ContractDetailPage() {
     if (next) setLoad({ kind: 'ok', contract: next });
     setNotice(nextNotice);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  async function refreshApprovalDetail() {
+    const requestedTarget = `${code}|${user!.id}`;
+    const next = await contractsApi.getDetail({ userId: user!.id, signedInAt: user!.signedInAt, code, retry: true });
+    if (detailTarget.current !== requestedTarget) return;
+    setLoad({ kind: 'ok', contract: next });
+    setNotice(null);
   }
 
   function actionError(error: unknown, action: 'submit' | 'cancel'): PageNotice | null {
@@ -300,7 +310,7 @@ export function ContractDetailPage() {
           {notice.body}
         </Alert>
       )}
-      {contract.pendingTask && (
+      {!BACKEND_ENABLED && contract.pendingTask && (
         <Alert
           tone="warning"
           title="Có phần việc chờ xử lý lại"
@@ -326,6 +336,7 @@ export function ContractDetailPage() {
 
       <RecordNotice contract={contract} />
       {!BACKEND_ENABLED && <ReviewPanel user={user} contract={contract} onChange={apply} />}
+      {BACKEND_ENABLED && <ContractApprovalPanel key={contract.id ?? contract.code} user={user} contract={contract} onRefresh={refreshApprovalDetail} />}
       {BACKEND_ENABLED && (
         <CancellationPanel
           contract={contract}
