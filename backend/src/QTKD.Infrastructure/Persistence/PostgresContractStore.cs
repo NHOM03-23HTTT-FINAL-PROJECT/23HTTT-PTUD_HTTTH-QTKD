@@ -26,7 +26,7 @@ public partial class PostgresContractStore : IContractStore
         c.document_type = 'Contract' AND (
             ($2 = 'SalesStaff' AND c.owner_id = $1) OR
             ($2 = 'SalesManager' AND c.owning_department_id = $3) OR
-            ($2 IN ('LegalStaff', 'BoardMember') AND (
+            ($2 IN ('LegalStaff', 'LegalManager', 'BoardMember', 'BoardChair') AND (
                 EXISTS (
                     SELECT 1 FROM qtkd.approval_round ar
                     JOIN qtkd.approval_step st USING(round_id)
@@ -409,9 +409,11 @@ public partial class PostgresContractStore : IContractStore
                 'coordinations', '[]'::jsonb,
                 'steps', (
                     SELECT coalesce(jsonb_agg(jsonb_build_object(
-                        'key', CASE au.role
+                        'key', CASE config.stage_key
                             WHEN 'SalesManager' THEN 'sales'
+                            WHEN 'sales' THEN 'sales'
                             WHEN 'LegalStaff' THEN 'legal'
+                            WHEN 'legal' THEN 'legal'
                             ELSE 'board'
                         END,
                         'label', st.step_name,
@@ -420,7 +422,7 @@ public partial class PostgresContractStore : IContractStore
                         'assignedAt', st.assigned_at,
                         'acceptedAt', st.accepted_at,
                         'state', CASE st.step_status
-                            WHEN 'NotStarted' THEN 'waiting'
+                            WHEN 'NotStarted' THEN CASE WHEN st.assignee_id IS NULL THEN 'unassigned' ELSE 'waiting' END
                             WHEN 'Pending' THEN 'pending-accept'
                             WHEN 'Reviewing' THEN 'reviewing'
                             WHEN 'Completed' THEN CASE WHEN st.decision = 'Approve' THEN 'done' ELSE 'stopped' END
@@ -433,10 +435,17 @@ public partial class PostgresContractStore : IContractStore
                         END,
                         'decidedByName', du.full_name,
                         'decidedAt', st.decided_at,
-                        'comment', CASE WHEN au.role = 'LegalStaff' AND $2 <> 'LegalStaff' THEN NULL ELSE st.comment END
+                        'comment', CASE WHEN config.stage_key IN ('LegalStaff', 'legal') AND $2 NOT IN ('LegalStaff', 'LegalManager') THEN NULL ELSE st.comment END
                     ) ORDER BY st.step_order), '[]')
                     FROM qtkd.approval_step st
-                    JOIN qtkd.user_account au ON au.user_id = st.assignee_id
+                    LEFT JOIN qtkd.user_account au ON au.user_id = st.assignee_id
+                    LEFT JOIN LATERAL (
+                        SELECT coalesce(
+                            ar.record_snapshot->'workflow'->'stages'->(st.step_order - 1)->>'key',
+                            ar.record_snapshot->'workflow'->'stages'->>(st.step_order - 1),
+                            au.role::text
+                        ) AS stage_key
+                    ) config ON true
                     LEFT JOIN qtkd.user_account du ON du.user_id = st.decided_by
                     WHERE st.round_id = ar.round_id
                 )

@@ -11,7 +11,7 @@ $root = Join-Path ([IO.Path]::GetTempPath()) ('qtkd-env-tests-' + [Guid]::NewGui
 $apiFile = Join-Path $root 'api.env'
 $dbFile = Join-Path $root 'db.env'
 $marker = Join-Path $root 'must-not-exist'
-$caFile = Join-Path $root 'test ca.crt'
+$certificateFile = Join-Path $root 'test-ca.crt'
 $names = @('Jwt__SigningKey', 'ConnectionStrings__Identity', 'DIRECT_URL')
 $before = @{}
 foreach ($name in $names) { $before[$name] = [Environment]::GetEnvironmentVariable($name, 'Process'); [Environment]::SetEnvironmentVariable($name, $null, 'Process') }
@@ -38,13 +38,13 @@ try {
     [IO.File]::WriteAllText($dbFile, ('DIRECT_URL="' + $url + '"'))
     $settings = Get-QtkdLocalSettings -ApiEnvFile $apiFile -DatabaseEnvFile $dbFile
     Assert-LocalEnv ($settings.Source -eq 'DB/.env DIRECT_URL' -and $settings.Connection -eq $connection) 'single URI source and JWT fallback'
-    [IO.File]::WriteAllText($caFile, 'offline path fixture only')
-    $tlsUrl = $url.Replace('sslmode=require', 'sslmode=verify-full') + '&sslrootcert=test%20ca.crt'
+    [IO.File]::WriteAllText($certificateFile, 'synthetic-certificate-path-test')
+    $tlsUrl = $url.Replace('sslmode=require', 'sslmode=verify-full') + '&sslrootcert=./test-ca.crt'
     [IO.File]::WriteAllText($dbFile, ('DIRECT_URL="' + $tlsUrl + '"'))
-    $tls = Get-QtkdLocalSettings -ApiEnvFile $apiFile -DatabaseEnvFile $dbFile
-    $parsed.set_ConnectionString($tls.Connection)
-    Assert-LocalEnv ($parsed['Root Certificate'] -eq $caFile -and $parsed['SSL Mode'] -eq 'VerifyFull') 'CA path resolves relative to DB env while SSL verification is preserved'
-    Assert-LocalEnvThrows { ConvertFrom-QtkdDatabaseUrl -DatabaseUrl ($tlsUrl.Replace('test%20ca.crt', 'missing.crt')) -BaseDirectory $root } 'missing CA fails before launch'
+    $tlsSettings = Get-QtkdLocalSettings -ApiEnvFile $apiFile -DatabaseEnvFile $dbFile
+    $parsed.set_ConnectionString($tlsSettings.Connection)
+    Assert-LocalEnv ($parsed['Root Certificate'] -eq $certificateFile -and $parsed['SSL Mode'] -eq 'VerifyFull') 'CA path resolves relative to DB env location and preserves verification'
+    Assert-LocalEnvThrows { ConvertFrom-QtkdDatabaseUrl -DatabaseUrl ($tlsUrl.Replace('test-ca.crt', 'missing-ca.crt')) -CertificateBaseDirectory $root } 'missing certificate fails before connection'
     [Environment]::SetEnvironmentVariable('ConnectionStrings__Identity', 'Host=synthetic.invalid;Database=test', 'Process')
     $overridden = Get-QtkdLocalSettings -ApiEnvFile $apiFile -DatabaseEnvFile $dbFile
     Assert-LocalEnv ($overridden.Source -eq 'process environment') 'explicit process environment precedence'
@@ -54,6 +54,6 @@ try {
     'PASS: local environment parsing, literal values, URI quoting, pooler handling, validation and precedence. No network connection or real secret output.'
 } finally {
     foreach ($name in $names) { [Environment]::SetEnvironmentVariable($name, $before[$name], 'Process') }
-    foreach ($file in @($apiFile, $dbFile, $marker, $caFile)) { if (Test-Path -LiteralPath $file -PathType Leaf) { Remove-Item -LiteralPath $file -Force } }
+    foreach ($file in @($apiFile, $dbFile, $marker, $certificateFile)) { if (Test-Path -LiteralPath $file -PathType Leaf) { Remove-Item -LiteralPath $file -Force } }
     [IO.Directory]::Delete($root)
 }

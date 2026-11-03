@@ -9,14 +9,14 @@ import './PlaceholderPages.css';
 
 /** Các màn nghiệp vụ hiện chỉ có mock. Chỉ mount khi dùng danh tính prototype. */
 export function BusinessRoute({ permission, label, children, apiReady = false }: {
-  apiReady?: boolean;
   permission?: Permission;
   label: string;
   children: ReactNode;
+  apiReady?: boolean;
 }) {
   return (
     <RequirePermission permission={permission} label={label}>
-      {(IS_MOCK_AUTH || apiReady) ? children : (
+      {IS_MOCK_AUTH || apiReady ? children : (
         <div className="placeholder-page">
           <h1 className="placeholder-page__title">{label}</h1>
           <Alert tone="info" title="Chức năng chưa sẵn sàng">

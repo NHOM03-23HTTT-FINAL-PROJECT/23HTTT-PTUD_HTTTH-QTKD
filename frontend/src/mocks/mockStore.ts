@@ -2,7 +2,6 @@ import type { Area, AreaService, AreaStaff } from '@/features/areas/types/area';
 import type { LoginTrace } from '@/features/auth/types/auth';
 import type { Customer } from '@/features/customers/types/customer';
 import type { Contract } from '@/features/contracts/types/contract';
-import type { WorkflowConfig } from '@/features/contracts/types/workflowConfig';
 import { SEED_ACCOUNTS } from './seed/users';
 
 /*
@@ -116,10 +115,6 @@ type MockState = {
   contracts: Contract[];
   /** Idempotency-Key của yêu cầu tạo/trình hợp đồng → mã hợp đồng. */
   contractRequests: Record<string, string>;
-  /** Cấu hình người tham gia đã kích hoạt trong prototype; thay cho bản cùng mã trong seed. */
-  workflowConfigs: WorkflowConfig[];
-  /** Idempotency-Key của yêu cầu kích hoạt cấu hình → mã cấu hình (SYS-CTR-10 E6). */
-  workflowRequests: Record<string, string>;
 };
 
 const MAX_AUDIT_EVENTS = 200;
@@ -142,8 +137,6 @@ function createInitialState(): MockState {
     areaRecordOverrides: {},
     contracts: [],
     contractRequests: {},
-    workflowConfigs: [],
-    workflowRequests: {},
   };
   for (const account of SEED_ACCOUNTS) {
     if (account.lastLogin) state.lastLogins[account.id] = account.lastLogin;
@@ -302,19 +295,6 @@ export const mockStore = {
       contractRequests: idempotencyKey
         ? { ...s.contractRequests, [idempotencyKey]: contract.code }
         : s.contractRequests,
-    }));
-  },
-  getStoredWorkflowConfigs(): WorkflowConfig[] {
-    return readState().workflowConfigs;
-  },
-  getWorkflowCodeByRequest(idempotencyKey: string): string | undefined {
-    return readState().workflowRequests[idempotencyKey];
-  },
-  /** Lưu phiên bản cấu hình mới (kèm lịch sử) và khóa yêu cầu trong một lần ghi. */
-  saveWorkflowConfig(config: WorkflowConfig, idempotencyKey?: string) {
-    update((s) => ({
-      workflowConfigs: [...s.workflowConfigs.filter((item) => item.code !== config.code), config],
-      workflowRequests: idempotencyKey ? { ...s.workflowRequests, [idempotencyKey]: config.code } : s.workflowRequests,
     }));
   },
   audit(event: Omit<AuditEvent, 'at'>) {

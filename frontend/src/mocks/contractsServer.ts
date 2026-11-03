@@ -1,4 +1,4 @@
-import type { Permission } from '@/constants/roles';
+import { BOARD_ROLES, LEGAL_ROLES, type Permission } from '@/constants/roles';
 import type { AuthUser } from '@/features/auth/types/auth';
 import {
   ContractActionError,
@@ -46,7 +46,7 @@ import {
   CONTRACT_TEMPLATES,
   CONTRACT_TYPES,
   COORDINATION_DEPARTMENTS,
-  DEPARTMENT_WORKFLOW_SCOPE,
+  DEFAULT_REVIEWERS,
   SEED_CONTRACTS,
   SIMULATED_CONFLICT_PREFIX,
   SIMULATED_CONTRACT_SAVE_ERROR_PREFIX,
@@ -54,7 +54,6 @@ import {
   SIMULATED_NOTIFY_ERROR_PREFIX,
   WORKFLOW_PEOPLE,
 } from './seed/contracts';
-import { mockFindActiveWorkflow } from './workflowServer';
 
 /** Hồ sơ lưu từ phiên bản prototype cũ (chỉ có SYS-CTR-01) chưa có các trường quy trình. */
 function normalize(contract: Contract): Contract {
@@ -102,8 +101,8 @@ function actionAuthorize(userId: string, signedInAt: string, permission: Permiss
 /** Phạm vi truy cập theo vai trò (SYS-CTR-02 A1–A3); BE thật kiểm tra lại ở mọi API. */
 function scopeOf(user: AuthUser): ContractScope {
   if (user.roles.includes('TP_KD')) return 'department';
-  if (user.roles.includes('GD')) return 'granted';
-  if (user.roles.includes('NV_PC')) return 'assigned';
+  if (user.roles.some((role) => BOARD_ROLES.includes(role))) return 'granted';
+  if (user.roles.some((role) => LEGAL_ROLES.includes(role))) return 'assigned';
   return 'own';
 }
 
@@ -278,7 +277,7 @@ export function mockListContracts({ userId, signedInAt, query, variant, retry }:
 
 /** Ẩn ý kiến phối hợp nội bộ của Pháp chế với người ngoài Pháp chế (SYS-CTR-11 A9). */
 function sanitizeFor(contract: Contract, user: AuthUser): Contract {
-  if (user.roles.includes('NV_PC')) return contract;
+  if (user.roles.some((role) => LEGAL_ROLES.includes(role))) return contract;
   return {
     ...contract,
     rounds: contract.rounds.map((round) => ({
@@ -367,12 +366,9 @@ function missingForSubmit(contract: Contract): string[] {
   return [...missing, ...noArea];
 }
 
-function salesReviewerFor(contract: Contract) {
-  const scope = DEPARTMENT_WORKFLOW_SCOPE[contract.departmentCode];
-  const config = scope ? mockFindActiveWorkflow('contract', scope) : undefined;
-  const ids = config?.stages.find((stage) => stage.key === 'sales')?.participants ?? [];
-  const person = ids.map((id) => WORKFLOW_PEOPLE.find((item) => item.id === id)).find((item) => item?.active);
-  return { config, person };
+/** Prototype: người còn hoạt động đầu tiên trong danh sách mặc định của bước. */
+function reviewerFor(step: ApprovalStepKey) {
+  return DEFAULT_REVIEWERS[step].map((id) => WORKFLOW_PEOPLE.find((item) => item.id === id)).find((item) => item?.active);
 }
 
 function precheckSubmit(contract: Contract) {
@@ -381,20 +377,20 @@ function precheckSubmit(contract: Contract) {
   const activeAreas = activeAreaCodes();
   const suspended = contract.services.filter((item) => item.requiresArea && item.areaCode && !activeAreas.has(item.areaCode));
   if (suspended.length > 0) throw new ContractActionError('AREA_INACTIVE', { items: suspended.map((item) => `${item.serviceName} · ${item.areaCode}`) });
-  const { config, person } = salesReviewerFor(contract);
-  if (!config || !person) throw new ContractActionError('NO_APPROVER');
-  return { config, person };
+  const person = reviewerFor('sales');
+  if (!person) throw new ContractActionError('NO_APPROVER');
+  return { person };
 }
 
 /** SYS-CTR-04 bước 3–5: kiểm tra trước khi hiển thị hộp thoại xác nhận. */
 export function mockCheckSubmit({ userId, signedInAt, code }: { userId: string; signedInAt: string; code: string }): SubmitCheck {
   const { contract } = ownerAction(userId, signedInAt, code, EDITABLE_STATUSES);
-  const { config, person } = precheckSubmit(contract);
-  return { salesReviewer: person.name, configLabel: `${config.code} · phiên bản ${config.version}`, resubmit: contract.status === 'revision-requested' };
+  const { person } = precheckSubmit(contract);
+  return { salesReviewer: person.name, resubmit: contract.status === 'revision-requested' };
 }
 
 /**
- * SYS-CTR-04 bước 7–9: tạo lượt duyệt theo cấu hình đang áp dụng và giao bước đầu cho Trưởng phòng KD.
+ * SYS-CTR-04 bước 7–9: tạo lượt duyệt và giao bước đầu cho Trưởng phòng KD.
  * Cùng Idempotency-Key chỉ tạo một lượt; trình lại sau chỉnh sửa (A1) tạo lượt mới, giữ lượt cũ trong lịch sử.
  */
 export function mockSubmitContract(request: SubmitContractRequest): { contract: Contract; replayed: boolean } {
@@ -423,8 +419,6 @@ export function mockSubmitContract(request: SubmitContractRequest): { contract: 
     submittedByName: user.fullName,
     submittedAt: now,
     contractVersion: contract.version,
-    configCode: checked.config.code,
-    configVersion: checked.config.version,
     result: 'in-progress',
     steps,
     log: [{ at: now, stepKey: 'sales', actorName: user.fullName, action: 'submit', from: contract.status, to: 'submitted', version: contract.version, note: contract.status === 'revision-requested' ? 'Trình lại sau khi chỉnh sửa theo yêu cầu.' : undefined }],
@@ -481,20 +475,6 @@ function replaceRound(contract: Contract, round: ApprovalRound): ApprovalRound[]
   return contract.rounds.map((item) => (item.no === round.no ? round : item));
 }
 
-function boardAssignee(contract: Contract) {
-  const scope = DEPARTMENT_WORKFLOW_SCOPE[contract.departmentCode];
-  const config = scope ? mockFindActiveWorkflow('contract', scope) : undefined;
-  const ids = config?.stages.find((stage) => stage.key === 'board')?.participants ?? [];
-  return ids.map((id) => WORKFLOW_PEOPLE.find((item) => item.id === id)).find((item) => item?.active);
-}
-
-function legalAssignee(contract: Contract) {
-  const scope = DEPARTMENT_WORKFLOW_SCOPE[contract.departmentCode];
-  const config = scope ? mockFindActiveWorkflow('contract', scope) : undefined;
-  // Luân phiên rút gọn cho prototype: giao người đầu tiên còn hoạt động trong danh sách.
-  const ids = config?.stages.find((stage) => stage.key === 'legal')?.participants ?? [];
-  return ids.map((id) => WORKFLOW_PEOPLE.find((item) => item.id === id)).find((item) => item?.active);
-}
 
 /**
  * SYS-CTR-07 / 08 / 09: ghi nhận quyết định tại bước đang giữ hồ sơ. Kiểm tra người được giao, bước hiện tại,
@@ -543,7 +523,7 @@ export function mockDecideReview(request: DecideReviewRequest): DecideReviewResu
     } else {
       log.push({ at: now, stepKey: request.step, actorName: user.fullName, action: 'approve', from: 'under-review', to: 'under-review', note: comment, version: contract.version });
       const nextKey = STEP_ORDER[index + 1];
-      const person = nextKey === 'legal' ? legalAssignee(contract) : boardAssignee(contract);
+      const person = reviewerFor(nextKey);
       log.push({ at: now, stepKey: nextKey, actorName: nextKey === 'legal' ? 'Hệ thống' : user.fullName, action: nextKey === 'legal' ? 'handoff-legal' : 'handoff-board', from: 'under-review', to: 'under-review', version: contract.version });
       steps = steps.map((item) =>
         item.key !== nextKey ? item : person

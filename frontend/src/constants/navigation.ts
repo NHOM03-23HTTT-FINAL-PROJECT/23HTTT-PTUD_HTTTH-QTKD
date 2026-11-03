@@ -33,6 +33,15 @@ const APPROVAL_HISTORY: NavItem = {
   module: 'Phê duyệt (APR)',
 };
 
+/** SYS-CTR-10 · Trưởng bộ phận phân công người duyệt cho bước của bộ phận mình. */
+const APPROVAL_ASSIGNMENTS: NavItem = {
+  label: 'Phân công người duyệt',
+  path: '/phe-duyet/phan-cong',
+  icon: 'users',
+  permission: 'approvals.assign',
+  module: 'Phê duyệt (APR)',
+};
+
 const CONTRACT_LIST: NavItem = {
   label: 'Danh sách hợp đồng',
   path: '/hop-dong',
@@ -68,7 +77,7 @@ export const WORKSPACE_NAV: Record<WorkspaceKey, NavGroup[]> = {
         { label: 'Hồ sơ chờ tôi duyệt', path: '/phe-duyet/cho-duyet', icon: 'inbox', permission: 'approvals.approve', module: 'Phê duyệt (APR)' },
       ],
     },
-    { title: 'PHÊ DUYỆT', items: [TRACK_PROGRESS, APPROVAL_HISTORY] },
+    { title: 'PHÊ DUYỆT', items: [APPROVAL_ASSIGNMENTS, TRACK_PROGRESS, APPROVAL_HISTORY] },
     { title: 'KHU VỰC', items: [AREA_LOOKUP] },
   ],
   'khai-thac': [
@@ -92,13 +101,14 @@ export const WORKSPACE_NAV: Record<WorkspaceKey, NavGroup[]> = {
       ],
     },
     { title: 'HỢP ĐỒNG', items: [CONTRACT_LIST] },
-    { title: 'PHÊ DUYỆT', items: [TRACK_PROGRESS, APPROVAL_HISTORY] },
+    { title: 'PHÊ DUYỆT', items: [APPROVAL_ASSIGNMENTS, TRACK_PROGRESS, APPROVAL_HISTORY] },
   ],
   bgd: [
     {
       title: 'PHÊ DUYỆT',
       items: [
         { label: 'Hồ sơ chờ phê duyệt', path: '/phe-duyet/cho-phe-duyet', icon: 'inbox', permission: 'approvals.approve', badge: 2, module: 'Phê duyệt (APR)' },
+        APPROVAL_ASSIGNMENTS,
         APPROVAL_HISTORY,
       ],
     },
@@ -111,10 +121,6 @@ export const WORKSPACE_NAV: Record<WorkspaceKey, NavGroup[]> = {
         { label: 'Tài khoản người dùng', path: '/quan-tri/tai-khoan', icon: 'users', permission: 'users.manage', module: 'Người dùng & phân quyền' },
         { label: 'Vai trò & phân quyền', path: '/quan-tri/vai-tro', icon: 'shield', permission: 'roles.manage', module: 'Người dùng & phân quyền' },
       ],
-    },
-    {
-      title: 'QUY TRÌNH',
-      items: [{ label: 'Quy trình phê duyệt', path: '/quan-tri/quy-trinh', icon: 'workflow', permission: 'workflows.manage', module: 'Cấu hình quy trình (APR)' }],
     },
     {
       title: 'HỆ THỐNG',
@@ -138,6 +144,7 @@ export const WORKSPACE_SEARCH_PLACEHOLDER: Record<WorkspaceKey, string> = {
 
 /** Màn hình dùng chung cho mọi vai trò (không cần quyền nghiệp vụ). */
 export const ACCOUNT_NAV = {
+  coordination: { label: 'Yêu cầu phối hợp phòng ban', path: '/phe-duyet/phoi-hop', icon: 'users', module: 'Phối hợp rà soát hợp đồng' },
   profile: { label: 'Thông tin cá nhân', path: '/tai-khoan/thong-tin', icon: 'user', module: 'Tài khoản cá nhân' },
   changePassword: { label: 'Đổi mật khẩu', path: '/doi-mat-khau', icon: 'lock', module: 'UC-CHUNG-04 · Đổi mật khẩu' },
   contactAdmin: { label: 'Liên hệ Quản trị hệ thống', path: '/lien-he-quan-tri', icon: 'mail', module: 'Hỗ trợ người dùng' },

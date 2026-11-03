@@ -20,7 +20,9 @@ enum UserRole {
   OperationsManager
   Accountant
   LegalStaff
+  LegalManager
   BoardMember
+  BoardChair
   SystemAdmin
 
   @@map("user_role")
@@ -828,7 +830,7 @@ model ApprovalStep {
   roundId         String             @map("round_id") @db.Uuid
   stepName        String             @map("step_name") @db.VarChar(200)
   stepOrder       Int                @map("step_order")
-  assigneeId      String             @map("assignee_id") @db.Uuid
+  assigneeId      String?            @map("assignee_id") @db.Uuid
   assignedAt      DateTime?          @map("assigned_at") @db.Timestamptz(6)
   acceptedAt      DateTime?          @map("accepted_at") @db.Timestamptz(6)
   stepStatus      ApprovalStepStatus @default(NotStarted) @map("step_status")
@@ -839,7 +841,7 @@ model ApprovalStep {
   decidedAt       DateTime?          @map("decided_at") @db.Timestamptz(6)
 
   roundRef     ApprovalRound @relation("ApprovalStep_roundId", fields: [roundId], references: [roundId], onDelete: Restrict, onUpdate: Restrict)
-  assigneeRef  UserAccount   @relation("ApprovalStep_assigneeId", fields: [assigneeId], references: [userId], onDelete: Restrict, onUpdate: Restrict)
+  assigneeRef  UserAccount?  @relation("ApprovalStep_assigneeId", fields: [assigneeId], references: [userId], onDelete: Restrict, onUpdate: Restrict)
   decidedByRef UserAccount?  @relation("ApprovalStep_decidedBy", fields: [decidedBy], references: [userId], onDelete: Restrict, onUpdate: Restrict)
 
   @@unique([roundId, stepOrder])

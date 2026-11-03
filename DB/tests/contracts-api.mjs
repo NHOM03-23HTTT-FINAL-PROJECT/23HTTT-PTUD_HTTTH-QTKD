@@ -143,7 +143,13 @@ try {
     return { status: response.status, body: result };
   }
   const fixtureSessions = new Map();
-  for (const username of ['demo.sales', 'demo.sales.manager', 'demo.board', 'demo.legal.unassigned']) {
+  for (const username of [
+    'demo.sales',
+    'demo.sales.manager',
+    'demo.board.chair',
+    'demo.legal.unassigned',
+    'demo.legal.manager',
+  ]) {
     const userId =
       username === 'demo.legal.unassigned'
         ? unassignedLegalId
@@ -172,10 +178,34 @@ try {
   pass('anonymous contract access is rejected');
   const sales = tokenFor('demo.sales'),
     manager = tokenFor('demo.sales.manager'),
-    board = tokenFor('demo.board'),
+    board = tokenFor('demo.board.chair'),
     legal = tokenFor('demo.legal.unassigned');
   assert.equal((await call('/contracts', legal)).body.total, 0);
   pass('legal role without assignment sees no contracts');
+  const legalManagerList = await call('/contracts', tokenFor('demo.legal.manager'));
+  assert.equal(legalManagerList.status, 200, JSON.stringify(legalManagerList.body));
+  assert.equal(legalManagerList.body.total, 0);
+  const unassignedStep = data.approvalStep.find((step) => step.assigneeId == null);
+  assert(unassignedStep, 'main seed must include an unassigned approval step');
+  const unassignedRound = data.approvalRound.find((round) => round.roundId === unassignedStep.roundId);
+  const unassignedCode = (
+    await db.query('SELECT contract_code FROM qtkd.contract WHERE contract_id=$1', [
+      unassignedRound.contractId,
+    ])
+  ).rows[0].contract_code;
+  const unassignedContract = await call(`/contracts/${unassignedCode}`, sales);
+  assert.equal(unassignedContract.status, 200, JSON.stringify(unassignedContract.body));
+  const shownRound = unassignedContract.body.rounds.find((round) => round.no === unassignedRound.roundNo);
+  assert.equal(
+    shownRound.steps.length,
+    data.approvalStep.filter((step) => step.roundId === unassignedRound.roundId).length,
+  );
+  assert(
+    shownRound.steps.some(
+      (step) => step.assigneeId === null && step.state === 'unassigned' && step.key === 'legal',
+    ),
+  );
+  pass('main manager roles preserve scope and unassigned approval stages remain visible in contract details');
   const options = (await call('/contracts/form-options', sales)).body;
   const emptyFilters = await call(
     '/contracts?keyword=&status=&areaCode=&contractType=&page=1&size=10&view=all',

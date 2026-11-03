@@ -29,7 +29,7 @@ function Read-QtkdEnvFile {
 }
 
 function ConvertFrom-QtkdDatabaseUrl {
-    param([Parameter(Mandatory)][string]$DatabaseUrl, [string]$BaseDirectory = (Get-Location).Path)
+    param([Parameter(Mandatory)][string]$DatabaseUrl, [string]$CertificateBaseDirectory = (Get-Location).Path)
     $uri = $null
     if (-not [Uri]::TryCreate($DatabaseUrl, [UriKind]::Absolute, [ref]$uri) -or
         $uri.Scheme -notin @('postgres', 'postgresql') -or
@@ -54,19 +54,16 @@ function ConvertFrom-QtkdDatabaseUrl {
     $ssl = @{ 'require' = 'Require'; 'verify-ca' = 'VerifyCA'; 'verify-full' = 'VerifyFull' }[$parameters['sslmode']]
     # Npgsql quoted values escape double quotes by doubling them; never build a shell command from credentials.
     $quote = { param([string]$value) '"' + $value.Replace('"', '""') + '"' }
-    $certificateSetting = ''
-    if (-not [string]::IsNullOrWhiteSpace($parameters['sslrootcert'])) {
-        $certificate = $parameters['sslrootcert']
-        if (-not [IO.Path]::IsPathRooted($certificate)) { $certificate = Join-Path $BaseDirectory $certificate }
-        $certificate = [IO.Path]::GetFullPath($certificate)
-        if (-not (Test-Path -LiteralPath $certificate -PathType Leaf)) {
-            throw 'The sslrootcert CA file configured in DIRECT_URL does not exist relative to DB/.env.'
-        }
-        $certificateSetting = ';Root Certificate=' + (& $quote $certificate)
+    $certificate = ''
+    if ($parameters['sslrootcert']) {
+        $certificatePath = $parameters['sslrootcert']
+        if (-not [IO.Path]::IsPathRooted($certificatePath)) { $certificatePath = Join-Path $CertificateBaseDirectory $certificatePath }
+        if (-not (Test-Path -LiteralPath $certificatePath -PathType Leaf)) { throw 'The configured sslrootcert file does not exist. Restore the CA certificate next to DB/.env or update its path.' }
+        $certificate = ';Root Certificate=' + (& $quote ([IO.Path]::GetFullPath($certificatePath)))
     }
     return 'Host=' + (& $quote $uri.Host) + ';Port=5432;Database=' + (& $quote $database) +
         ';Username=' + (& $quote $username) + ';Password=' + (& $quote $password) +
-        ';SSL Mode=' + $ssl + $certificateSetting + ';Search Path=qtkd;Include Error Detail=false'
+        ';SSL Mode=' + $ssl + ';Search Path=qtkd;Include Error Detail=false' + $certificate
 }
 
 function Get-QtkdLocalSettings {
@@ -84,7 +81,7 @@ function Get-QtkdLocalSettings {
         $source = 'process DIRECT_URL'
         if ([string]::IsNullOrWhiteSpace($url)) { $url = $database['DIRECT_URL']; $source = 'DB/.env DIRECT_URL' }
         if ([string]::IsNullOrWhiteSpace($url)) { throw 'Paste the Supabase connection URI into DIRECT_URL in DB/.env first.' }
-        $connection = ConvertFrom-QtkdDatabaseUrl -DatabaseUrl $url -BaseDirectory ([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($DatabaseEnvFile)))
+        $connection = ConvertFrom-QtkdDatabaseUrl -DatabaseUrl $url -CertificateBaseDirectory ([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($DatabaseEnvFile)))
     }
     return @{ Jwt = $jwt; Connection = $connection; Source = $source }
 }

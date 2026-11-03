@@ -20,10 +20,12 @@ import { CustomerSuspendPage } from '@/features/customers/pages/CustomerSuspendP
 import { ApprovalInboxPage } from '@/features/contracts/pages/ApprovalInboxPage';
 import { ContractCreatePage } from '@/features/contracts/pages/ContractCreatePage';
 import { ContractDetailPage } from '@/features/contracts/pages/ContractDetailPage';
+import { ContractReviewPage } from '@/features/contracts/pages/ContractReviewPage';
+import { CoordinationInboxPage } from '@/features/contracts/pages/LegalCoordinationPanel';
 import { ContractEditPage } from '@/features/contracts/pages/ContractEditPage';
 import { ContractListPage } from '@/features/contracts/pages/ContractListPage';
 import { ContractProgressPage } from '@/features/contracts/pages/ContractProgressPage';
-import { WorkflowConfigFormPage, WorkflowConfigListPage } from '@/features/contracts/pages/WorkflowConfigPages';
+import { ApprovalAssignmentPage } from '@/features/contracts/pages/ApprovalAssignmentPage';
 import { DashboardPage } from '@/features/dashboard/pages/DashboardPage';
 import { MainLayout } from '@/layouts/MainLayout';
 import { PublicOnly, RequireAuth } from './guards';
@@ -32,6 +34,7 @@ import { NavPlaceholderPage, NotFoundPage, RecordPlaceholderPage } from './Place
 
 /** Đường dẫn trong menu đã có màn hình thật, không dùng trang giữ chỗ. */
 const IMPLEMENTED_PATHS = new Set<string>([
+  '/phe-duyet/phoi-hop',
   ROUTES.changePassword,
   ROUTES.customers,
   ROUTES.customerCreate,
@@ -47,7 +50,7 @@ const IMPLEMENTED_PATHS = new Set<string>([
   ROUTES.approvalLegalDone,
   ROUTES.approvalBoard,
   ROUTES.approvalTracking,
-  ROUTES.workflows,
+  ROUTES.approvalAssignments,
 ]);
 
 /**
@@ -228,7 +231,7 @@ export function AppRoutes() {
             <Route
               path={ROUTES.approvalSales}
               element={
-                <BusinessRoute permission="approvals.approve" label="Hồ sơ chờ tôi duyệt">
+                <BusinessRoute apiReady permission="approvals.approve" label="Hồ sơ chờ tôi duyệt">
                   <ApprovalInboxPage key="sales" step="sales" />
                 </BusinessRoute>
               }
@@ -236,7 +239,7 @@ export function AppRoutes() {
             <Route
               path={ROUTES.approvalLegal}
               element={
-                <BusinessRoute permission="approvals.review-legal" label="Chờ rà soát pháp lý">
+                <BusinessRoute apiReady permission="approvals.review-legal" label="Chờ rà soát pháp lý">
                   <ApprovalInboxPage key="legal" step="legal" />
                 </BusinessRoute>
               }
@@ -244,7 +247,7 @@ export function AppRoutes() {
             <Route
               path={ROUTES.approvalLegalDone}
               element={
-                <BusinessRoute permission="approvals.review-legal" label="Đã rà soát">
+                <BusinessRoute apiReady permission="approvals.review-legal" label="Đã rà soát">
                   <ApprovalInboxPage key="legal-done" step="legal" done />
                 </BusinessRoute>
               }
@@ -252,7 +255,7 @@ export function AppRoutes() {
             <Route
               path={ROUTES.approvalBoard}
               element={
-                <BusinessRoute permission="approvals.approve" label="Hồ sơ chờ phê duyệt">
+                <BusinessRoute apiReady permission="approvals.approve" label="Hồ sơ chờ phê duyệt">
                   <ApprovalInboxPage key="board" step="board" />
                 </BusinessRoute>
               }
@@ -266,29 +269,15 @@ export function AppRoutes() {
               }
             />
             <Route
-              path={ROUTES.workflows}
+              path={ROUTES.approvalAssignments}
               element={
-                <BusinessRoute permission="workflows.manage" label="Quy trình phê duyệt">
-                  <WorkflowConfigListPage />
+                <BusinessRoute apiReady permission="approvals.assign" label="Phân công người duyệt">
+                  <ApprovalAssignmentPage />
                 </BusinessRoute>
               }
             />
-            <Route
-              path={ROUTES.workflowCreate}
-              element={
-                <BusinessRoute permission="workflows.manage" label="Tạo cấu hình người tham gia">
-                  <WorkflowConfigFormPage key="new" />
-                </BusinessRoute>
-              }
-            />
-            <Route
-              path="/quan-tri/quy-trinh/:code/cap-nhat"
-              element={
-                <BusinessRoute permission="workflows.manage" label="Cập nhật cấu hình người tham gia">
-                  <WorkflowConfigFormPage key="edit" />
-                </BusinessRoute>
-              }
-            />
+            <Route path="/phe-duyet/ho-so/:id" element={<ContractReviewPage />} />
+            <Route path="/phe-duyet/phoi-hop" element={<BusinessRoute apiReady label="Phối hợp phòng ban"><CoordinationInboxPage /></BusinessRoute>} />
             <Route path="/bang-thanh-toan/:code" element={<RecordPlaceholderPage kind="payment" />} />
             {NAV_PATHS.map((path) => (
               <Route key={path} path={path} element={<NavPlaceholderPage />} />

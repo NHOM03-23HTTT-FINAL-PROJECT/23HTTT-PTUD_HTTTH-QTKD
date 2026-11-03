@@ -496,10 +496,6 @@ function SubmitDialog({
             <dt>Bước đầu giao cho</dt>
             <dd>{check.salesReviewer}</dd>
           </div>
-          <div>
-            <dt>Cấu hình áp dụng</dt>
-            <dd>{check.configLabel}</dd>
-          </div>
         </dl>
         <p>
           {check.resubmit

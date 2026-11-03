@@ -15,6 +15,10 @@ using QTKD.Application.Common.Interfaces;
 using QTKD.Application.Features.Contracts;
 using QTKD.Domain.Contracts;
 using QTKD.Api.Authorization;
+using QTKD.Api.Endpoints;
+using QTKD.Application.Features.ContractApprovals;
+using QTKD.Application.Features.Workflows;
+using QTKD.Infrastructure.ContractApprovals;
 using QTKD.Application.Features.Identity;
 using QTKD.Domain.Identity;
 using QTKD.Infrastructure.Identity;
@@ -28,11 +32,14 @@ builder.Logging.AddJsonConsole(options => options.IncludeScopes = true);
 builder.Services.AddOptions<TokenOptions>().BindConfiguration("Jwt").ValidateDataAnnotations().ValidateOnStart();
 builder.Services.AddOptions<DatabaseOptions>().BindConfiguration("ConnectionStrings").ValidateDataAnnotations().ValidateOnStart();
 builder.Services.AddSingleton(TimeProvider.System);
-var databaseNames = new NpgsqlNullNameTranslator();
+// One translator for the whole app. The options lambda runs per request scope; a new translator each time
+// makes EF build a new internal service provider per request and throw ManyServiceProvidersCreatedWarning
+// after 20, which turned every later request into 500 SYSTEM_ERROR.
+var enumNames = new NpgsqlNullNameTranslator();
 builder.Services.AddDbContext<IdentityDbContext>((sp, options) => options.UseNpgsql(
     sp.GetRequiredService<IConfiguration>().GetConnectionString("Identity") ?? throw new InvalidOperationException("ConnectionStrings:Identity is required."),
-    pg => { pg.MapEnum<UserRole>("user_role", "qtkd", databaseNames);
-        pg.MapEnum<UserStatus>("user_status", "qtkd", databaseNames); pg.MapEnum<SessionEndReason>("session_end_reason", "qtkd", databaseNames); }));
+    pg => { pg.MapEnum<UserRole>("user_role", "qtkd", enumNames);
+        pg.MapEnum<UserStatus>("user_status", "qtkd", enumNames); pg.MapEnum<SessionEndReason>("session_end_reason", "qtkd", enumNames); }));
 builder.Services.AddIdentityCore<UserAccount>(options =>
 {
     options.User.RequireUniqueEmail = true;
@@ -42,6 +49,14 @@ builder.Services.AddIdentityCore<UserAccount>(options =>
 builder.Services.AddScoped<IPasswordHasher<UserAccount>, BcryptPasswordHasher>();
 builder.Services.AddScoped<TokenIssuer>();
 builder.Services.AddScoped<IIdentityService, IdentityService>();
+builder.Services.AddScoped<ContractApprovalService>();
+builder.Services.AddSingleton<WorkflowEngine>();
+builder.Services.AddScoped<PostgresApprovalStore>();
+builder.Services.AddScoped<IApprovalDbSessions, ApprovalDbSessions>();
+builder.Services.AddScoped<ContractCoordinationService>();
+builder.Services.AddScoped<ApprovalAssignmentService>();
+builder.Services.AddScoped<IApprovalStore>(sp => sp.GetRequiredService<PostgresApprovalStore>());
+builder.Services.AddScoped<IContractApprovalEngine, ContractApprovalEngine>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
 builder.Services.AddSingleton<Microsoft.Extensions.Options.IOptionsChangeTokenSource<JwtBearerOptions>>(
@@ -101,7 +116,7 @@ builder.Services.AddRateLimiter(options =>
 });
 var allowedOrigins = builder.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? [];
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy.WithOrigins(allowedOrigins)
-    .WithMethods("GET", "POST", "PUT").WithHeaders("Content-Type", "Authorization", "X-QTKD-CSRF").AllowCredentials()));
+    .WithMethods("GET", "POST", "PUT").WithHeaders("Content-Type", "Authorization", "X-QTKD-CSRF", "Idempotency-Key").AllowCredentials()));
 
 builder.Services.AddControllers();
 builder.Services.Configure<FormOptions>(o => o.MultipartBodyLengthLimit = 21 * 1024 * 1024);
@@ -134,6 +149,16 @@ app.Use(async (context, next) =>
         context.Response.StatusCode = conflict ? 409 : 503;
         await context.Response.WriteAsJsonAsync(new { code = conflict ? "CONFLICT" : "DATABASE_UNAVAILABLE" });
     }
+    catch (BadHttpRequestException)
+    {
+        context.Response.StatusCode = 400;
+        await context.Response.WriteAsJsonAsync(new { code = "VALIDATION", traceId = context.TraceIdentifier });
+    }
+    catch (ReviewFailure error)
+    {
+        context.Response.StatusCode = error.Status;
+        await context.Response.WriteAsJsonAsync(new { code = error.Code, traceId = context.TraceIdentifier });
+    }
     catch (IdentityFailure error)
     {
         context.Response.StatusCode = error.Status;
@@ -165,6 +190,9 @@ app.Use(async (context, next) =>
 });
 app.UseRateLimiter();
 app.UseAuthorization();
+app.MapContractApprovals(allowedOrigins);
+app.MapGet("/api/v1/notifications", async (HttpContext context, PostgresApprovalStore store, CancellationToken ct)
+    => Results.Ok(await store.Notifications(Guid.Parse(context.User.FindFirstValue("sub")!), ct))).RequireAuthorization();
 
 const string cookieName = "__Host-qtkd-refresh";
 bool Csrf(HttpContext context) => context.Request.Headers["X-QTKD-CSRF"] == "1"

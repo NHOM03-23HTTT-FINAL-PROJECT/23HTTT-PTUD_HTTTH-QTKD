@@ -6,7 +6,7 @@ import { validateSeedData } from "../scripts/validate-seed.js";
 
 test("all demo users have one role and matching department; zero grants is valid", () => {
   const data = buildSeedData("OFFLINE_ONLY_NOT_A_PASSWORD_HASH");
-  assert.equal(data.roleDefinition.length, 8);
+  assert.equal(data.roleDefinition.length, 10);
   assert(data.userAccount.every(user => typeof user.role === "string"));
   assert.equal(data.rolePermission.filter(grant => grant.role === "Accountant").length, 0);
   validateSeedData(data);

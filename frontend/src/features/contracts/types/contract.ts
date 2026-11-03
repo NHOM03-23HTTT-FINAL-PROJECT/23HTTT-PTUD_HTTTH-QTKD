@@ -125,8 +125,6 @@ export type ApprovalRound = {
   submittedByName: string;
   submittedAt: string;
   contractVersion: number;
-  configCode: string;
-  configVersion: number;
   result: ApprovalRoundResult;
   endedAt?: string;
   steps: ApprovalStep[];
@@ -295,7 +293,7 @@ export type CoordinationRequest = Actor & { code: string; department: string; co
 export type CoordinationReplyRequest = Actor & { code: string; id: string; reply: string };
 
 /** Kiểm tra trước khi mở hộp thoại xác nhận trình (SYS-CTR-04 bước 3–5). */
-export type SubmitCheck = { salesReviewer: string; configLabel: string; resubmit: boolean };
+export type SubmitCheck = { salesReviewer: string; resubmit: boolean };
 
 export type CreateContractRequest = {
   userId: string;

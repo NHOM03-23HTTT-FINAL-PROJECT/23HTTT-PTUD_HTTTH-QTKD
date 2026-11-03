@@ -14,7 +14,7 @@ Các module đăng nhập, đăng xuất, đổi mật khẩu, quản lý ngư�
 
 ## Tích hợp xác thực
 
-Sau khi ghép `origin/main` tại `9e70d3e`, ứng dụng có module identity của nhóm. Module hợp đồng dùng chung JWT, kiểm tra phiên và permission của module đó; không có chức năng đăng nhập riêng. `CurrentActor` đọc UUID từ claim `sub`, rồi đọc lại vai trò, trạng thái và phòng ban từ DB để kiểm tra phạm vi hồ sơ.
+Sau khi ghép `origin/main` tại `17d9b18`, ứng dụng có module identity, rà soát/phê duyệt và phân công của nhóm. Module hợp đồng dùng chung JWT, kiểm tra phiên và permission của module đó; không có chức năng đăng nhập riêng. `CurrentActor` đọc UUID từ claim `sub`, rồi đọc lại vai trò, trạng thái và phòng ban từ DB để kiểm tra phạm vi hồ sơ.
 
 Cấu hình theo `backend/.env.example` của main:
 
@@ -44,7 +44,7 @@ VITE_AUTH_MODE=api
 
 Chạy `npm run dev` trong `frontend/`. Vite proxy `/api` sang HTTPS cổng 7156; `QTKD_API_PROXY` cho phép đổi đích khi kiểm thử. Các file `.env` riêng trên máy được giữ nguyên; tự bổ sung hai biến FE trên nếu chưa có.
 
-Đăng nhập bằng `demo.sales`, `demo.sales.manager`, `demo.board` hoặc tài khoản tương ứng có sẵn trong seed. Mật khẩu là `SEED_PASSWORD` đã dùng khi chạy seed, không phải mật khẩu Supabase. Đổi giá trị trong `.env` không tự đổi mật khẩu các tài khoản đã seed. Seed mặc định yêu cầu đổi mật khẩu ở lần đăng nhập đầu; hoàn tất màn đổi mật khẩu rồi vào hợp đồng. Không cần tạo endpoint giả hoặc bỏ `[Authorize]`.
+Đăng nhập bằng `demo.sales`, `demo.sales.manager`, `demo.board.chair` hoặc tài khoản tương ứng có sẵn trong seed. Với seed mới từ main, `demo.board.chair` là trưởng Ban Giám đốc nhận cấp quyết định cuối cho đề nghị hủy hợp đồng Approved; `demo.board` vẫn là thành viên BGĐ cho các hồ sơ được phân công. Mật khẩu là `SEED_PASSWORD` đã dùng khi chạy seed, không phải mật khẩu Supabase. Đổi giá trị trong `.env` không tự đổi mật khẩu các tài khoản đã seed. Seed mặc định yêu cầu đổi mật khẩu ở lần đăng nhập đầu; hoàn tất màn đổi mật khẩu rồi vào hợp đồng. Không cần tạo endpoint giả hoặc bỏ `[Authorize]`.
 
 Migration `202611020004_contracts` bổ sung mã hợp đồng, snapshot, metadata tệp, đề nghị hủy, idempotency và dữ liệu bàn giao kết quả hủy. Hai migration cũ giữ nguyên. `DB/data-dictionary/baseline.prisma` đối chiếu schema gốc. Review migration trước khi nhóm áp dụng; backend không tự migrate/seed. Lượt chỉnh sửa này không ghi Supabase.
 

@@ -113,7 +113,9 @@ API mode dùng mật khẩu demo được nhóm chia sẻ riêng, không dùng m
 | `demo.operations.manager` | OperationsManager |
 | `demo.accountant`, `demo.accountant.reviewer` | Accountant |
 | `demo.legal` | LegalStaff |
+| `demo.legal.manager` | LegalManager (Trưởng phòng Pháp chế, trưởng PC, có tab Phân công người duyệt) |
 | `demo.board` | BoardMember |
+| `demo.board.chair` | BoardChair (Tổng Giám đốc, trưởng BGĐ, có tab Phân công người duyệt) |
 | `demo.admin` | SystemAdmin |
 
 Role Accountant hiện có grants rỗng nhưng vẫn đăng nhập được. Tên `.reviewer` không tạo role/quyền riêng. Trên QTKD_DATH, chín tài khoản hiện có đã được reset và bỏ bắt đổi mật khẩu theo phê duyệt riêng ngày 02/11/2026; tài khoản seed trên DB mới vẫn có `mustChangePassword=true`. Đổi `SEED_PASSWORD` trong file không tự đổi mật khẩu đã lưu trong DB.

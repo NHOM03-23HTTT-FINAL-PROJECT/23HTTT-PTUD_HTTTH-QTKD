@@ -1,6 +1,6 @@
 namespace QTKD.Domain.Identity;
 
-public enum UserRole { SalesStaff, SalesManager, OperationsStaff, OperationsManager, Accountant, LegalStaff, BoardMember, SystemAdmin }
+public enum UserRole { SalesStaff, SalesManager, OperationsStaff, OperationsManager, Accountant, LegalStaff, LegalManager, BoardMember, BoardChair, SystemAdmin }
 public enum UserStatus { Active, TemporarilyLocked, Disabled }
 public enum SessionEndReason { Logout, Expired, Revoked }
 

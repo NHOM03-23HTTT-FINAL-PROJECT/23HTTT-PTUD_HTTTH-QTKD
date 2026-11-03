@@ -60,7 +60,7 @@ public partial class PostgresContractStore
                     SELECT u.user_id
                     FROM qtkd.user_account u
                     JOIN qtkd.department bd ON bd.manager_id = u.user_id
-                    WHERE u.role = 'BoardMember' AND u.status = 'Active'
+                    WHERE u.role IN ('BoardMember', 'BoardChair') AND u.status = 'Active'
                     ORDER BY u.user_id
                     LIMIT 1
                 ) b ON true
@@ -128,7 +128,7 @@ public partial class PostgresContractStore
 
             var assignee = Guid.Parse(pending[sales ? "sales_assignee_id" : "board_assignee_id"]!.GetValue<string>());
             if (actor.Id != assignee ||
-                actor.Role != (sales ? "SalesManager" : "BoardMember") ||
+                (sales ? actor.Role != "SalesManager" : actor.Role is not ("BoardMember" or "BoardChair")) ||
                 (sales && actor.ManagedDepartmentId != current.DepartmentId))
             {
                 throw new BusinessException("NOT_ASSIGNEE", 403);

@@ -40,7 +40,7 @@ public class Actor
 
     public bool IsSalesStaff => Role == "SalesStaff";
 
-    public bool CanViewContracts => Role is "SalesStaff" or "SalesManager" or "LegalStaff" or "BoardMember";
+    public bool CanViewContracts => Role is "SalesStaff" or "SalesManager" or "LegalStaff" or "LegalManager" or "BoardMember" or "BoardChair";
 }
 
 public static class ContractRules

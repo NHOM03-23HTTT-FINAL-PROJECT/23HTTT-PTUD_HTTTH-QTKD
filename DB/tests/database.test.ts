@@ -79,7 +79,7 @@ test('all 26 source tables and all 239 active columns are mapped', () => {
 test('valid complete fixture passes without any connection', () => {
   const counts = validateSeedData(fixture());
   assert.equal(Object.keys(counts).length, 29);
-  assert.equal(counts.userAccount, 9);
+  assert.equal(counts.userAccount, 11);
   assert.equal(counts.department, 6);
 });
 

@@ -50,8 +50,8 @@ public static class IdentityCodes
     {
         [UserRole.SalesStaff] = "NV_KD", [UserRole.SalesManager] = "TP_KD",
         [UserRole.OperationsStaff] = "NV_KT", [UserRole.OperationsManager] = "TP_KT",
-        [UserRole.Accountant] = "NV_KTOAN", [UserRole.LegalStaff] = "NV_PC",
-        [UserRole.BoardMember] = "GD", [UserRole.SystemAdmin] = "QTHT"
+        [UserRole.Accountant] = "NV_KTOAN", [UserRole.LegalStaff] = "NV_PC", [UserRole.LegalManager] = "TP_PC",
+        [UserRole.BoardMember] = "GD", [UserRole.BoardChair] = "TGD", [UserRole.SystemAdmin] = "QTHT"
     };
     public static UserRole ParseRole(string? code) => RoleCodes.FirstOrDefault(x => x.Value == code) is var pair
         && code is not null && pair.Value is not null ? pair.Key : throw new IdentityFailure(400, "VALIDATION");

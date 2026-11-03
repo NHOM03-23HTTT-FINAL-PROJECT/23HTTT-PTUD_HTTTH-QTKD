@@ -27,6 +27,8 @@ export const ids = {
   legalStaff: id(2, 7),
   boardMember: id(2, 8),
   admin: id(2, 9),
+  legalManager: id(2, 10),
+  boardChair: id(2, 11),
   customer: id(8),
   suspendedCustomer: id(8, 2),
   port: id(10),
@@ -40,6 +42,9 @@ export const ids = {
   submittedContract: id(14, 2),
   draftContract: id(14, 3),
   appendix: id(14, 4),
+  assignSalesContract: id(14, 5),
+  assignLegalContract: id(14, 6),
+  assignBoardContract: id(14, 7),
   item: id(15),
   price: id(16),
   liftingPrice: id(17),
@@ -51,6 +56,9 @@ export const ids = {
   contractRound: id(24),
   currentRound: id(24, 2),
   paymentRound: id(24, 3),
+  assignSalesRound: id(24, 4),
+  assignLegalRound: id(24, 5),
+  assignBoardRound: id(24, 6),
   contractFile: id(7),
   paymentFile: id(7, 2),
 } as const;
@@ -71,8 +79,8 @@ export function buildSeedData(passwordHash: string) {
       departmentName: 'Kế toán',
       managerId: ids.accountingReviewer,
     },
-    { departmentId: ids.legal, code: 'PC', departmentName: 'Pháp chế', managerId: ids.legalStaff },
-    { departmentId: ids.board, code: 'BGD', departmentName: 'Ban Giám đốc', managerId: ids.boardMember },
+    { departmentId: ids.legal, code: 'PC', departmentName: 'Pháp chế', managerId: ids.legalManager },
+    { departmentId: ids.board, code: 'BGD', departmentName: 'Ban Giám đốc', managerId: ids.boardChair },
     {
       departmentId: ids.adminDepartment,
       code: 'QTHT',
@@ -139,6 +147,20 @@ export function buildSeedData(passwordHash: string) {
       role: 'BoardMember',
     },
     {
+      userId: ids.legalManager,
+      username: 'demo.legal.manager',
+      fullName: 'Đinh Quang Demo',
+      departmentId: ids.legal,
+      role: 'LegalManager',
+    },
+    {
+      userId: ids.boardChair,
+      username: 'demo.board.chair',
+      fullName: 'Lý Tâm Demo',
+      departmentId: ids.board,
+      role: 'BoardChair',
+    },
+    {
       userId: ids.admin,
       username: 'demo.admin',
       fullName: 'Đặng Nam Demo',
@@ -153,7 +175,7 @@ export function buildSeedData(passwordHash: string) {
     status: 'Active' as const,
     failedLoginCount: 0,
     mustChangePassword: true,
-    canSign: user.userId === ids.boardMember,
+    canSign: user.userId === ids.boardMember || user.userId === ids.boardChair,
   })) satisfies Prisma.UserAccountCreateManyInput[];
 
   const customer = [
@@ -305,6 +327,28 @@ export function buildSeedData(passwordHash: string) {
       parentContractId: ids.contract,
       title: 'Phụ lục dự thảo Demo',
       status: 'Draft',
+    },
+    // SYS-CTR-10: hồ sơ để thử tab "Phân công người duyệt" của từng trưởng bộ phận.
+    {
+      ...contractBase,
+      contractId: ids.assignSalesContract,
+      documentType: 'Contract',
+      title: 'Chờ TP Kinh doanh phân công Demo',
+      status: 'Submitted',
+    },
+    {
+      ...contractBase,
+      contractId: ids.assignLegalContract,
+      documentType: 'Contract',
+      title: 'Chờ TP Pháp chế phân công Demo',
+      status: 'UnderReview',
+    },
+    {
+      ...contractBase,
+      contractId: ids.assignBoardContract,
+      documentType: 'Contract',
+      title: 'Chờ Tổng Giám đốc phân công Demo',
+      status: 'UnderReview',
     },
   ] satisfies Prisma.ContractCreateManyInput[];
 
@@ -487,6 +531,24 @@ export function buildSeedData(passwordHash: string) {
         workflow: { version: 1, stages: ['Accountant', 'BoardMember'] },
       },
     },
+    // SYS-CTR-10: lượt đang chạy có bước chưa phân công (assignee_id trống, NotStarted).
+    ...(
+      [
+        [ids.assignSalesRound, ids.assignSalesContract],
+        [ids.assignLegalRound, ids.assignLegalContract],
+        [ids.assignBoardRound, ids.assignBoardContract],
+      ] as const
+    ).map(([roundId, contractId]) => ({
+      roundId,
+      recordType: 'Contract' as const,
+      contractId,
+      recordVersion: 1,
+      roundNo: 1,
+      submittedBy: ids.salesStaff,
+      submittedAt: sentAt,
+      result: 'Running' as const,
+      recordSnapshot: snapshot(contractId),
+    })),
   ] satisfies Prisma.ApprovalRoundCreateManyInput[];
   const approvalStep: Prisma.ApprovalStepCreateManyInput[] = [];
   for (const [roundIndex, roundId, complete] of [
@@ -533,6 +595,53 @@ export function buildSeedData(passwordHash: string) {
       decidedBy: assigneeId,
       decidedAt: at(`2026-11-01T0${index + 3}:00:00Z`),
     }),
+  );
+
+  // SYS-CTR-10 · dữ liệu thử phân công. Thứ tự bước: 1 Rà soát kinh doanh, 2 Pháp chế, 3 Ban Giám đốc.
+  const stepNames = ['Rà soát kinh doanh', 'Rà soát pháp lý', 'Phê duyệt'];
+  const unassigned = (roundId: string, row: number, order: number) => ({
+    stepId: id(25, row),
+    roundId,
+    stepName: stepNames[order - 1],
+    stepOrder: order,
+    stepStatus: 'NotStarted' as const,
+  });
+  const salesApproved = (roundId: string, row: number) => ({
+    stepId: id(25, row),
+    roundId,
+    stepName: stepNames[0],
+    stepOrder: 1,
+    assigneeId: ids.salesManager,
+    assignedAt: sentAt,
+    acceptedAt: sentAt,
+    stepStatus: 'Completed' as const,
+    decision: 'Approve' as const,
+    comment: 'Đồng ý chuyển Pháp chế (dữ liệu thử phân công).',
+    decidedBy: ids.salesManager,
+    decidedAt: at('2026-11-01T04:00:00Z'),
+  });
+  approvalStep.push(
+    // A. Mọi bước chưa phân công → TP Kinh doanh gán bước 1, bước chuyển sang Chờ tiếp nhận.
+    unassigned(ids.assignSalesRound, 9, 1),
+    unassigned(ids.assignSalesRound, 10, 2),
+    unassigned(ids.assignSalesRound, 11, 3),
+    // B. Kinh doanh đã duyệt, Pháp chế chưa có người → TP Pháp chế gán, bước vào Đang rà soát ngay.
+    salesApproved(ids.assignLegalRound, 12),
+    unassigned(ids.assignLegalRound, 13, 2),
+    unassigned(ids.assignLegalRound, 14, 3),
+    // C. Pháp chế đang rà soát (không đổi người được), BGĐ chưa có người → Tổng Giám đốc gán, chờ Pháp chế bàn giao.
+    salesApproved(ids.assignBoardRound, 15),
+    {
+      stepId: id(25, 16),
+      roundId: ids.assignBoardRound,
+      stepName: stepNames[1],
+      stepOrder: 2,
+      assigneeId: ids.legalStaff,
+      assignedAt: at('2026-11-01T04:00:00Z'),
+      acceptedAt: at('2026-11-01T04:00:00Z'),
+      stepStatus: 'Reviewing',
+    },
+    unassigned(ids.assignBoardRound, 17, 3),
   );
 
   return {
