@@ -188,17 +188,21 @@ const TREE_ICON = ['building', 'layers', 'map-pin'] as const;
 export function AreaTreeCard({ nodes }: { nodes: AreaTreeNode[] }) {
   return (
     <PanelCard title="Sơ đồ phân cấp mặt bằng" subtitle="Cảng → Bến/Bãi → Ô/Vị trí" className="area-tree">
-      {nodes.map((node) => (
-        <div
-          key={node.name}
-          className={node.depth === 0 ? 'area-tree__node area-tree__node--root' : 'area-tree__node'}
-          style={{ paddingLeft: node.depth * 22 }}
-        >
-          <Icon name={TREE_ICON[node.depth]} />
-          <span className="area-tree__name">{node.name}</span>
-          {node.badge && <StatusBadge label={node.badge.label} tone={node.badge.tone} />}
-        </div>
-      ))}
+      {nodes.length === 0 ? (
+        <p style={{ padding: '16px', color: 'var(--text-secondary)' }}>Chưa có khu vực nào trong hệ thống.</p>
+      ) : (
+        nodes.map((node) => (
+          <div
+            key={node.name}
+            className={node.depth === 0 ? 'area-tree__node area-tree__node--root' : 'area-tree__node'}
+            style={{ paddingLeft: node.depth * 22 }}
+          >
+            <Icon name={TREE_ICON[node.depth]} />
+            <span className="area-tree__name">{node.name}</span>
+            {node.badge && <StatusBadge label={node.badge.label} tone={node.badge.tone} />}
+          </div>
+        ))
+      )}
     </PanelCard>
   );
 }

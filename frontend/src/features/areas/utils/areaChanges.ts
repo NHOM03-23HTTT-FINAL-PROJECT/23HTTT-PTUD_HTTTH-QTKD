@@ -67,8 +67,19 @@ function display(draft: AreaDraft, field: AreaField): string {
 
 /** Mục lịch sử tạo ra phiên bản hiện hành (Phiên bản 7 · 21/10/2026 15:20 · Lê Minh Tâm). */
 export function currentVersionEntry(area: Area): AreaHistoryEntry {
-  const versioned = area.history.filter((h) => h.kind !== 'assignment' && h.version === area.version);
-  return versioned[versioned.length - 1] ?? area.history[area.history.length - 1];
+  const history = area.history || [];
+  const versioned = history.filter((h) => h.kind !== 'assignment' && h.version === area.version);
+  return (
+    versioned[versioned.length - 1] ??
+    history[history.length - 1] ?? {
+      version: area.version || 1,
+      at: area.createdAt || new Date().toISOString(),
+      by: area.createdBy || 'Hệ thống',
+      byTitle: area.createdByTitle || 'Quản trị viên',
+      action: 'Tạo mới khu vực',
+      kind: 'create',
+    }
+  );
 }
 
 /** Danh sách trường khác bản đang lưu, kèm giá trị trước → sau đã định dạng (cột "Thay đổi chưa lưu", Audit log). */

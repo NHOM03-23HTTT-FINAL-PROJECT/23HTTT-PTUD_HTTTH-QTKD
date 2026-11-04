@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEven
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { useSession } from '@/app/providers/SessionProvider';
+import { sessionStore } from '@/lib/auth/session';
 import { Button, ButtonLink } from '@/components/button/Button';
 import { Pagination } from '@/components/data-table/Pagination';
 import { Alert } from '@/components/feedback/Alert';
@@ -13,14 +14,51 @@ import { LevelBadge } from '../components/HierarchyChain';
 import {
   AREA_PAGE_SIZE,
   AreaSearchError,
+  type Area,
   type AreaListItem,
   type AreaSearchQuery,
   type AreaSearchResult,
   type AreaStatusFilter,
   type AreaTypeCode,
 } from '../types/area';
-import { AREA_STATUS_BADGE, AREA_TYPES, areaIcon, areaTypeLabel, formatAreaNumber, formatCapacity } from '../utils/areaFormat';
+import { AREA_TYPES, areaIcon, areaTypeLabel, formatAreaNumber, formatCapacity, getAreaStatusBadge } from '../utils/areaFormat';
+import { Component, type ErrorInfo, type ReactNode } from 'react';
 import './Areas.css';
+
+
+interface ErrorBoundaryProps {
+  children: ReactNode;
+}
+interface ErrorBoundaryState {
+  hasError: boolean;
+}
+class AreaErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError(): ErrorBoundaryState {
+    return { hasError: true };
+  }
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('AreaErrorBoundary caught error:', error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="area-empty area-empty--inline">
+          <span className="area-empty__icon area-empty__icon--danger">
+            <Icon name="x-circle" />
+          </span>
+          <h3>Không thể kết xuất dữ liệu khu vực</h3>
+          <p>Định dạng dữ liệu không tương thích. Vui lòng thử lại hoặc tải lại trang.</p>
+          <Button onClick={() => this.setState({ hasError: false })}>Thử lại</Button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 type LookupVariant = 'list' | 'lookup' | 'hierarchy';
 type ViewMode = 'table' | 'tree';
@@ -94,7 +132,13 @@ export function AreaLookupPage({ variant }: { variant: LookupVariant }) {
   const lastResult = useRef<AreaSearchResult | null>(null);
   const requestId = useRef(0);
   const searchInput = useRef<HTMLInputElement>(null);
-  const parentOptions = useMemo(() => areasApi.getTree().filter((a) => a.level < 3), []);
+  const [tree, setTree] = useState<Area[]>(() => areasApi.getTree());
+  useEffect(() => {
+    areasApi.fetchTreeAsync?.().then((t) => {
+      if (t?.length) setTree(t);
+    });
+  }, []);
+  const parentOptions = useMemo(() => tree.filter((a) => a.level < 3), [tree]);
 
   useEffect(() => setDraft(query.keyword), [query.keyword]);
 
@@ -119,7 +163,7 @@ export function AreaLookupPage({ variant }: { variant: LookupVariant }) {
       })
       .catch((error) => {
         if (id !== requestId.current) return;
-        if (error instanceof AreaSearchError && error.code === 'SESSION_ENDED') endSession(error.sessionStatus ?? 'expired');
+        if (error instanceof AreaSearchError && error.code === 'SESSION_ENDED' && sessionStore.isSignedOut()) endSession(error.sessionStatus ?? 'expired');
         else if (error instanceof AreaSearchError && error.code === 'FORBIDDEN') setState({ kind: 'forbidden' });
         else setState({ kind: 'error' });
       });
@@ -331,10 +375,10 @@ export function AreaLookupPage({ variant }: { variant: LookupVariant }) {
           )}
 
           {state.kind !== 'error' && shown && shown.total > 0 && view === 'table' && (
-            <LookupTable rows={shown.items} onOpen={(code) => navigate(ROUTES.areaDetail(code))} />
+            <AreaErrorBoundary><LookupTable rows={shown.items} onOpen={(code) => navigate(ROUTES.areaDetail(code))} /></AreaErrorBoundary>
           )}
           {state.kind !== 'error' && shown && shown.total > 0 && view === 'tree' && (
-            <LookupTree key={queryKey} result={shown} expandAll={filtered} onOpen={(code) => navigate(ROUTES.areaDetail(code))} />
+            <AreaErrorBoundary><LookupTree key={queryKey} result={shown} expandAll={filtered} onOpen={(code) => navigate(ROUTES.areaDetail(code))} /></AreaErrorBoundary>
           )}
         </section>
       )}
@@ -409,7 +453,7 @@ function LookupTable({ rows, onOpen }: { rows: AreaListItem[]; onOpen: (code: st
               <td>{formatCapacity(row.capacity, row.capacityUnit)}</td>
               <td>{row.childCount}</td>
               <td>
-                <StatusBadge label={AREA_STATUS_BADGE[row.status].label} tone={AREA_STATUS_BADGE[row.status].tone} />
+                {(() => { const b = getAreaStatusBadge(row.status); return <StatusBadge label={b.label} tone={b.tone} />; })()}
               </td>
             </tr>
           ))}
@@ -460,8 +504,12 @@ function LookupTree({ result, expandAll, onOpen }: LookupTreeProps) {
   }
 
   const rows: { area: AreaListItem; depth: number }[] = [];
+  const visitedNodes = new Set<string>();
   const visit = (parent: string | null, depth: number) => {
+    if (depth > 10) return;
     for (const area of nodes.byParent.get(parent) ?? []) {
+      if (visitedNodes.has(area.code)) continue;
+      visitedNodes.add(area.code);
       rows.push({ area, depth });
       if (expanded.has(area.code)) visit(area.code, depth + 1);
     }
@@ -518,7 +566,7 @@ function LookupTree({ result, expandAll, onOpen }: LookupTreeProps) {
                 <td>{formatCapacity(area.capacity, area.capacityUnit)}</td>
                 <td>{area.childCount}</td>
                 <td>
-                  <StatusBadge label={AREA_STATUS_BADGE[area.status].label} tone={AREA_STATUS_BADGE[area.status].tone} />
+                  {(() => { const b = getAreaStatusBadge(area.status); return <StatusBadge label={b.label} tone={b.tone} />; })()}
                 </td>
               </tr>
             );

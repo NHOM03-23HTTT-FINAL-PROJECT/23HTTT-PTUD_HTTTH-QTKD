@@ -60,12 +60,13 @@ type IconProps = {
 };
 
 export function Icon({ name, size = 20, className, title }: IconProps) {
-  const [outer, inner] = ICON_LAYOUT[name];
-  const url = svgUrls[`../../assets/icons/${name}.svg`];
+  const layout = (name && ICON_LAYOUT[name]) || ICON_LAYOUT['grid'];
+  const [outer, inner] = layout;
+  const url = (name && svgUrls[`../../assets/icons/${name}.svg`]) || svgUrls['../../assets/icons/grid.svg'];
   const glyphStyle: CSSProperties = {
     inset: inner,
-    WebkitMaskImage: `url("${url}")`,
-    maskImage: `url("${url}")`,
+    WebkitMaskImage: url ? `url("${url}")` : undefined,
+    maskImage: url ? `url("${url}")` : undefined,
   };
 
   return (

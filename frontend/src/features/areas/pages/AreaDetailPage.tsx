@@ -39,7 +39,7 @@ import type {
   AreaStatus,
 } from '../types/area';
 import { AREA_FIELD_LABELS, currentVersionEntry } from '../utils/areaChanges';
-import { AREA_STATUS_BADGE, areaTypeLabel, formatAreaSize, formatCapacity } from '../utils/areaFormat';
+import { areaTypeLabel, formatAreaSize, formatCapacity, getAreaStatusBadge } from '../utils/areaFormat';
 import { ancestryOf, childrenOf } from '../utils/areaHierarchy';
 import './Areas.css';
 
@@ -75,10 +75,29 @@ const TABS: { key: TabKey; label: string; group?: AreaRecordGroup }[] = [
  */
 export function AreaDetailPage() {
   const { code = '' } = useParams();
-  const area = areasApi.getArea(code);
+  const [area, setArea] = useState<Area | null | undefined>(() => areasApi.getArea(code));
+  const [loading, setLoading] = useState(() => !area);
+
+  useEffect(() => {
+    let active = true;
+    areasApi.getOperationCatalogsAsync().catch(() => undefined);
+    areasApi.fetchAreaAsync(code).then((fetched) => {
+      if (active) {
+        if (fetched) setArea(fetched);
+        setLoading(false);
+      }
+    }).catch(() => {
+      if (active) setLoading(false);
+    });
+    return () => { active = false; };
+  }, [code]);
+
+  if (loading) {
+    return <div style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>Đang tải dữ liệu khu vực...</div>;
+  }
   if (!area) return <AreaNotFound />;
   // key theo phiên bản để làm mới toàn bộ trang sau khi cập nhật.
-  return <AreaProfile key={`${area.id}-${area.version}`} area={area} />;
+  return <AreaProfile key={`${area.id}-${area.version}`} area={area} onUpdateArea={setArea} />;
 }
 
 /** 13.10 · Không hiển thị tên hay chi tiết hồ sơ khi AreaId không hợp lệ hoặc đã bị gỡ. */
@@ -110,7 +129,7 @@ export function AreaNotFound() {
   );
 }
 
-function AreaProfile({ area }: { area: Area }) {
+function AreaProfile({ area, onUpdateArea }: { area: Area; onUpdateArea?: (next: Area) => void }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { can } = useAuth();
@@ -151,12 +170,16 @@ function AreaProfile({ area }: { area: Area }) {
     setOperation(null);
     records.retry(group);
     showToast({ title, description });
+    areasApi.fetchAreaAsync(area.code).then((fresh) => {
+      if (fresh) onUpdateArea?.(fresh);
+    });
     navigate(`${location.pathname}${location.search}`, { replace: true, state: location.state });
   }
 
-  const badge = AREA_STATUS_BADGE[area.status];
+  const badge = getAreaStatusBadge(area.status);
   const versionEntry = currentVersionEntry(area);
-  const lastEntry = area.history[area.history.length - 1];
+  const history = area.history || [];
+  const lastEntry = history.length > 0 ? history[history.length - 1] : null;
   const openArea = (code: string) => navigate(ROUTES.areaDetail(code));
 
   function tabCount(key: TabKey, group?: AreaRecordGroup): number | undefined {
@@ -363,9 +386,13 @@ function AreaProfile({ area }: { area: Area }) {
                 <div className="side-card__item">
                   <span className="side-card__label">Nhật ký gần nhất (ARE-11)</span>
                   <span className="side-card__value">
-                    {lastEntry.changes?.length
-                      ? `${lastEntry.action}: ${lastEntry.changes.map((c) => AREA_FIELD_LABELS[c.field].toLowerCase()).join(', ')}`
-                      : `${lastEntry.action} – ${lastEntry.detail}`}
+                    {lastEntry ? (
+                      lastEntry.changes?.length
+                        ? `${lastEntry.action}: ${lastEntry.changes.map((c) => (AREA_FIELD_LABELS[c.field] || c.field).toLowerCase()).join(', ')}`
+                        : `${lastEntry.action}${lastEntry.detail ? ` – ${lastEntry.detail}` : ''}`
+                    ) : (
+                      `Tạo mới khu vực lúc ${formatDateTime(area.createdAt)}`
+                    )}
                   </span>
                 </div>
               </section>
@@ -400,6 +427,7 @@ function AreaProfile({ area }: { area: Area }) {
           onClose={() => setChangingParent(false)}
           onChanged={(result) => {
             setChangingParent(false);
+            if (result.area) onUpdateArea?.(result.area);
             const next: AreaDetailState = {
               replayed: result.replayed,
               hierarchy: { changes: result.changes, previousParent: result.previousParent },
@@ -415,7 +443,7 @@ function AreaProfile({ area }: { area: Area }) {
           current={records.state.staff.status === 'ok' ? records.state.staff.data : []}
           onClose={() => setOperation(null)}
           onDone={(person) => {
-            afterOperation('staff', 'Đã phân công nhân sự', `${person.name} phụ trách ${area.code} – ${person.shift}.`);
+            afterOperation('staff', 'Đã phân công nhân sự', `${person.name} phụ trách ${area.code}.`);
             selectTab('nhan-su');
           }}
         />
@@ -450,8 +478,13 @@ function AreaProfile({ area }: { area: Area }) {
           onClose={() => setOperation(null)}
           onDone={(next) => {
             setOperation(null);
-            const entry = next.history[next.history.length - 1];
-            const state: AreaDetailState = { statusChanged: { status: next.status, reason: entry.reason ?? '' } };
+            onUpdateArea?.(next);
+            const entry = next.history?.length ? next.history[next.history.length - 1] : null;
+            const state: AreaDetailState = { statusChanged: { status: next.status, reason: entry?.reason ?? '' } };
+            showToast({
+              title: next.status === 'suspended' ? 'Đã tạm ngưng khu vực' : 'Đã mở lại hoạt động',
+              description: `${next.name} (${next.code}) đã chuyển sang trạng thái ${next.status === 'suspended' ? 'Tạm ngưng' : 'Hoạt động'}.`,
+            });
             navigate(ROUTES.areaDetail(area.code), { replace: true, state });
           }}
         />

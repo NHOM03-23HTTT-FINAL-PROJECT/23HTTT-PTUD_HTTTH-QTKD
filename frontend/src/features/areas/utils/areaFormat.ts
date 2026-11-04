@@ -1,6 +1,6 @@
 import type { BadgeTone } from '@/components/status-badge/StatusBadge';
 import type { IconName } from '@/components/icon/Icon';
-import type { Area, AreaReferences, AreaStatus, AreaTypeCode, CapacityUnit } from '../types/area';
+import type { Area, AreaReferences, AreaTypeCode, CapacityUnit } from '../types/area';
 
 /** Danh mục loại mặt bằng (ghi chú 01.1: Cảng, Cầu bến, Bãi CY, Kho CFS, Bãi phụ…). */
 export const AREA_TYPES: { value: AreaTypeCode; label: string }[] = [
@@ -19,14 +19,40 @@ export const CAPACITY_UNITS: { value: CapacityUnit; label: string }[] = [
 
 const TYPE_LABEL = Object.fromEntries(AREA_TYPES.map((t) => [t.value, t.label])) as Record<AreaTypeCode, string>;
 
-export function areaTypeLabel(type: AreaTypeCode): string {
-  return TYPE_LABEL[type];
+/**
+ * Chuẩn hóa giá trị loại mặt bằng từ DB/API (tiếng Việt hoặc enum code) về AreaTypeCode.
+ */
+export function normalizeAreaType(type: string | undefined | null): AreaTypeCode {
+  if (!type) return 'BAI_CY';
+  const clean = type.trim().toUpperCase().replace(/[\s-]+/g, '_');
+  if (clean === 'CẢNG' || clean === 'CANG' || clean.includes('PORT')) return 'CANG';
+  if (clean.includes('CẦU') || clean.includes('BEN') || clean.includes('CAU_BEN') || clean.includes('BERTH')) return 'CAU_BEN';
+  if (clean.includes('CY') || clean.includes('BAI_CY') || clean.includes('YARD')) return 'BAI_CY';
+  if (clean.includes('CFS') || clean.includes('KHO_CFS')) return 'KHO_CFS';
+  if (clean.includes('LANH') || clean.includes('KHO_LANH') || clean.includes('COLD')) return 'KHO_LANH';
+  if (clean.includes('PHU') || clean.includes('BAI_PHU') || clean.includes('BLOCK')) return 'BAI_PHU';
+  return (clean in TYPE_ICON) ? (clean as AreaTypeCode) : 'BAI_CY';
 }
 
-export const AREA_STATUS_BADGE: Record<AreaStatus, { label: string; tone: BadgeTone }> = {
+export function areaTypeLabel(type: AreaTypeCode | string): string {
+  if (!type) return '—';
+  if (type in TYPE_LABEL) return TYPE_LABEL[type as AreaTypeCode];
+  const normalized = normalizeAreaType(type);
+  return TYPE_LABEL[normalized] ?? String(type);
+}
+
+export const AREA_STATUS_BADGE: Record<string, { label: string; tone: BadgeTone }> = {
   active: { label: 'Hoạt động', tone: 'success' },
   suspended: { label: 'Tạm ngưng', tone: 'warning' },
 };
+
+export function getAreaStatusBadge(status: string | undefined | null): { label: string; tone: BadgeTone } {
+  const key = String(status ?? '').toLowerCase().trim();
+  if (key === 'suspended' || key === 'tạm ngưng' || key === 'tam_ngung') {
+    return AREA_STATUS_BADGE.suspended;
+  }
+  return AREA_STATUS_BADGE.active;
+}
 
 const TYPE_ICON: Record<AreaTypeCode, IconName> = {
   CANG: 'building',
@@ -39,7 +65,9 @@ const TYPE_ICON: Record<AreaTypeCode, IconName> = {
 
 /** Biểu tượng trên cây sơ đồ: phân khu Cấp 3 dùng "layers" như frame 02.1. */
 export function areaIcon(area: Pick<Area, 'type' | 'level'>): IconName {
-  return area.level === 3 ? 'layers' : TYPE_ICON[area.type];
+  if (area.level === 3) return 'layers';
+  const code = normalizeAreaType(area.type);
+  return TYPE_ICON[code] ?? 'grid';
 }
 
 /** "4 bảng giá · 6 hợp đồng · 12 kỳ sản lượng" – bỏ nhóm bằng 0; null khi chưa có tham chiếu (04.1 / 04.8). */

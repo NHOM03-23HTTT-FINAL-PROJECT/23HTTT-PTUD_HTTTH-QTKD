@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { useSession, useUnsavedChanges } from '@/app/providers/SessionProvider';
@@ -18,7 +18,7 @@ import { ParentAreaPicker } from '../components/ParentAreaPicker';
 import { useEditAreaForm, type EditAreaAlert } from '../hooks/useEditAreaForm';
 import type { Area, AreaConflict, AreaField, AreaTypeCode, CapacityUnit } from '../types/area';
 import { AREA_FIELD_LABELS, currentVersionEntry, diffAreaDraft, toAreaDraft } from '../utils/areaChanges';
-import { AREA_STATUS_BADGE, AREA_TYPES, CAPACITY_UNITS, describeReferences } from '../utils/areaFormat';
+import { AREA_TYPES, CAPACITY_UNITS, describeReferences, getAreaStatusBadge } from '../utils/areaFormat';
 import { levelUnder, pathUnder } from '../utils/areaHierarchy';
 import { AREA_CODE_MAX_LENGTH, AREA_NAME_MAX_LENGTH } from '../utils/areaValidation';
 import { AreaNotFound, type AreaDetailState } from './AreaDetailPage';
@@ -35,9 +35,27 @@ const OUT_OF_SCOPE_NOTES = [
 /** UC-ARE-04 · Cập nhật thông tin và quy chuẩn kỹ thuật khu vực (04.1 → 04.8), mở từ "Chỉnh sửa ▾" tại chi tiết khu vực. */
 export function AreaEditPage() {
   const { code = '' } = useParams();
-  const area = areasApi.getArea(code);
+  const [area, setArea] = useState<Area | null | undefined>(() => areasApi.getArea(code));
+  const [loading, setLoading] = useState(() => !area);
+
+  useEffect(() => {
+    let active = true;
+    areasApi.fetchAreaAsync(code).then((fetched) => {
+      if (active) {
+        if (fetched) setArea(fetched);
+        setLoading(false);
+      }
+    }).catch(() => {
+      if (active) setLoading(false);
+    });
+    return () => { active = false; };
+  }, [code]);
+
+  if (loading) {
+    return <div style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>Đang tải dữ liệu khu vực...</div>;
+  }
   if (!area) return <AreaNotFound />;
-  return <EditAreaForm key={area.id} area={area} />;
+  return <EditAreaForm key={`${area.id}-${area.version}`} area={area} />;
 }
 
 function EditAreaForm({ area }: { area: Area }) {
@@ -70,7 +88,7 @@ function EditAreaForm({ area }: { area: Area }) {
   const changed = useMemo(() => new Set<AreaField>(changes.map((c) => c.field)), [changes]);
   const before = (field: AreaField) => changes.find((c) => c.field === field)?.before;
   const versionEntry = currentVersionEntry(original);
-  const badge = AREA_STATUS_BADGE[original.status];
+  const badge = getAreaStatusBadge(original.status);
 
   if (!user) return null;
 

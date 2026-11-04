@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { useSession } from '@/app/providers/SessionProvider';
 import { Button } from '@/components/button/Button';
@@ -56,11 +56,14 @@ function useOperation() {
 type StaffAssignDialogProps = { area: Area; current: AreaStaff[]; onClose: () => void; onDone: (person: AreaStaff) => void };
 
 export function StaffAssignDialog({ area, current, onClose, onDone }: StaffAssignDialogProps) {
-  const catalog = useMemo(() => areasApi.getOperationCatalogs().staff, []);
-  const available = catalog.filter((s) => !current.some((c) => c.staffCode === s.staffCode));
+  const [catalog, setCatalog] = useState(() => areasApi.getOperationCatalogs().staff);
+  useEffect(() => {
+    areasApi.getOperationCatalogsAsync?.().then((res) => {
+      if (res?.staff) setCatalog(res.staff);
+    });
+  }, []);
+  const available = useMemo(() => catalog.filter((s) => !current.some((c) => c.staffCode === s.staffCode)), [catalog, current]);
   const [staffCode, setStaffCode] = useState('');
-  const [title, setTitle] = useState('');
-  const [shift, setShift] = useState('');
   const [since, setSince] = useState(todayIso());
   const [attempted, setAttempted] = useState(false);
   const { busy, error, run } = useOperation();
@@ -68,18 +71,16 @@ export function StaffAssignDialog({ area, current, onClose, onDone }: StaffAssig
   const errors = attempted
     ? {
         staff: staffCode ? undefined : 'Vui lòng chọn nhân viên.',
-        title: title.trim() ? undefined : 'Vui lòng nhập chức danh tại khu vực.',
-        shift: shift ? undefined : 'Vui lòng chọn ca trực.',
         since: since ? undefined : 'Vui lòng chọn ngày bắt đầu phụ trách.',
       }
     : {};
 
   async function save() {
     setAttempted(true);
-    if (!staffCode || !title.trim() || !shift || !since) return;
+    if (!staffCode || !since) return;
     let assigned: AreaStaff | null = null;
     const ok = await run(async (id) => {
-      assigned = await areasApi.assignStaff({ ...id, code: area.code, staffCode, title, shift, since });
+      assigned = await areasApi.assignStaff({ ...id, code: area.code, staffCode, since });
     });
     if (ok && assigned) onDone(assigned);
   }
@@ -102,7 +103,7 @@ export function StaffAssignDialog({ area, current, onClose, onDone }: StaffAssig
       }
     >
       <p className="dialog__body">
-        Giao cán bộ Khai thác phụ trách {area.name} ({area.code}) theo ca trực. Thao tác được ghi vào lịch sử biến động của khu vực.
+        Giao cán bộ Khai thác phụ trách {area.name} ({area.code}). Thao tác được ghi vào lịch sử biến động của khu vực.
       </p>
       {error && <Alert tone="danger" title="Chưa phân công được">{error}</Alert>}
       <div className="operation-form">
@@ -114,22 +115,7 @@ export function StaffAssignDialog({ area, current, onClose, onDone }: StaffAssig
           value={staffCode}
           error={errors.staff}
           disabled={busy || available.length === 0}
-          onChange={(value) => {
-            setStaffCode(value);
-            const picked = catalog.find((s) => s.staffCode === value);
-            if (picked && !title.trim()) setTitle(picked.defaultTitle);
-          }}
-        />
-        <InputField label="Chức danh tại khu vực" required value={title} error={errors.title} disabled={busy} onChange={(e) => setTitle(e.target.value)} />
-        <SelectField
-          label="Ca trực"
-          required
-          placeholder="Chọn ca trực"
-          options={SHIFTS.map((s) => ({ value: s, label: s }))}
-          value={shift}
-          error={errors.shift}
-          disabled={busy}
-          onChange={setShift}
+          onChange={(value) => setStaffCode(value)}
         />
         <InputField label="Phụ trách từ ngày" required type="date" value={since} error={errors.since} disabled={busy} onChange={(e) => setSince(e.target.value)} />
       </div>
@@ -191,15 +177,20 @@ export function EndStaffDialog({ area, person, onClose, onDone }: EndStaffDialog
 type ServicesDialogProps = { area: Area; current: AreaService[]; onClose: () => void; onDone: (summary: string) => void };
 
 export function ServicesDialog({ area, current, onClose, onDone }: ServicesDialogProps) {
-  const catalog = useMemo(() => areasApi.getOperationCatalogs().services, []);
+  const [catalog, setCatalog] = useState(() => areasApi.getOperationCatalogs().services);
+  useEffect(() => {
+    areasApi.getOperationCatalogsAsync?.().then((res) => {
+      if (res?.services) setCatalog(res.services);
+    });
+  }, []);
   const [selected, setSelected] = useState<Set<string>>(() => new Set(current.map((s) => s.name)));
   const [since, setSince] = useState(todayIso());
   const [reason, setReason] = useState('');
   const { busy, error, run } = useOperation();
 
-  const added = [...selected].filter((n) => !current.some((s) => s.name === n));
-  const removed = current.filter((s) => !selected.has(s.name));
-  const groups = [...new Set(catalog.map((s) => s.group))];
+  const added = useMemo(() => [...selected].filter((n) => !current.some((s) => s.name === n)), [selected, current]);
+  const removed = useMemo(() => current.filter((s) => !selected.has(s.name)), [selected, current]);
+  const groups = useMemo(() => [...new Set(catalog.map((s) => s.group))], [catalog]);
 
   function toggle(name: string) {
     setSelected((value) => {
@@ -243,12 +234,10 @@ export function ServicesDialog({ area, current, onClose, onDone }: ServicesDialo
         </Alert>
       )}
       <div className="operation-services">
-        {groups.map((group) => (
-          <div key={group} className="operation-services__group" role="group" aria-label={group}>
-            <span className="operation-services__title">{group}</span>
-            {catalog
-              .filter((s) => s.group === group)
-              .map((service) => {
+        {groups.length <= 1 ? (
+          <div className="operation-services__group" role="group">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '0.75rem' }}>
+              {catalog.map((service) => {
                 const on = selected.has(service.name);
                 return (
                   <label key={service.name} className="export-sections__item">
@@ -263,8 +252,32 @@ export function ServicesDialog({ area, current, onClose, onDone }: ServicesDialo
                   </label>
                 );
               })}
+            </div>
           </div>
-        ))}
+        ) : (
+          groups.map((group) => (
+            <div key={group} className="operation-services__group" role="group" aria-label={group}>
+              <span className="operation-services__title">{group}</span>
+              {catalog
+                .filter((s) => s.group === group)
+                .map((service) => {
+                  const on = selected.has(service.name);
+                  return (
+                    <label key={service.name} className="export-sections__item">
+                      <input type="checkbox" checked={on} disabled={busy} onChange={() => toggle(service.name)} />
+                      <span className={on ? 'export-sections__box export-sections__box--on' : 'export-sections__box'} aria-hidden>
+                        {on && <Icon name="check" size={14} />}
+                      </span>
+                      <span className="operation-services__name">
+                        {service.name}
+                        <small>{service.unit}</small>
+                      </span>
+                    </label>
+                  );
+                })}
+            </div>
+          ))
+        )}
       </div>
       <div className="operation-form">
         <InputField

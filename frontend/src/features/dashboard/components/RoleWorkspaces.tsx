@@ -14,7 +14,7 @@ import {
   SALES_DASHBOARD,
 } from '@/mocks/seed/dashboards';
 import { formatDateTime } from '@/utils/format';
-import type { ApprovalRow, AreaRow, ContractRow, LegalReviewRow, UserRow } from '../types/dashboard';
+import type { ApprovalRow, AreaRow, AreaTreeNode, ContractRow, LegalReviewRow, UserRow } from '../types/dashboard';
 import {
   ActivityCard,
   AreaTreeCard,
@@ -82,24 +82,33 @@ export function SalesWorkspace() {
 /* ---------- 05.2 · Khai thác ---------- */
 
 const AREA_COLUMNS: Column<AreaRow>[] = [
-  { key: 'code', header: 'Mã khu vực', width: 120, render: (r) => <CodeLink code={r.code} to="/khu-vuc" /> },
+  { key: 'code', header: 'Mã khu vực', width: 120, render: (r) => <CodeLink code={r.code} to={`/khu-vuc/${encodeURIComponent(r.code)}`} /> },
   { key: 'name', header: 'Tên khu vực', render: (r) => <Stack primary={r.name} secondary={r.change} /> },
   { key: 'level', header: 'Cấp', width: 70, render: (r) => r.level },
   { key: 'parent', header: 'Khu vực cha', width: 170, render: (r) => r.parent },
   { key: 'status', header: 'Trạng thái', width: 110, align: 'end', render: (r) => <StatusBadge label={r.status.label} tone={r.status.tone} /> },
 ];
 
-export function OperationsWorkspace() {
+export function OperationsWorkspace({
+  areas,
+  areaTree,
+}: {
+  areas?: AreaRow[];
+  areaTree?: AreaTreeNode[];
+} = {}) {
   const data = OPERATIONS_DASHBOARD;
+  const currentAreas = areas ?? data.areas;
+  const currentTree = areaTree ?? data.areaTree;
+
   return (
     <div className="dash-main">
       <div className="dash-main__primary">
         <TableCard title="Khu vực cập nhật gần đây" subtitle="Tạo mới hoặc chỉnh sửa thông số trong 7 ngày qua" viewAllTo="/khu-vuc">
-          <DataTable columns={AREA_COLUMNS} rows={data.areas} rowKey={(r) => r.code} />
+          <DataTable columns={AREA_COLUMNS} rows={currentAreas} rowKey={(r) => r.code} />
         </TableCard>
       </div>
       <div className="dash-main__side">
-        <AreaTreeCard nodes={data.areaTree} />
+        <AreaTreeCard nodes={currentTree} />
       </div>
     </div>
   );
