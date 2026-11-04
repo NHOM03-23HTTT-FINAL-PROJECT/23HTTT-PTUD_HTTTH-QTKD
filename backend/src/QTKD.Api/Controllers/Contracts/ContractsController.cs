@@ -23,6 +23,7 @@ public class ContractsController : ControllerBase
     }
 
     [HttpGet("form-options")]
+    [Authorize(Policy = "customers.view")]
     public async Task<System.Text.Json.Nodes.JsonObject> Options(CancellationToken ct) =>
         await _service.Options(await _actor.Get(ct), ct);
 
@@ -45,6 +46,7 @@ public class ContractsController : ControllerBase
 
     [HttpPost]
     [Authorize(Policy = "contracts.create")]
+    [Authorize(Policy = "customers.view")]
     public async Task<System.Text.Json.Nodes.JsonObject> Create(
         CreateContract request,
         CancellationToken ct
@@ -54,6 +56,7 @@ public class ContractsController : ControllerBase
 
     [HttpPut("{code}")]
     [Authorize(Policy = "contracts.create")]
+    [Authorize(Policy = "customers.view")]
     public async Task<System.Text.Json.Nodes.JsonObject> Update(
         string code,
         UpdateContract request,

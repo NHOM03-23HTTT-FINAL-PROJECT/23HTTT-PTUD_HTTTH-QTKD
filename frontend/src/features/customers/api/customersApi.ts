@@ -38,7 +38,7 @@ export const customersApi = {
         return await apiRequest('/customers', { method: 'POST', headers: { 'Idempotency-Key': request.idempotencyKey }, body: JSON.stringify({ draft: request.draft }) });
       } catch (error) {
         if (error instanceof ApiError) {
-          if (error.code === 'DUPLICATE_TAX_CODE') throw new CreateCustomerError('DUPLICATE_TAX_CODE', { existing: { taxCode: request.draft.taxCode.trim(), code: '', name: '', status: 'active' } });
+          if (error.code === 'DUPLICATE_TAX_CODE') throw new CreateCustomerError('DUPLICATE_TAX_CODE', { existing: { taxCode: request.draft.taxCode.trim() } });
           if (error.code === 'IDEMPOTENCY_KEY_REUSED') throw new CreateCustomerError('IDEMPOTENCY_KEY_REUSED');
           if (error.status === 401) throw new CreateCustomerError('SESSION_ENDED');
           if (error.status === 403) throw new CreateCustomerError('FORBIDDEN');

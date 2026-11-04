@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth, type CurrentUser } from '@/app/providers/AuthProvider';
 import { SessionProvider } from '@/app/providers/SessionProvider';
@@ -12,15 +13,28 @@ import './MainLayout.css';
 /** App shell sau đăng nhập: Topbar + Sidebar theo vai trò + vùng làm việc (frame 05.x). */
 export function MainLayout() {
   const { user } = useAuth();
+  const { pathname } = useLocation();
+  const [navOpen, setNavOpen] = useState(false);
+  const navToggle = useRef<HTMLButtonElement>(null);
+  useEffect(() => setNavOpen(false), [pathname]);
+  useEffect(() => {
+    if (!navOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { setNavOpen(false); navToggle.current?.focus(); }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [navOpen]);
   if (!user) return null;
   const workspace = user.departmentInfo.workspace;
 
   return (
     <SessionProvider user={user}>
       <div className="app-shell" data-accent={workspace}>
-        <Topbar user={user} />
+        <Topbar user={user} navOpen={navOpen} navToggle={navToggle} onToggleNav={() => setNavOpen((open) => !open)} />
         <div className="app-shell__body">
-          <Sidebar user={user} />
+          {navOpen && <button type="button" className="mobile-nav-backdrop" aria-hidden="true" tabIndex={-1} onClick={() => setNavOpen(false)} />}
+          <Sidebar user={user} open={navOpen} onNavigate={() => setNavOpen(false)} />
           <main className="app-shell__workspace">
             <Outlet />
           </main>
@@ -30,12 +44,17 @@ export function MainLayout() {
   );
 }
 
-function Topbar({ user }: { user: CurrentUser }) {
+function Topbar({ user, navOpen, navToggle, onToggleNav }: { user: CurrentUser; navOpen: boolean;
+  navToggle: RefObject<HTMLButtonElement>; onToggleNav: () => void }) {
   const workspace = user.departmentInfo.workspace;
   const hasUnread = IS_MOCK_AUTH && getUnreadCount(workspace) > 0;
 
   return (
     <header className="topbar">
+      <button ref={navToggle} type="button" className="topbar__menu" aria-controls="app-navigation"
+        aria-expanded={navOpen} aria-label={navOpen ? 'Đóng menu điều hướng' : 'Mở menu điều hướng'} onClick={onToggleNav}>
+        <Icon name={navOpen ? 'x' : 'list'} />
+      </button>
       <NavLink to={ROUTES.dashboard} className="topbar__logo">
         <span className="topbar__mark">
           <Icon name="layers" />
@@ -72,7 +91,7 @@ function Topbar({ user }: { user: CurrentUser }) {
 }
 
 /** "Đổi mật khẩu" và "Đăng xuất" nằm trong menu tài khoản trên Topbar, không lặp lại ở Sidebar. */
-function Sidebar({ user }: { user: CurrentUser }) {
+function Sidebar({ user, open, onNavigate }: { user: CurrentUser; open: boolean; onNavigate: () => void }) {
   const areaRecordNavPath = user.departmentInfo.workspace === 'khai-thac' ? ROUTES.areas : ROUTES.areaLookup;
   const groups = WORKSPACE_NAV[user.departmentInfo.workspace]
     .map((group) => ({
@@ -82,7 +101,8 @@ function Sidebar({ user }: { user: CurrentUser }) {
     .filter((group) => group.items.length > 0);
 
   return (
-    <nav className="sidebar" aria-label="Điều hướng chính">
+    <nav id="app-navigation" className={open ? 'sidebar sidebar--open' : 'sidebar'} aria-label="Điều hướng chính"
+      onClick={(event) => { if ((event.target as Element).closest('a')) onNavigate(); }}>
       <p className="sidebar__group">TỔNG QUAN</p>
       <SidebarLink item={{ label: 'Bảng điều khiển', path: ROUTES.dashboard, icon: 'grid', module: '' }} />
 

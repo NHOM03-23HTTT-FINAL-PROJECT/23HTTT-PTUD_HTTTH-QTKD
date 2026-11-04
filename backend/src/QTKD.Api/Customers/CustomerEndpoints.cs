@@ -56,8 +56,10 @@ public static class CustomerEndpoints
         api.MapGet("/{code}/records/{group}", async (string code, string group, HttpContext context, CustomerService service, IIdentityService identity, CancellationToken ct) =>
         {
             await service.Get(Actor(context), code, ct);
-            var permission = group switch { "contracts" => "contracts.view", "payments" => "payments.view", "priceLists" => null, _ => throw new CustomerFailure(404, "NOT_FOUND") };
-            if (permission is null || !await identity.HasPermission(Actor(context), permission, ct)) throw new CustomerFailure(403, "FORBIDDEN");
+            // No price-list access policy or source is integrated yet; reveal no records.
+            if (group == "priceLists") throw new CustomerFailure(503, "SOURCE_UNAVAILABLE");
+            var permission = group switch { "contracts" => "contracts.view", "payments" => "payments.view", _ => throw new CustomerFailure(404, "NOT_FOUND") };
+            if (!await identity.HasPermission(Actor(context), permission, ct)) throw new CustomerFailure(403, "FORBIDDEN");
             throw new CustomerFailure(503, "SOURCE_UNAVAILABLE");
         }).RequireAuthorization("customers.view");
     }

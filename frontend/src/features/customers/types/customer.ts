@@ -91,7 +91,7 @@ export type CreateCustomerResult = {
   replayed: boolean;
 };
 
-export type DuplicateCustomer = Pick<Customer, 'code' | 'name' | 'status' | 'taxCode'>;
+export type DuplicateCustomer = Pick<Customer, 'taxCode'> & Partial<Pick<Customer, 'code' | 'name' | 'status'>>;
 
 export type CreateCustomerErrorCode =
   | 'VALIDATION' // A5.1 / A5.2 / A5.4 / A5.5 – BE kiểm tra lại

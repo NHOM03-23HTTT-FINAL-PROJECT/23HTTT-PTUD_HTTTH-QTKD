@@ -286,14 +286,15 @@ function CreateCustomerAlertBanner({ alert, canViewExisting, retrying, onOpenExi
       );
     case 'duplicate': {
       const { existing } = alert;
+      const existingCode = existing.code;
       const suspended = existing.status === 'suspended';
       return (
         <Alert
           tone="warning"
           title="Khách hàng đã tồn tại – không tạo hồ sơ mới"
           action={
-            canViewExisting && existing.code && (
-              <button type="button" className="alert__link" onClick={() => onOpenExisting(existing.code)}>
+            canViewExisting && existingCode && (
+              <button type="button" className="alert__link" onClick={() => onOpenExisting(existingCode)}>
                 Mở hồ sơ hiện có
               </button>
             )
@@ -302,7 +303,8 @@ function CreateCustomerAlertBanner({ alert, canViewExisting, retrying, onOpenExi
           {existing.code ? <>Mã số thuế {existing.taxCode} thuộc {existing.code} · {existing.name}
           {suspended
             ? ' (đang Tạm ngưng). Hệ thống không tạo hồ sơ trùng và không tự kích hoạt lại. Hãy dùng hồ sơ hiện có và chuyển người có thẩm quyền xử lý theo UC-CUS-04.'
-            : ' (đang Hoạt động). Hệ thống không tạo hồ sơ trùng. Hãy dùng hồ sơ hiện có.'}</> : `Mã số thuế ${existing.taxCode} đã tồn tại. Hệ thống không tạo hồ sơ trùng.`}
+            : existing.status === 'active' ? ' (đang Hoạt động). Hệ thống không tạo hồ sơ trùng. Hãy dùng hồ sơ hiện có.'
+              : '. Hệ thống không tạo hồ sơ trùng. Hãy kiểm tra hồ sơ hiện có.'}</> : `Mã số thuế ${existing.taxCode} đã tồn tại. Hệ thống không tạo hồ sơ trùng.`}
         </Alert>
       );
     }

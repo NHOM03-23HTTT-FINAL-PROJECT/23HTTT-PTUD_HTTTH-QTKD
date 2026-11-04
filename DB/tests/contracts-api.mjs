@@ -206,7 +206,25 @@ try {
     ),
   );
   pass('main manager roles preserve scope and unassigned approval stages remain visible in contract details');
-  const options = (await call('/contracts/form-options', sales)).body;
+  const peerId = randomUUID();
+  await db.query(
+    "INSERT INTO qtkd.user_account(user_id,username,company_email,password_hash,full_name,department_id,role,must_change_password) SELECT $1,'demo.sales.peer','sales.peer@example.invalid',password_hash,'Sales Peer',department_id,role,false FROM qtkd.user_account WHERE user_id=$2",
+    [peerId, ids.salesStaff],
+  );
+  const peerCustomer = (await db.query(
+    "INSERT INTO qtkd.customer(customer_name,tax_code,address,legal_representative,phone,account_manager_id) VALUES ('Peer customer','9999999998','Test address','Test representative','0900000000',$1) RETURNING customer_code",
+    [peerId])).rows[0].customer_code;
+  const outsideCustomer = (await db.query(
+    "INSERT INTO qtkd.customer(customer_name,tax_code,address,legal_representative,phone,account_manager_id) VALUES ('Outside customer','9999999999','Test address','Test representative','0900000000',$1) RETURNING customer_code",
+    [unassignedLegalId])).rows[0].customer_code;
+  const suspendedCode = (await db.query('SELECT customer_code FROM qtkd.customer WHERE customer_id=$1', [ids.suspendedCustomer])).rows[0].customer_code;
+  const optionsResponse = await call('/contracts/form-options', sales);
+  assert.equal(optionsResponse.status, 200, JSON.stringify(optionsResponse.body));
+  const options = optionsResponse.body;
+  assert(options.customers.some((customer) => customer.code === peerCustomer));
+  assert(!options.customers.some((customer) => customer.code === outsideCustomer || customer.code === suspendedCode));
+  assert.equal((await call('/contracts/form-options', legal)).status, 403);
+  pass('contract customer choices honor customer permissions, department scope and active status');
   const emptyFilters = await call(
     '/contracts?keyword=&status=&areaCode=&contractType=&page=1&size=10&view=all',
     sales,
@@ -217,10 +235,10 @@ try {
   assert.equal((await call('/contracts?status=invalid', sales)).status, 422);
   assert.equal((await call('/contracts?keyword=&view=', sales)).status, 200);
   pass('empty optional list filters load normally while invalid status is rejected');
-  assert.equal(options.customers.length, 1);
+  assert.equal(options.customers.length, 2);
   assert(!options.areas.some((a) => a.code === 'DEMO-B02'));
   const draft = {
-    customerCode: options.customers[0].code,
+    customerCode: options.customers.find((customer) => customer.taxCode === '0000000001').code,
     sourceMode: 'blank',
     templateCode: '',
     title: 'Integration contract',
@@ -233,6 +251,19 @@ try {
     services: [{ id: 'line-1', ...options.services[0], areaCode: 'DEMO-B01' }],
   };
   const bad = structuredClone(draft);
+  for (const code of [outsideCustomer, suspendedCode]) {
+    const rejected = await call('/contracts', sales, 'POST', { draft: { ...draft, customerCode: code } }, randomUUID());
+    assert.equal(rejected.status, 409, JSON.stringify(rejected.body));
+    assert.equal(rejected.body.code, 'CUSTOMER_INACTIVE');
+  }
+  await db.query("DELETE FROM qtkd.role_permission WHERE role='SalesStaff' AND permission_code='customers.view'");
+  try {
+    assert.equal((await call('/contracts/form-options', sales)).status, 403);
+    assert.equal((await call('/contracts', sales, 'POST', { draft }, randomUUID())).status, 403);
+  } finally {
+    await db.query("INSERT INTO qtkd.role_permission(role,permission_code) VALUES ('SalesStaff','customers.view') ON CONFLICT DO NOTHING");
+  }
+  pass('contract creation rejects out-of-scope or suspended customers and requires customer viewing permission');
   const duplicateItems = structuredClone(draft);
   duplicateItems.services = [0, 1].map(() => ({ ...draft.services[0], requiresArea: true, areaCode: '' }));
   for (const malformed of [duplicateItems, { ...draft, services: [null] }]) {
@@ -272,6 +303,12 @@ try {
     409,
   );
   pass('create sets server-side owner, accepts same-day dates and replays the exact request only');
+  const forbiddenUpdate = await call(`/contracts/${contract.code}`, sales, 'PUT', {
+    baseVersion: contract.version, draft: { ...draft, customerCode: outsideCustomer },
+  });
+  assert.equal(forbiddenUpdate.status, 409, JSON.stringify(forbiddenUpdate.body));
+  assert.equal(forbiddenUpdate.body.code, 'CUSTOMER_INACTIVE');
+  pass('contract update cannot switch to an out-of-scope customer');
   assert.equal((await call(`/contracts/${contract.code}`, board)).status, 404);
   assert(
     (await call('/contracts?areaCode=DEMO-B01', sales)).body.items.some((c) => c.code === contract.code),

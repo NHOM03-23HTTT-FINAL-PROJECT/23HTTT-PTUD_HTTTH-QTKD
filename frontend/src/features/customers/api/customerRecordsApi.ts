@@ -26,6 +26,7 @@ export const customerRecordsApi = {
           if (error.status === 401) throw new CustomerRecordsError('SESSION_ENDED');
           if (error.status === 403) throw new CustomerRecordsError('FORBIDDEN');
           if (error.status === 404) throw new CustomerRecordsError('NOT_FOUND');
+          if (error.code === 'SOURCE_UNAVAILABLE') throw new CustomerRecordsError('SOURCE_UNAVAILABLE');
           throw new CustomerRecordsError('LOAD_FAILED');
         }
         throw error;

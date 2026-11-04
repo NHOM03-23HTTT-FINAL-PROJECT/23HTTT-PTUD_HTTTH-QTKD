@@ -57,19 +57,23 @@ public partial class PostgresContractStore : IContractStore
 
         var customers = await Array(c, null, """
             SELECT coalesce(jsonb_agg(jsonb_build_object(
-                'code', customer_code,
-                'name', customer_name,
-                'taxCode', tax_code,
-                'address', address,
-                'representative', legal_representative,
-                'contactName', contact_name,
-                'phone', phone,
-                'email', email,
-                'status', lower(status::text)
-            )), '[]')
-            FROM qtkd.customer
-            WHERE status = 'Active'
-            """, ct);
+                'code', c.customer_code,
+                'name', c.customer_name,
+                'taxCode', c.tax_code,
+                'address', c.address,
+                'representative', c.legal_representative,
+                'contactName', c.contact_name,
+                'phone', c.phone,
+                'email', c.email,
+                'status', lower(c.status::text)
+            ) ORDER BY c.customer_name, c.customer_code), '[]')
+            FROM qtkd.customer c
+            JOIN qtkd.user_account owner ON owner.user_id=c.account_manager_id
+            JOIN qtkd.user_account viewer ON viewer.user_id=$1 AND viewer.status='Active'
+            JOIN qtkd.department department ON department.department_id=viewer.department_id AND department.code='KD'
+            WHERE c.status='Active' AND owner.department_id=viewer.department_id
+              AND EXISTS (SELECT 1 FROM qtkd.role_permission p WHERE p.role=viewer.role AND p.permission_code='customers.view')
+            """, ct, actor.Id);
 
         var areas = await Array(c, null, """
             SELECT coalesce(jsonb_agg(jsonb_build_object(

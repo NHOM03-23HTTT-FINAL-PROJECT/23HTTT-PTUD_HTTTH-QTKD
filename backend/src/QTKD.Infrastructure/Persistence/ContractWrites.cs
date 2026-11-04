@@ -17,7 +17,7 @@ public partial class PostgresContractStore
                 throw new BusinessException("FORBIDDEN", 403);
             }
 
-            var customer = await References(c, tx, draft, ct);
+            var customer = await References(c, tx, actor, draft, ct);
             var id = Guid.NewGuid();
 
             var created = (await Object(c, tx, """
@@ -69,7 +69,7 @@ public partial class PostgresContractStore
         await NoPendingCancellation(c, tx, current.Id, ct);
 
         var draft = request.Draft;
-        var customer = await References(c, tx, draft, ct);
+        var customer = await References(c, tx, actor, draft, ct);
 
         await Execute(c, tx, """
             UPDATE qtkd.contract
@@ -149,7 +149,7 @@ public partial class PostgresContractStore
             by,
             reason);
 
-    private static async Task<JsonObject> References(NpgsqlConnection c, NpgsqlTransaction tx, ContractDraft draft, CancellationToken ct)
+    private static async Task<JsonObject> References(NpgsqlConnection c, NpgsqlTransaction tx, Actor actor, ContractDraft draft, CancellationToken ct)
     {
         if (draft.SourceMode == "template" && draft.TemplateCode != "MHD-THAM-KHAO-01")
         {
@@ -162,26 +162,32 @@ public partial class PostgresContractStore
             });
         }
 
+        // Keep the customer scope and role grants stable while validating the reference.
+        await Execute(c, tx, "SELECT pg_advisory_xact_lock_shared(22023)", ct);
         var customer = await Object(c, tx, """
             SELECT jsonb_build_object(
-                'id', customer_id,
-                'code', customer_code,
-                'name', customer_name,
-                'taxCode', tax_code,
-                'address', address,
-                'representative', legal_representative,
-                'contactName', contact_name,
-                'phone', phone,
-                'email', email
+                'id', c.customer_id,
+                'code', c.customer_code,
+                'name', c.customer_name,
+                'taxCode', c.tax_code,
+                'address', c.address,
+                'representative', c.legal_representative,
+                'contactName', c.contact_name,
+                'phone', c.phone,
+                'email', c.email
             )
-            FROM qtkd.customer
-            WHERE customer_code = $1 AND status = 'Active'
-            FOR SHARE
-            """, ct, draft.CustomerCode) ?? throw new BusinessException("CUSTOMER_INACTIVE", 409, new
+            FROM qtkd.customer c
+            JOIN qtkd.user_account owner ON owner.user_id=c.account_manager_id
+            JOIN qtkd.user_account viewer ON viewer.user_id=$2 AND viewer.status='Active'
+            JOIN qtkd.department department ON department.department_id=viewer.department_id AND department.code='KD'
+            WHERE c.customer_code=$1 AND c.status='Active' AND owner.department_id=viewer.department_id
+              AND EXISTS (SELECT 1 FROM qtkd.role_permission p WHERE p.role=viewer.role AND p.permission_code='customers.view')
+            FOR SHARE OF c
+            """, ct, draft.CustomerCode, actor.Id) ?? throw new BusinessException("CUSTOMER_INACTIVE", 409, new
         {
             fieldErrors = new
             {
-                customerCode = "Khách hàng không còn ở trạng thái Hoạt động."
+                customerCode = "Khách hàng không còn hợp lệ hoặc bạn không được phép chọn."
             }
         });
 

@@ -162,7 +162,23 @@ try {
     body: { baseVersion: statusVersion, reasonGroup: 'CONG_NO', reason: 'Kiểm tra công nợ', evidence: [], plan: [], coordinationNote: '' } }), 503, 'REVIEW_INCOMPLETE');
   expect(await call(`/customers/${created.code}/records/payments`, { token: tokens.staff }), 403, 'FORBIDDEN');
   expect(await call(`/customers/${created.code}/records/contracts`, { token: tokens.staff }), 503, 'SOURCE_UNAVAILABLE');
+  expect(await call(`/customers/${created.code}/records/priceLists`, { token: tokens.staff }), 503, 'SOURCE_UNAVAILABLE');
+  expect(await call(`/customers/${outside.rows[0].customer_code}/records/priceLists`, { token: tokens.staff }), 404, 'NOT_FOUND');
   assert.equal((await call(`/customers/${created.code}`, { token: tokens.staff })).data.status, 'active');
+
+  for (let index = 0; index < 10; index++) {
+    const pagingTax = '5' + String(Math.floor(Math.random() * 1_000_000_000)).padStart(9, '0');
+    await db.query(`INSERT INTO qtkd.customer(customer_name,tax_code,address,legal_representative,phone,account_manager_id)
+      SELECT $1,$2,'Địa chỉ thử','Người thử','0900000000',user_id FROM qtkd.user_account WHERE username=$3`,
+      [`Paging ${unique} ${index}`, pagingTax, names.staff]);
+  }
+  const query = `keyword=${encodeURIComponent(`paging ${unique}`)}&status=active&sort=code-asc&size=8`;
+  const firstPage = await call(`/customers?${query}&page=1`, { token: tokens.staff });
+  const secondPage = await call(`/customers?${query}&page=2`, { token: tokens.staff });
+  expect(firstPage, 200); expect(secondPage, 200);
+  assert.equal(firstPage.data.total, 10); assert.equal(secondPage.data.total, 10);
+  assert.equal(firstPage.data.items.length, 8); assert.equal(secondPage.data.items.length, 2);
+  assert.equal(new Set([...firstPage.data.items, ...secondPage.data.items].map(item => item.code)).size, 10);
 
   // Simulate administration revoking a role grant while a request is in flight.
   // This touches only the disposable DB and restores the grant even on failure.
@@ -180,6 +196,27 @@ try {
   } finally {
     await db.query('ROLLBACK').catch(() => {});
     await db.query("INSERT INTO qtkd.role_permission(role,permission_code) VALUES ('SalesStaff','customers.create') ON CONFLICT DO NOTHING");
+  }
+  const service = await db.query("INSERT INTO qtkd.service(service_name,unit,requires_area) VALUES ('Dịch vụ kiểm thử quyền','lần',false) RETURNING service_code");
+  const contractTitle = `Kiểm tra thu hồi quyền ${unique}`;
+  const contractDraft = { customerCode: created.code, sourceMode: 'blank', templateCode: '', title: contractTitle,
+    contractType: 'Logistics', effectiveFrom: '2026-11-01', effectiveTo: '2027-11-01', value: '1000',
+    paymentTerm: '30 ngày', content: 'Nội dung thử', services: [{ id: 'test', serviceCode: service.rows[0].service_code,
+      serviceName: 'Dịch vụ kiểm thử quyền', unit: 'lần', requiresArea: false, areaCode: '' }] };
+  try {
+    await db.query('BEGIN');
+    await db.query('SELECT pg_advisory_xact_lock(22023)');
+    await db.query("DELETE FROM qtkd.role_permission WHERE role='SalesStaff' AND permission_code='customers.view'");
+    const pendingContract = call('/contracts', { method: 'POST', token: tokens.staff, key: randomUUID(), body: { draft: contractDraft } });
+    await new Promise(resolve => setTimeout(resolve, 200));
+    await db.query('COMMIT');
+    const result = await pendingContract;
+    assert([403, 409].includes(result.status), JSON.stringify(result.data));
+    const absent = await db.query('SELECT count(*)::int AS count FROM qtkd.contract WHERE title=$1', [contractTitle]);
+    assert.equal(absent.rows[0].count, 0);
+  } finally {
+    await db.query('ROLLBACK').catch(() => {});
+    await db.query("INSERT INTO qtkd.role_permission(role,permission_code) VALUES ('SalesStaff','customers.view') ON CONFLICT DO NOTHING");
   }
   console.log('Customer API business checks passed on disposable PostgreSQL.');
   console.log(`Local browser test user: ${names.staff}`);

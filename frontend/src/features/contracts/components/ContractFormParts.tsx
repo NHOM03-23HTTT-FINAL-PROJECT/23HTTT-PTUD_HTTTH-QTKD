@@ -82,7 +82,9 @@ function CustomerPicker({
     )
     .slice(0, 8);
   return (
-    <div className="field contract-customer-picker">
+    <div className="field contract-customer-picker" onBlur={(event) => {
+      if (!event.currentTarget.contains(event.relatedTarget)) { setOpen(false); setKeyword(''); }
+    }}>
       <label className="field__label" htmlFor="contract-customer">
         Khách hàng<span className="field__required">*</span>
       </label>
@@ -100,8 +102,12 @@ function CustomerPicker({
             setOpen(true);
           }}
           onChange={(event) => {
+            if (value) onChange('');
             setKeyword(event.target.value);
             setOpen(true);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') { setOpen(false); setKeyword(''); }
           }}
         />
       </div>
@@ -327,13 +333,13 @@ export function ContractFormFields({ form, disabled }: { form: ContractDraftForm
       <hr className="contract-divider" />
       <ContractSection
         title="Mẫu hợp đồng"
-        description="Dùng mẫu đã ban hành hoặc tự lập nội dung dự thảo mới."
+        description={BACKEND_ENABLED ? 'Dùng mẫu tham khảo hoặc tự lập nội dung dự thảo mới.' : 'Dùng mẫu đã ban hành hoặc tự lập nội dung dự thảo mới.'}
       >
         <div className="contract-source-cards" role="radiogroup" aria-label="Cách lập hợp đồng">
           <SourceCard
             checked={values.sourceMode === 'template'}
-            title="Dùng mẫu hợp đồng"
-            description="Tải sẵn nội dung và điều khoản phổ biến."
+            title={BACKEND_ENABLED ? 'Dùng mẫu tham khảo' : 'Dùng mẫu hợp đồng'}
+            description={BACKEND_ENABLED ? 'Kiểm tra và điều chỉnh nội dung trước khi sử dụng.' : 'Tải sẵn nội dung và điều khoản phổ biến.'}
             onClick={() => form.changeSourceMode('template')}
           />
           <SourceCard
@@ -363,7 +369,7 @@ export function ContractFormFields({ form, disabled }: { form: ContractDraftForm
               value={selectedTemplate?.version ?? ''}
               placeholder="Tự hiển thị theo mẫu"
               disabled
-              hint="Phiên bản đang có hiệu lực của mẫu đã chọn."
+              hint={BACKEND_ENABLED ? 'Phiên bản của mẫu tham khảo, chưa phải mẫu nghiệp vụ chính thức.' : 'Phiên bản đang có hiệu lực của mẫu đã chọn.'}
             />
           </div>
         )}

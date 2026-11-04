@@ -198,7 +198,7 @@ function CustomerProfile({ customer }: { customer: Customer }) {
           <section className="customer-card customer-layout__main">
             <div className="customer-card__heading">
               <h2>Lịch sử thay đổi</h2>
-              <p>Tạo hồ sơ, cập nhật thông tin và chuyển trạng thái, mới nhất trước.</p>
+              <p>Thông tin tạo và cập nhật, mới nhất trước. Lịch sử trạng thái được hiển thị riêng.</p>
             </div>
             <ol className="history-timeline">
               {[...customer.history].reverse().map((entry, index) => (
@@ -465,22 +465,25 @@ function RelatedRecordsCard({
       </div>
       <ul className="related-list">
         {RELATED.map((item) => {
-          const status = records[item.group].status;
-          if (status === 'error') {
+          const record = records[item.group];
+          const status = record.status;
+          if (record.status === 'error') {
             return (
               <li key={item.group} className="related-list__item">
-                <span className="related-list__icon related-list__icon--danger">
+                <span className={record.reason === 'failed' ? 'related-list__icon related-list__icon--danger' : 'related-list__icon'}>
                   <Icon name="alert" />
                 </span>
                 <span className="related-list__text">
                   <span className="related-list__label">{item.label}</span>
-                  <span className="related-list__summary related-list__summary--danger">
-                    Không tải được nhóm hồ sơ này. Các phần khác vẫn xem được.
+                  <span className={record.reason === 'failed' ? 'related-list__summary related-list__summary--danger' : 'related-list__summary'}>
+                    {record.reason === 'unavailable' ? 'Chưa kết nối dữ liệu của nhóm hồ sơ này.'
+                      : record.reason === 'forbidden' ? 'Quyền hiện tại chưa cho phép xem nhóm hồ sơ này.'
+                        : 'Không tải được nhóm hồ sơ này. Các phần khác vẫn xem được.'}
                   </span>
                 </span>
-                <button type="button" className="link-button" onClick={() => onRetry(item.group)}>
+                {record.reason === 'failed' && <button type="button" className="link-button" onClick={() => onRetry(item.group)}>
                   Thử lại
-                </button>
+                </button>}
               </li>
             );
           }
