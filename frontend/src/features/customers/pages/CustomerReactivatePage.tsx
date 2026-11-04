@@ -15,6 +15,7 @@ import { StatusBadge } from '@/components/status-badge/StatusBadge';
 import { ROUTES } from '@/constants/routes';
 import { formatDateTime, formatTime } from '@/utils/format';
 import { useCustomer } from '../hooks/useCustomer';
+import { useCustomerStatusPermissions } from '../hooks/useCustomerStatusPermissions';
 import { customerStatusApi } from '../api/customerStatusApi';
 import { DecisionItem, StatusHistoryCard } from '../components/CustomerStatusPanels';
 import type { Customer } from '../types/customer';
@@ -52,6 +53,7 @@ function newIdempotencyKey() {
 export function CustomerReactivatePage() {
   const { code = '' } = useParams();
   const { customer, loading, failed } = useCustomer(code);
+  const permissions = useCustomerStatusPermissions(code);
   if (loading) return <Alert tone="info" title="Đang tải hồ sơ khách hàng" />;
   if (failed) return <Alert tone="danger" title="Không tải được hồ sơ khách hàng">Vui lòng thử lại sau.</Alert>;
 
@@ -76,6 +78,9 @@ export function CustomerReactivatePage() {
       </>
     );
   }
+  if (permissions.loading) return <Alert tone="info" title="Đang kiểm tra quyền thao tác" />;
+  if (permissions.failed) return <Alert tone="danger" title="Không kiểm tra được quyền thao tác" action={<button type="button" className="btn btn--secondary" onClick={permissions.retry}>Thử lại</button>} />;
+  if (!permissions.canReactivate) return <Alert tone="warning" title="Bạn không có quyền kích hoạt lại khách hàng này">Liên hệ Trưởng phòng Kinh doanh nếu cần được giao quyền.</Alert>;
   // A2: khách hàng đã Hoạt động → thông báo trên hồ sơ, không ghi lịch sử trùng.
   if (customer.status === 'active') {
     const state: CustomerDetailState = { alreadyActive: true };

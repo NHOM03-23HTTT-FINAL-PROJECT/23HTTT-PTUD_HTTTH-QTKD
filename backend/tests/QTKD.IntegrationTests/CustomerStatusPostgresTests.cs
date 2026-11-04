@@ -35,14 +35,18 @@ public sealed class CustomerStatusPostgresTests
         public bool AllowReactivation { get; set; }
         public bool HasImpact { get; set; }
         public bool HasOtherMissingSource { get; set; }
-        public Task<SuspensionReview> Suspension(NpgsqlConnection c, NpgsqlTransaction tx, Guid customerId, Guid actorId, CancellationToken ct)
+        public TaskCompletionSource<bool>? SuspensionStarted { get; set; }
+        public TaskCompletionSource<bool>? ContinueSuspension { get; set; }
+        public async Task<SuspensionReview> Suspension(NpgsqlConnection c, NpgsqlTransaction tx, Guid customerId, Guid actorId, CancellationToken ct)
         {
+            SuspensionStarted?.TrySetResult(true);
+            if (ContinueSuspension is { } continuation) await continuation.Task.WaitAsync(ct);
             StatusImpactItem[] items = HasImpact
                 ? [new("contract-1", "contract", "Còn hiệu lực", "HD-TEST", "Hợp đồng thử", "", "Active", "success",
                     "Pháp chế", ["Giữ nguyên", "Rà soát"], "Không tự hủy")]
                 : [];
-            return Task.FromResult(new SuspensionReview(items, Complete ? [] : ["job"],
-                MissingSources: HasOtherMissingSource ? ["debt"] : []));
+            return new SuspensionReview(items, Complete ? [] : ["job"],
+                MissingSources: HasOtherMissingSource ? ["debt"] : []);
         }
         public Task<ReactivationSourceResult> Reactivation(NpgsqlConnection c, NpgsqlTransaction tx, Guid customerId,
             Guid actorId, string? reasonGroup, StatusException? exception, CancellationToken ct) =>
@@ -89,6 +93,137 @@ public sealed class CustomerStatusPostgresTests
 
     private static async Task<string?> Code(HttpResponseMessage response) =>
         (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString();
+
+    [LocalCustomerPostgresFact]
+    public async Task Individual_delegation_checks_each_action_owner_expiry_revocation_and_audit()
+    {
+        var port = int.Parse(Environment.GetEnvironmentVariable("QTKD_CUSTOMER_TEST_PORT") ?? "0");
+        if (port is < 1024 or > 65535) throw new InvalidOperationException("A disposable loopback database port is required.");
+        var connection = $"Host=127.0.0.1;Port={port};Database=qtkdtest;Username=postgres;Password=qtkd-test-only;SSL Mode=Disable";
+        await using var db = new NpgsqlConnection(connection); await db.OpenAsync();
+        var marker = Guid.NewGuid().ToString("N")[..10];
+        var manager = $"delegation.{marker}.manager"; var staff = $"delegation.{marker}.staff";
+        var other = $"delegation.{marker}.other"; var outside = $"delegation.{marker}.outside";
+        var hash = BCrypt.Net.BCrypt.HashPassword("Customer.Test@2026", 10);
+        var ids = new Dictionary<string, Guid>();
+        foreach (var (username, role, dept) in new[] { (manager, "SalesManager", "KD"), (staff, "SalesStaff", "KD"),
+            (other, "SalesStaff", "KD"), (outside, "OperationsStaff", "KT") })
+        {
+            await using var user = new NpgsqlCommand("""
+                INSERT INTO qtkd.user_account(username,company_email,password_hash,full_name,department_id,role,status,must_change_password)
+                SELECT @name,@email,@hash,@name,department_id,@role::qtkd.user_role,'Active',false FROM qtkd.department WHERE code=@dept
+                RETURNING user_id
+                """, db);
+            user.Parameters.AddWithValue("name", username); user.Parameters.AddWithValue("email", username + "@example.invalid");
+            user.Parameters.AddWithValue("hash", hash); user.Parameters.AddWithValue("role", role); user.Parameters.AddWithValue("dept", dept);
+            ids[username] = (Guid)(await user.ExecuteScalarAsync())!;
+        }
+        async Task<string> CreateCustomer(string owner)
+        {
+            await using var insert = new NpgsqlCommand("""
+                INSERT INTO qtkd.customer(customer_name,tax_code,address,legal_representative,phone,account_manager_id)
+                VALUES ('Khách thử quyền',@tax,'Địa chỉ thử','Người thử','0900000000',@owner) RETURNING customer_code
+                """, db);
+            insert.Parameters.AddWithValue("tax", "6" + Random.Shared.Next(1_000_000_000).ToString("D9"));
+            insert.Parameters.AddWithValue("owner", ids[owner]); return (string)(await insert.ExecuteScalarAsync())!;
+        }
+        var own = await CreateCustomer(staff); var peer = await CreateCustomer(other);
+        var source = new ControlledSource { Complete = true, AllowReactivation = true };
+        using var factory = new CustomerFactory(connection, source);
+        using var lead = factory.CreateClient(); using var employee = factory.CreateClient(); using var colleague = factory.CreateClient();
+        foreach (var client in new[] { lead, employee, colleague })
+        {
+            client.DefaultRequestHeaders.Add("Origin", "http://localhost:5173");
+            client.DefaultRequestHeaders.Add("X-QTKD-CSRF", "1");
+        }
+        await Login(lead, manager); await Login(employee, staff); await Login(colleague, other);
+        var path = "/api/v1/customers/" + own;
+        var initial = await employee.GetFromJsonAsync<JsonElement>(path + "/status-permissions");
+        Assert.False(initial.GetProperty("canSuspend").GetBoolean()); Assert.False(initial.GetProperty("canReactivate").GetBoolean());
+        Assert.Equal(HttpStatusCode.Forbidden, (await employee.GetAsync("/api/v1/customers/delegations")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await employee.PostAsJsonAsync("/api/v1/customers/delegations", new { granteeId = ids[other], action = "suspend" })).StatusCode);
+        var candidates = await lead.GetFromJsonAsync<JsonElement>("/api/v1/customers/delegations/candidates");
+        Assert.Contains(candidates.EnumerateArray(), x => x.GetProperty("id").GetGuid() == ids[staff]);
+        Assert.DoesNotContain(candidates.EnumerateArray(), x => x.GetProperty("id").GetGuid() == ids[outside]);
+        foreach (var invalid in new[] { ids[manager], ids[outside], Guid.Empty })
+        {
+            var response = await lead.PostAsJsonAsync("/api/v1/customers/delegations", new { granteeId = invalid, action = "suspend" });
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        }
+        var past = await lead.PostAsJsonAsync("/api/v1/customers/delegations", new { granteeId = ids[staff], action = "suspend", expiresAt = DateTimeOffset.UtcNow.AddMinutes(-1) });
+        Assert.Equal("DELEGATION_EXPIRY_INVALID", await Code(past));
+        var grantBody = new { granteeId = ids[staff], action = "suspend", expiresAt = (DateTimeOffset?)null, reason = "Kiểm thử" };
+        var competing = await Task.WhenAll(lead.PostAsJsonAsync("/api/v1/customers/delegations", grantBody), lead.PostAsJsonAsync("/api/v1/customers/delegations", grantBody));
+        Assert.Equal(new[] { HttpStatusCode.OK, HttpStatusCode.Conflict }, competing.Select(x => x.StatusCode).Order().ToArray());
+        var grant = await competing.Single(x => x.StatusCode == HttpStatusCode.OK).Content.ReadFromJsonAsync<JsonElement>();
+        var grantId = grant.GetProperty("id").GetGuid();
+        var capabilities = await employee.GetFromJsonAsync<JsonElement>(path + "/status-permissions");
+        Assert.True(capabilities.GetProperty("canSuspend").GetBoolean()); Assert.False(capabilities.GetProperty("canReactivate").GetBoolean());
+        var wrongCustomer = await employee.GetFromJsonAsync<JsonElement>("/api/v1/customers/" + peer + "/status-permissions");
+        Assert.False(wrongCustomer.GetProperty("canSuspend").GetBoolean());
+        var peerCapabilities = await colleague.GetFromJsonAsync<JsonElement>(path + "/status-permissions");
+        Assert.False(peerCapabilities.GetProperty("canSuspend").GetBoolean());
+        var suspend = new { baseVersion = 1, reasonGroup = "KHAC", reason = "Kiểm thử", evidence = Array.Empty<object>(), plan = Array.Empty<object>(), coordinationNote = "" };
+        Assert.Equal(HttpStatusCode.Forbidden, (await Post(employee, "/api/v1/customers/" + peer + "/suspend", suspend, Guid.NewGuid().ToString())).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await Post(employee, path + "/suspend", suspend, Guid.NewGuid().ToString())).StatusCode);
+        var reactivate = new { baseVersion = 2, reason = "Đã xử lý", evidence = Array.Empty<object>() };
+        Assert.Equal(HttpStatusCode.Forbidden, (await Post(employee, path + "/reactivate", reactivate, Guid.NewGuid().ToString())).StatusCode);
+        var reactivationGrant = await lead.PostAsJsonAsync("/api/v1/customers/delegations", new { granteeId = ids[staff], action = "reactivate", expiresAt = DateTimeOffset.UtcNow.AddHours(1) });
+        Assert.Equal(HttpStatusCode.OK, reactivationGrant.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await Post(employee, path + "/reactivate", reactivate, Guid.NewGuid().ToString())).StatusCode);
+        var revokePath = "/api/v1/customers/delegations/" + grantId + "/revoke";
+        Assert.Equal(HttpStatusCode.OK, (await lead.PostAsJsonAsync(revokePath, new { })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await lead.PostAsJsonAsync(revokePath, new { })).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await Post(employee, path + "/suspend", suspend, Guid.NewGuid().ToString())).StatusCode);
+        await using (var audit = new NpgsqlCommand("SELECT count(*) FROM qtkd.audit_log WHERE entity_id=@id AND action='CUSTOMER_DELEGATION_REVOKED'", db))
+        { audit.Parameters.AddWithValue("id", grantId); Assert.Equal(1L, (long)(await audit.ExecuteScalarAsync())!); }
+        var timed = await lead.PostAsJsonAsync("/api/v1/customers/delegations", new { granteeId = ids[staff], action = "suspend", expiresAt = DateTimeOffset.UtcNow.AddHours(1) });
+        Assert.Equal(HttpStatusCode.OK, timed.StatusCode);
+        var timedId = (await timed.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        await using (var expire = new NpgsqlCommand("UPDATE qtkd.customer_status_delegation SET granted_at=clock_timestamp()-interval '2 minutes',expires_at=clock_timestamp()-interval '1 minute' WHERE delegation_id=@id", db))
+        { expire.Parameters.AddWithValue("id", timedId); await expire.ExecuteNonQueryAsync(); }
+        capabilities = await employee.GetFromJsonAsync<JsonElement>(path + "/status-permissions");
+        Assert.False(capabilities.GetProperty("canSuspend").GetBoolean()); Assert.True(capabilities.GetProperty("canReactivate").GetBoolean());
+        Assert.Equal(HttpStatusCode.Forbidden, (await Post(employee, path + "/suspend", suspend, Guid.NewGuid().ToString())).StatusCode);
+        var renewed = await lead.PostAsJsonAsync("/api/v1/customers/delegations", grantBody);
+        Assert.Equal(HttpStatusCode.OK, renewed.StatusCode);
+        var renewedId = (await renewed.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        Assert.Equal(HttpStatusCode.OK, (await lead.PostAsJsonAsync($"/api/v1/customers/delegations/{renewedId}/revoke", new { })).StatusCode);
+        // A grant must still be valid after a potentially slow review, immediately before saving.
+        var end = DateTimeOffset.UtcNow.AddSeconds(4);
+        var shortGrant = await lead.PostAsJsonAsync("/api/v1/customers/delegations", new { granteeId = ids[staff], action = "suspend", expiresAt = end });
+        Assert.Equal(HttpStatusCode.OK, shortGrant.StatusCode);
+        source.SuspensionStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        source.ContinueSuspension = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        var currentSuspend = new { baseVersion = 3, reasonGroup = "KHAC", reason = "Kiểm tra hết hạn", evidence = Array.Empty<object>(), plan = Array.Empty<object>(), coordinationNote = "" };
+        var pending = Post(employee, path + "/suspend", currentSuspend, Guid.NewGuid().ToString());
+        await source.SuspensionStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        var delay = end - DateTimeOffset.UtcNow + TimeSpan.FromMilliseconds(250);
+        if (delay > TimeSpan.Zero) await Task.Delay(delay);
+        source.ContinueSuspension.SetResult(true);
+        Assert.Equal(HttpStatusCode.Forbidden, (await pending).StatusCode);
+        Assert.Equal("active", (await employee.GetFromJsonAsync<JsonElement>(path)).GetProperty("status").GetString());
+
+        // Revocation and an already-running action are serialized. Future actions are denied.
+        var finalGrant = await lead.PostAsJsonAsync("/api/v1/customers/delegations", grantBody);
+        Assert.Equal(HttpStatusCode.OK, finalGrant.StatusCode);
+        var finalId = (await finalGrant.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        source.SuspensionStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        source.ContinueSuspension = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        var running = Post(employee, path + "/suspend", currentSuspend, Guid.NewGuid().ToString());
+        await source.SuspensionStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        var revoking = lead.PostAsJsonAsync($"/api/v1/customers/delegations/{finalId}/revoke", new { });
+        await Task.Delay(250);
+        Assert.False(revoking.IsCompleted);
+        source.ContinueSuspension.SetResult(true);
+        Assert.Equal(HttpStatusCode.OK, (await running).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await revoking).StatusCode);
+        capabilities = await employee.GetFromJsonAsync<JsonElement>(path + "/status-permissions");
+        Assert.False(capabilities.GetProperty("canSuspend").GetBoolean());
+        var list = await lead.GetFromJsonAsync<JsonElement>("/api/v1/customers/delegations");
+        Assert.Contains(list.EnumerateArray(), x => x.GetProperty("id").GetGuid() == timedId && x.GetProperty("state").GetString() == "expired");
+        Assert.Contains(list.EnumerateArray(), x => x.GetProperty("id").GetGuid() == grantId && x.GetProperty("state").GetString() == "revoked");
+    }
 
     [LocalCustomerPostgresFact]
     public async Task Status_flow_checks_authority_sources_concurrency_and_atomic_history()
@@ -230,11 +365,21 @@ public sealed class CustomerStatusPostgresTests
         }
         if (runBrowser)
         {
+            Guid staffId;
+            await using (var findStaff = new NpgsqlCommand("SELECT user_id FROM qtkd.user_account WHERE username=@name", db))
+            {
+                findStaff.Parameters.AddWithValue("name", staff); staffId = (Guid)(await findStaff.ExecuteScalarAsync())!;
+            }
+            foreach (var action in new[] { "suspend", "reactivate" })
+            {
+                var delegated = await client.PostAsJsonAsync("/api/v1/customers/delegations", new { granteeId = staffId, action });
+                Assert.Equal(HttpStatusCode.OK, delegated.StatusCode);
+            }
             var repo = Environment.GetEnvironmentVariable("QTKD_CUSTOMER_REPO") ?? throw new InvalidOperationException("Test repository path is required.");
             var start = new ProcessStartInfo("node") { WorkingDirectory = Path.Combine(repo, "frontend"), RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
             start.ArgumentList.Add("tests/customer-status-live-browser.mjs");
             start.Environment["QTKD_CUSTOMER_TEST_DISPOSABLE"] = "true";
-            start.Environment["QTKD_UI_MANAGER"] = manager;
+            start.Environment["QTKD_UI_ACTOR"] = staff;
             start.Environment["QTKD_UI_CUSTOMER_CODE"] = customerCode;
             using var process = Process.Start(start) ?? throw new InvalidOperationException("Cannot start browser test.");
             var output = process.StandardOutput.ReadToEndAsync(); var errors = process.StandardError.ReadToEndAsync();

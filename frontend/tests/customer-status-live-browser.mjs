@@ -1,15 +1,15 @@
 // Full browser flow against the explicitly disposable test host and injected review source.
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-const { QTKD_CUSTOMER_TEST_DISPOSABLE: disposable, QTKD_UI_MANAGER: manager, QTKD_UI_CUSTOMER_CODE: code,
+const { QTKD_CUSTOMER_TEST_DISPOSABLE: disposable, QTKD_UI_ACTOR: actor, QTKD_UI_CUSTOMER_CODE: code,
   QTKD_PLAYWRIGHT_PACKAGE: pkg, QTKD_BROWSER_PATH: browserPath, QTKD_UI_SCREENSHOT: screenshot } = process.env;
-if (disposable !== 'true' || !manager || !code || !pkg || !browserPath) throw new Error('Disposable host and synthetic test credentials are required');
+if (disposable !== 'true' || !actor || !code || !pkg || !browserPath) throw new Error('Disposable host and synthetic test credentials are required');
 const { chromium } = createRequire(import.meta.url)(pkg);
 const browser = await chromium.launch({ headless: true, executablePath: browserPath });
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   await page.goto('http://localhost:5173/');
-  await page.locator('input[name="username"]').fill(manager);
+  await page.locator('input[name="username"]').fill(actor);
   await page.locator('input[name="password"]').fill('Customer.Test@2026');
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
   await page.waitForURL(u => !u.pathname.includes('dang-nhap'));
@@ -33,5 +33,5 @@ try {
   await page.getByText('Đã kích hoạt lại khách hàng', { exact: true }).waitFor();
   assert(await page.getByText('Hoạt động', { exact: true }).first().isVisible());
   if (screenshot) await page.screenshot({ path: screenshot, fullPage: true });
-  console.log('Suspension and reactivation completed through the UI with a controlled test review source.');
+  console.log('A delegated employee suspended and reactivated their customer through the UI with a controlled test review source.');
 } finally { await browser.close(); }

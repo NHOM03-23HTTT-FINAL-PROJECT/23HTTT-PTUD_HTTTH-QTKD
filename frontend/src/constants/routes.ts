@@ -6,6 +6,7 @@ export const ROUTES = {
   forcedPasswordChange: '/doi-mat-khau-lan-dau',
   customers: '/khach-hang',
   customerCreate: '/khach-hang/tao-moi',
+  customerDelegations: '/khach-hang/uy-quyen',
   customerDetail: (code: string) => `/khach-hang/${code}`,
   customerEdit: (code: string) => `/khach-hang/${code}/chinh-sua`,
   customerSuspend: (code: string) => `/khach-hang/${code}/tam-ngung`,

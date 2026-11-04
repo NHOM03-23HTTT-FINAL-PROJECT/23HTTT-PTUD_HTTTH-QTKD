@@ -148,12 +148,18 @@ try {
   assert(review.data.failedKinds.includes('job') && review.data.missingSources.includes('debt'));
   assert.deepEqual(review.data.items.map(item => item.code).sort(), contractCodes.sort());
   try {
-    // A temporary role grant is used only to verify contract scope in this disposable database.
+    // A role grant alone must not authorize every employee.
     await db.query("INSERT INTO qtkd.role_permission(role,permission_code) VALUES ('SalesStaff','customers.change-status') ON CONFLICT DO NOTHING");
+    expect(await call(`/customers/${created.code}/suspension-review`, { token: tokens.staff }), 403);
+    const staffId = (await db.query('SELECT user_id FROM qtkd.user_account WHERE username=$1', [names.staff])).rows[0].user_id;
+    const delegation = await call('/customers/delegations', { method: 'POST', token: tokens.manager,
+      body: { granteeId: staffId, action: 'suspend', expiresAt: null, reason: 'Thử phạm vi hợp đồng' } });
+    expect(delegation, 200);
     const scoped = await call(`/customers/${created.code}/suspension-review`, { token: tokens.staff });
     expect(scoped, 200); assert(scoped.data.failedKinds.includes('contract'));
     assert.equal(scoped.data.items.length, 1);
     assert.equal(scoped.data.items[0].title, 'Hợp đồng của người phụ trách');
+    expect(await call(`/customers/delegations/${delegation.data.id}/revoke`, { method: 'POST', token: tokens.manager, body: {} }), 200);
   } finally {
     await db.query("DELETE FROM qtkd.role_permission WHERE role='SalesStaff' AND permission_code='customers.change-status'");
   }

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { useSession } from '@/app/providers/SessionProvider';
+import { IS_MOCK_AUTH } from '@/features/auth/api/authApi';
 import { Button, ButtonLink } from '@/components/button/Button';
 import { DataTable, type Column } from '@/components/data-table/DataTable';
 import { Pagination } from '@/components/data-table/Pagination';
@@ -171,9 +172,10 @@ export function CustomerListPage() {
           <h1>Danh sách khách hàng</h1>
           <p>Tìm theo mã, tên hoặc mã số thuế trong phạm vi phòng Kinh doanh.</p>
         </div>
-        {can('customers.create') && (
+        {(can('customers.create') || (!IS_MOCK_AUTH && user?.roles.includes('TP_KD') && can('customers.change-status'))) && (
           <div className="page-header__actions">
-            <ButtonLink to={ROUTES.customerCreate}>+ Tạo khách hàng</ButtonLink>
+            {!IS_MOCK_AUTH && user?.roles.includes('TP_KD') && can('customers.change-status') && <ButtonLink to={ROUTES.customerDelegations} variant="secondary">Ủy quyền trạng thái</ButtonLink>}
+            {can('customers.create') && <ButtonLink to={ROUTES.customerCreate}>+ Tạo khách hàng</ButtonLink>}
           </div>
         )}
       </div>

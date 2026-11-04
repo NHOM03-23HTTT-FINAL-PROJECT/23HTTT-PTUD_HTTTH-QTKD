@@ -25,6 +25,7 @@ import {
 import { useCustomerRecords, type CustomerRecordsState } from '../hooks/useCustomerRecords';
 import { useCustomer } from '../hooks/useCustomer';
 import { useCustomerCatalogs } from '../hooks/useCustomerCatalogs';
+import { useCustomerStatusPermissions } from '../hooks/useCustomerStatusPermissions';
 import type { Customer, CustomerField, CustomerHistoryEntry, CustomerStatus, EditableCustomerField } from '../types/customer';
 import type { CustomerRecordGroup } from '../types/customerRecords';
 import { CUSTOMER_FIELD_LABELS } from '../utils/customerChanges';
@@ -117,7 +118,7 @@ function CustomerProfile({ customer }: { customer: Customer }) {
   const location = useLocation();
   const { can, user } = useAuth();
   const canEdit = can('customers.update') && (IS_MOCK_AUTH || user?.roles.includes('TP_KD') || customer.ownerId === user?.id);
-  const canChangeStatus = can('customers.change-status') && (IS_MOCK_AUTH || user?.roles.includes('TP_KD') || customer.ownerId === user?.id);
+  const statusPermissions = useCustomerStatusPermissions(customer.code);
   const [searchParams, setSearchParams] = useSearchParams();
   const state = location.state as CustomerDetailState | null;
   const { catalogs } = useCustomerCatalogs();
@@ -158,9 +159,10 @@ function CustomerProfile({ customer }: { customer: Customer }) {
             Về danh sách
           </ButtonLink>
           {/* Menu "Chỉnh sửa thông tin ▾": Trưởng phòng KD có thêm thao tác trạng thái (03.0 / 04.0). */}
-          {(canEdit || canChangeStatus) && <CustomerActionsMenu customer={customer} canEdit={canEdit} canChangeStatus={canChangeStatus} />}
+          {(canEdit || statusPermissions.canSuspend || statusPermissions.canReactivate) && <CustomerActionsMenu customer={customer} canEdit={canEdit} canSuspend={statusPermissions.canSuspend} canReactivate={statusPermissions.canReactivate} />}
         </div>
       </div>
+      {statusPermissions.failed && <Alert tone="warning" title="Chưa kiểm tra được quyền đổi trạng thái" action={<button type="button" className="btn btn--secondary" onClick={statusPermissions.retry}>Thử lại</button>}>Các thao tác trạng thái tạm thời không hiển thị.</Alert>}
 
       <div className="profile-tabs" role="tablist" aria-label="Nhóm thông tin">
         {TABS.map((item) => {

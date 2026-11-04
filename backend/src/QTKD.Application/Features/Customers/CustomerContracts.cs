@@ -36,6 +36,11 @@ public sealed record SuspensionContext(string ReasonGroup, string Reason, Status
 public sealed record ReactivationContext(SuspensionContext Suspension, ReactivationCheck[] Checks, string? VerifiedBasis,
     bool CanReactivate, string[]? MissingSources = null);
 public sealed record StatusChangeResult(CustomerView Customer, bool Replayed);
+public sealed record CustomerStatusPermissions(bool CanSuspend, bool CanReactivate);
+public sealed record StatusDelegationCandidate(Guid Id, string Name, string Username);
+public sealed record GrantStatusDelegationRequest(Guid GranteeId, string? Action, DateTimeOffset? ExpiresAt, string? Reason);
+public sealed record StatusDelegationView(Guid Id, Guid GranteeId, string GranteeName, string GranteeUsername, string Action,
+    string? Reason, string GrantedBy, DateTime GrantedAt, DateTime? ExpiresAt, DateTime? RevokedAt, string? RevokedBy, string State);
 
 public sealed class CustomerFailure(int status, string code, object? detail = null) : Exception(code)
 {

@@ -37,9 +37,9 @@ type MenuItem = {
 
 /**
  * Nút "Chỉnh sửa thông tin ▾" (frame 03.0 / 04.0): phần chính mở UC-CUS-02, mũi tên mở menu có thao tác tạm ngưng /
- * kích hoạt lại dành cho Trưởng phòng KD; mục không áp dụng cho trạng thái hiện tại bị mờ.
+ * kích hoạt lại theo quyền trên hồ sơ; mục không áp dụng cho trạng thái hiện tại bị mờ.
  */
-export function CustomerActionsMenu({ customer, canEdit, canChangeStatus }: { customer: Customer; canEdit: boolean; canChangeStatus: boolean }) {
+export function CustomerActionsMenu({ customer, canEdit, canSuspend, canReactivate }: { customer: Customer; canEdit: boolean; canSuspend: boolean; canReactivate: boolean }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const suspended = customer.status === 'suspended';
@@ -61,22 +61,22 @@ export function CustomerActionsMenu({ customer, canEdit, canChangeStatus }: { cu
   }, [open]);
 
   const statusItems: MenuItem[] = [
-    {
+    ...(canSuspend ? [{
       to: ROUTES.customerSuspend(customer.code),
-      icon: 'pause',
+      icon: 'pause' as const,
       label: 'Tạm ngưng khách hàng',
       hint: suspended ? 'Khách hàng đã Tạm ngưng' : 'Ngăn phát sinh giao dịch mới · UC-CUS-03',
-      tone: 'danger',
+      tone: 'danger' as const,
       disabled: suspended,
-    },
-    {
+    }] : []),
+    ...(canReactivate ? [{
       to: ROUTES.customerReactivate(customer.code),
-      icon: 'play',
+      icon: 'play' as const,
       label: 'Kích hoạt lại khách hàng',
       hint: suspended ? 'Cho phép giao dịch trở lại · UC-CUS-04' : 'Chỉ khi khách hàng đang Tạm ngưng',
-      tone: 'success',
+      tone: 'success' as const,
       disabled: !suspended,
-    },
+    }] : []),
   ];
 
   return (
@@ -98,7 +98,7 @@ export function CustomerActionsMenu({ customer, canEdit, canChangeStatus }: { cu
         <div className="action-menu" role="menu">
           {canEdit && <MenuLink item={{ to: ROUTES.customerEdit(customer.code), icon: 'edit', label: 'Cập nhật thông tin', hint: 'Sửa thông tin hồ sơ · UC-CUS-02' }} />}
           {/* Chỉ hiện thao tác trạng thái khi phiên hiện tại có quyền tương ứng. */}
-          {canChangeStatus && (
+          {statusItems.length > 0 && (
             <>
               <p className="action-menu__group">TRẠNG THÁI HỢP TÁC</p>
               {statusItems.map((item) => (

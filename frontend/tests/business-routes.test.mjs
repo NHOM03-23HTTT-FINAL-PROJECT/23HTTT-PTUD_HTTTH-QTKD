@@ -88,9 +88,9 @@ const authResult = {
   user: { ...user, permissions: [] },
 };
 const routes = [
-  ['/khach-hang', 'customers.view'], ['/khach-hang/tao-moi', 'customers.create'],
+  ['/khach-hang', 'customers.view'], ['/khach-hang/tao-moi', 'customers.create'], ['/khach-hang/uy-quyen', 'customers.change-status'],
   ['/khach-hang/KH-001', 'customers.view'], ['/khach-hang/KH-001/chinh-sua', 'customers.update'],
-  ['/khach-hang/KH-001/tam-ngung', 'customers.change-status'], ['/khach-hang/KH-001/kich-hoat-lai', 'customers.change-status'],
+  ['/khach-hang/KH-001/tam-ngung', 'customers.view'], ['/khach-hang/KH-001/kich-hoat-lai', 'customers.view'],
   ['/khu-vuc', 'areas.view'], ['/khu-vuc/tra-cuu', 'areas.view'], ['/khu-vuc/so-do', 'areas.view'],
   ['/khu-vuc/tao-moi', 'areas.create'], ['/khu-vuc/KV-001', 'areas.view'], ['/khu-vuc/KV-001/chinh-sua', 'areas.update'],
   ['/hop-dong', 'contracts.view'], ['/hop-dong/tao-moi', 'contracts.create'],

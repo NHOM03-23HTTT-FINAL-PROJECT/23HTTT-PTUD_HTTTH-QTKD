@@ -77,7 +77,8 @@ public sealed partial class CustomerService
     {
         var actor = await GetActor(actorId, ct);
         await using var c = Connection(); await c.OpenAsync(ct); await using var tx = await c.BeginTransactionAsync(ct);
-        var row = await Find(c, tx, actor, ParseCode(code), false, ct); MayEdit(actor, row);
+        var row = await Find(c, tx, actor, ParseCode(code), false, ct);
+        await RequireStatusPermission(c, tx, actor, row, "Suspend", ct);
         if (row.Status != "Active") throw new CustomerFailure(409, "ALREADY_IN_STATUS");
         var review = await statusSource.Suspension(c, tx, row.Id, actorId, ct);
         if (review.Items is null || review.FailedKinds is null) throw new CustomerFailure(503, "REVIEW_INCOMPLETE");
@@ -88,7 +89,8 @@ public sealed partial class CustomerService
     {
         var actor = await GetActor(actorId, ct);
         await using var c = Connection(); await c.OpenAsync(ct); await using var tx = await c.BeginTransactionAsync(ct);
-        var row = await Find(c, tx, actor, ParseCode(code), false, ct); MayEdit(actor, row);
+        var row = await Find(c, tx, actor, ParseCode(code), false, ct);
+        await RequireStatusPermission(c, tx, actor, row, "Reactivate", ct);
         if (row.Status != "Suspended") throw new CustomerFailure(409, "ALREADY_IN_STATUS");
         var previous = await LastSuspension(c, tx, row.Id, ct) ?? throw new CustomerFailure(503, "REVIEW_INCOMPLETE");
         var result = await statusSource.Reactivation(c, tx, row.Id, actorId, previous.Review?.ReasonGroup, null, ct);
@@ -112,9 +114,10 @@ public sealed partial class CustomerService
         var note = (request.CoordinationNote ?? "").Trim();
         if (note.Length > 5000) throw new CustomerFailure(400, "VALIDATION");
         await using var c = Connection(); await c.OpenAsync(ct); await using var tx = await c.BeginTransactionAsync(ct);
-        var actor = await AuthorizeMutation(c, tx, actorId, sessionId, "customers.change-status", ct);
+        var actor = await AuthorizeMutation(c, tx, actorId, sessionId, "customers.view", ct);
         await LockKey(c, tx, actorId, "suspend", key, ct);
-        var row = await Find(c, tx, actor, customerCode, true, ct); MayEdit(actor, row);
+        var row = await Find(c, tx, actor, customerCode, true, ct);
+        await RequireStatusPermission(c, tx, actor, row, "Suspend", ct);
         var receipt = await Receipt(c, tx, actorId, "suspend", key, hash, ct);
         if (receipt is not null)
         {
@@ -125,6 +128,8 @@ public sealed partial class CustomerService
         if (row.Version != request.BaseVersion) throw new CustomerFailure(409, "CONFLICT");
         var review = await statusSource.Suspension(c, tx, row.Id, actorId, ct); RequireComplete(review);
         var plan = ValidatePlan(review, request.Plan);
+        // A time-limited delegation can expire while the review source is loading.
+        await RequireStatusPermission(c, tx, actor, row, "Suspend", ct);
         var descriptions = review.Items.Select(item => $"{item.Title}: {plan.Single(p => p.Id == item.Id).Option}").ToArray();
         var followUp = string.Join("; ", descriptions.Concat(string.IsNullOrEmpty(note) ? [] : [note]));
         var metadata = new StoredReview(request.ReasonGroup, plan, note);
@@ -139,9 +144,10 @@ public sealed partial class CustomerService
         Key(key); var customerCode = ParseCode(code); var hash = Hash(new { customerCode, request });
         var reason = RequiredReason(request.Reason); RequireNoUnstoredEvidence(request.Evidence);
         await using var c = Connection(); await c.OpenAsync(ct); await using var tx = await c.BeginTransactionAsync(ct);
-        var actor = await AuthorizeMutation(c, tx, actorId, sessionId, "customers.change-status", ct);
+        var actor = await AuthorizeMutation(c, tx, actorId, sessionId, "customers.view", ct);
         await LockKey(c, tx, actorId, "reactivate", key, ct);
-        var row = await Find(c, tx, actor, customerCode, true, ct); MayEdit(actor, row);
+        var row = await Find(c, tx, actor, customerCode, true, ct);
+        await RequireStatusPermission(c, tx, actor, row, "Reactivate", ct);
         var receipt = await Receipt(c, tx, actorId, "reactivate", key, hash, ct);
         if (receipt is not null)
         {
@@ -153,6 +159,7 @@ public sealed partial class CustomerService
         var previous = await LastSuspension(c, tx, row.Id, ct) ?? throw new CustomerFailure(503, "REVIEW_INCOMPLETE");
         var review = await statusSource.Reactivation(c, tx, row.Id, actorId, previous.Review?.ReasonGroup, request.Exception, ct);
         RequireReady(review);
+        await RequireStatusPermission(c, tx, actor, row, "Reactivate", ct);
         var result = await SaveStatus(c, tx, actor, row, "Reactivate", reason, review.VerifiedBasis, null,
             new { previous.Review?.ReasonGroup, checks = review.Checks }, [], ct);
         await SaveReceipt(c, tx, actorId, "reactivate", key, hash, row.Id, result, ct);

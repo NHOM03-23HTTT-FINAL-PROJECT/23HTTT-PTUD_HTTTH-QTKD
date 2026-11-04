@@ -13,6 +13,7 @@ import { ForgotPasswordPage } from '@/features/auth/pages/ForgotPasswordPage';
 import { LoginPage } from '@/features/auth/pages/LoginPage';
 import { CustomerCreatePage } from '@/features/customers/pages/CustomerCreatePage';
 import { CustomerDetailPage } from '@/features/customers/pages/CustomerDetailPage';
+import { CustomerDelegationsPage } from '@/features/customers/pages/CustomerDelegationsPage';
 import { CustomerEditPage } from '@/features/customers/pages/CustomerEditPage';
 import { CustomerListPage } from '@/features/customers/pages/CustomerListPage';
 import { CustomerReactivatePage } from '@/features/customers/pages/CustomerReactivatePage';
@@ -101,6 +102,10 @@ export function AppRoutes() {
               }
             />
             <Route
+              path={ROUTES.customerDelegations}
+              element={<BusinessRoute permission="customers.change-status" label="Ủy quyền trạng thái khách hàng" apiReady><CustomerDelegationsPage /></BusinessRoute>}
+            />
+            <Route
               path="/khach-hang/:code"
               element={
                 <BusinessRoute permission="customers.view" label="Hồ sơ khách hàng" apiReady>
@@ -119,7 +124,7 @@ export function AppRoutes() {
             <Route
               path="/khach-hang/:code/tam-ngung"
               element={
-                <BusinessRoute permission="customers.change-status" label="Tạm ngưng khách hàng" apiReady>
+                <BusinessRoute permission="customers.view" label="Tạm ngưng khách hàng" apiReady>
                   <CustomerSuspendPage />
                 </BusinessRoute>
               }
@@ -127,7 +132,7 @@ export function AppRoutes() {
             <Route
               path="/khach-hang/:code/kich-hoat-lai"
               element={
-                <BusinessRoute permission="customers.change-status" label="Kích hoạt lại khách hàng" apiReady>
+                <BusinessRoute permission="customers.view" label="Kích hoạt lại khách hàng" apiReady>
                   <CustomerReactivatePage />
                 </BusinessRoute>
               }

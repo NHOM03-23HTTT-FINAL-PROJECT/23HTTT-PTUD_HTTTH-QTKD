@@ -49,11 +49,14 @@ public sealed partial class CustomerService(IdentityDbContext identity, IOptions
     }
     private static string ParseCode(string code) => Regex.IsMatch(code, "^KH-[0-9]{6,19}$", RegexOptions.CultureInvariant)
         ? code : throw new CustomerFailure(404, "NOT_FOUND");
-    private async Task<Actor> AuthorizeMutation(NpgsqlConnection c, NpgsqlTransaction tx, Guid actorId, Guid sessionId, string permission, CancellationToken ct)
+    private async Task<Actor> AuthorizeMutation(NpgsqlConnection c, NpgsqlTransaction tx, Guid actorId, Guid sessionId, string permission, CancellationToken ct,
+        bool exclusiveAdministration = false)
     {
         // Identity administration uses the same lock before changing role grants or
         // assignments. Lock the user too, matching logout/password-change ordering.
-        await using (var administration = Cmd(c, tx, "SELECT pg_advisory_xact_lock_shared(22023)")) await administration.ExecuteNonQueryAsync(ct);
+        await using (var administration = Cmd(c, tx, exclusiveAdministration
+            ? "SELECT pg_advisory_xact_lock(22023)" : "SELECT pg_advisory_xact_lock_shared(22023)"))
+            await administration.ExecuteNonQueryAsync(ct);
         Actor actor;
         await using (var command = Cmd(c, tx, """
             SELECT u.department_id,u.role::text,u.full_name FROM qtkd.user_account u
@@ -146,13 +149,6 @@ public sealed partial class CustomerService(IdentityDbContext identity, IOptions
         var actor = await GetActor(actorId, ct);
         await using var c = Connection(); await c.OpenAsync(ct);
         return await View(c, null, await Find(c, null, actor, ParseCode(code), false, ct), ct);
-    }
-    public async Task EnsureStatusScope(Guid actorId, string code, CancellationToken ct)
-    {
-        var actor = await GetActor(actorId, ct);
-        await using var c = Connection(); await c.OpenAsync(ct);
-        var row = await Find(c, null, actor, ParseCode(code), false, ct);
-        MayEdit(actor, row);
     }
     public async Task<CustomerSearchResult> Search(Guid actorId, string? keyword, string? status, string? sort, int page, int size, CancellationToken ct)
     {

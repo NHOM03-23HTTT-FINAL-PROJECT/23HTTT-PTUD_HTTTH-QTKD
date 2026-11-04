@@ -24,7 +24,7 @@ test('all 26 source tables and all 239 active columns are mapped', () => {
       .filter((model) => !(model.table in source.tables))
       .map((model) => model.table)
       .sort(),
-    ['contract_cancellation_request', 'contract_delivery', 'customer_operation', 'customer_profile_data', 'customer_status_outbox', 'idempotency_request', 'permission', 'role_definition', 'role_permission'],
+    ['contract_cancellation_request', 'contract_delivery', 'customer_operation', 'customer_profile_data', 'customer_status_delegation', 'customer_status_outbox', 'idempotency_request', 'permission', 'role_definition', 'role_permission'],
   );
   assert.deepEqual(models.map((model) => model.table).sort(), Object.keys(source.tables).sort());
   assert.equal(Object.values(source.tables).flat().length, 239);
