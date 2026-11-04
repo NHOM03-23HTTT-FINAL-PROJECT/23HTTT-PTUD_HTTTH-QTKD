@@ -11,6 +11,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
 using Npgsql.NameTranslation;
 using QTKD.Api.Authorization;
+using QTKD.Application.Common.Interfaces;
 using QTKD.Application.Features.ContractApprovals;
 using QTKD.Domain.Identity;
 using QTKD.Infrastructure.Persistence;
@@ -77,6 +78,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
             else
             {
                 sqlite.Open(); services.AddDbContext<IdentityDbContext>(options => options.UseSqlite(sqlite));
+                // CurrentActor reads PostgreSQL via PgDatabase; on SQLite the same rule reads the test DbContext.
+                services.RemoveAll<ICurrentActor>();
+                services.AddScoped<ICurrentActor, SqliteCurrentActor>();
             }
         });
     }

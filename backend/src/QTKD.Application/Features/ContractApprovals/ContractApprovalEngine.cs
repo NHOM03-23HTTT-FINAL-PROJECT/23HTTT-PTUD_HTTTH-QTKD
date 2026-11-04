@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using QTKD.Application.Features.Workflows;
+using QTKD.Domain.Notifications;
 
 namespace QTKD.Application.Features.ContractApprovals;
 

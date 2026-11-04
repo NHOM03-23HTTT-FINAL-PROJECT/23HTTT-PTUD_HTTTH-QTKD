@@ -1,4 +1,4 @@
-using QTKD.Application.Features.ContractApprovals;
+using QTKD.Domain.Notifications;
 using Xunit;
 
 namespace QTKD.UnitTests.Notifications;

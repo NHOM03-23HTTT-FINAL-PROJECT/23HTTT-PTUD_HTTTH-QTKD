@@ -2,14 +2,17 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
-using QTKD.Application.Features.ContractApprovals;
-using QTKD.Infrastructure.ContractApprovals;
+using QTKD.Application.Common.Interfaces;
+using QTKD.Application.Features.Notifications;
+using QTKD.Domain.Notifications;
+using QTKD.Infrastructure.Persistence;
 using Xunit;
 
 namespace QTKD.IntegrationTests;
 
-// Real HTTP pipeline, JWT/session and CSRF. The notification store is a spy only:
+// Real HTTP pipeline (NotificationsController), JWT/session, current actor and CSRF. The notification store is a spy only:
 // these tests verify the inbox contract (recipient scoping, read-state writes), NOT PostgreSQL.
 public sealed class NotificationApiTests : IDisposable
 {
@@ -94,7 +97,7 @@ public sealed class NotificationApiTests : IDisposable
     public async Task Missing_or_foreign_notification_is_reported_as_not_found()
     {
         using var client = await Setup();
-        store.Failure = new ReviewFailure(404, "NOT_FOUND");
+        store.Missing = true;
         await AssertError(await client.PostAsJsonAsync($"/api/v1/notifications/{Guid.NewGuid()}/read", new { }), 404, "NOT_FOUND");
     }
     [Fact]
@@ -111,11 +114,14 @@ public sealed class NotificationApiTests : IDisposable
         Assert.Empty(store.Listed);
     }
     [Fact]
-    public void Production_resolves_the_postgres_notification_store()
+    public void Production_registers_the_postgres_notification_store()
     {
-        using var production = new ApiFactory();
-        using var scope = production.Services.CreateScope();
-        Assert.IsType<PostgresApprovalStore>(scope.ServiceProvider.GetRequiredService<INotificationStore>());
+        // Resolving it would build PgDatabase from the placeholder connection string; check the registration instead.
+        ServiceDescriptor? registered = null;
+        using var production = new ApiFactory().WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
+            registered = services.Last(x => x.ServiceType == typeof(INotificationStore))));
+        _ = production.Services;
+        Assert.Equal(typeof(PostgresNotificationStore), registered!.ImplementationType);
     }
     private sealed class NotificationSpy : INotificationStore
     {
@@ -124,25 +130,22 @@ public sealed class NotificationApiTests : IDisposable
         public Guid? CountActor;
         public (Guid Actor, Guid Id)? Read;
         public Guid? AllReadActor;
-        public ReviewFailure? Failure;
-        private void MaybeFail()
+        public bool Missing;
+        public Task<NotificationPage> List(Guid actor, NotificationQuery query, CancellationToken ct)
         {
-            if (Failure is not null) throw Failure;
-        }
-        public Task<NotificationPage> Notifications(Guid actor, NotificationQuery query, CancellationToken ct)
-        {
-            Listed.Add((actor, query)); MaybeFail();
+            Listed.Add((actor, query));
             return Task.FromResult(new NotificationPage(Items, Items.Count, Items.Count(x => !x.IsRead), query.Page, query.PageSize));
         }
         public Task<int> UnreadCount(Guid actor, CancellationToken ct)
-        { CountActor = actor; MaybeFail(); return Task.FromResult(Items.Count(x => !x.IsRead)); }
-        public Task<NotificationItem> MarkRead(Guid actor, Guid id, CancellationToken ct)
+        { CountActor = actor; return Task.FromResult(Items.Count(x => !x.IsRead)); }
+        public Task<NotificationItem?> MarkRead(Guid actor, Guid id, CancellationToken ct)
         {
-            Read = (actor, id); MaybeFail();
+            Read = (actor, id);
+            if (Missing) return Task.FromResult<NotificationItem?>(null);
             var item = Items.FirstOrDefault(x => x.Id == id) ?? Item("Thông báo", false) with { Id = id };
-            return Task.FromResult(item with { IsRead = true });
+            return Task.FromResult<NotificationItem?>(item with { IsRead = true });
         }
         public Task<int> MarkAllRead(Guid actor, CancellationToken ct)
-        { AllReadActor = actor; MaybeFail(); return Task.FromResult(Items.Count(x => !x.IsRead)); }
+        { AllReadActor = actor; return Task.FromResult(Items.Count(x => !x.IsRead)); }
     }
 }

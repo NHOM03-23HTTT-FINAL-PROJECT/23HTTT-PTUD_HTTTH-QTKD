@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.Http.Features;
 using QTKD.Api.Authentication;
 using QTKD.Application.Common.Interfaces;
 using QTKD.Application.Features.Contracts;
+using QTKD.Application.Features.Notifications;
 using QTKD.Domain.Contracts;
 using QTKD.Api.Authorization;
 using QTKD.Api.Endpoints;
@@ -56,7 +57,6 @@ builder.Services.AddScoped<IApprovalDbSessions, ApprovalDbSessions>();
 builder.Services.AddScoped<ContractCoordinationService>();
 builder.Services.AddScoped<ApprovalAssignmentService>();
 builder.Services.AddScoped<IApprovalStore>(sp => sp.GetRequiredService<PostgresApprovalStore>());
-builder.Services.AddScoped<INotificationStore>(sp => sp.GetRequiredService<PostgresApprovalStore>());
 builder.Services.AddScoped<IContractApprovalEngine, ContractApprovalEngine>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
@@ -129,6 +129,8 @@ builder.Services.AddScoped<IContractStore>(sp => new PostgresContractStore(
     sp.GetRequiredService<PgDatabase>(),
     Path.GetFullPath(builder.Configuration["Storage:Root"] ?? Path.Combine(builder.Environment.ContentRootPath, ".data", "uploads"))));
 builder.Services.AddScoped<ContractService>();
+builder.Services.AddScoped<INotificationStore, PostgresNotificationStore>();
+builder.Services.AddScoped<NotificationService>();
 
 var app = builder.Build();
 app.Use(async (context, next) =>
@@ -192,7 +194,6 @@ app.Use(async (context, next) =>
 app.UseRateLimiter();
 app.UseAuthorization();
 app.MapContractApprovals(allowedOrigins);
-app.MapNotifications(allowedOrigins);
 
 const string cookieName = "__Host-qtkd-refresh";
 bool Csrf(HttpContext context) => context.Request.Headers["X-QTKD-CSRF"] == "1"

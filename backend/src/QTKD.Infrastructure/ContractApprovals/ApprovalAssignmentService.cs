@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Npgsql;
 using QTKD.Application.Features.ContractApprovals;
+using QTKD.Domain.Notifications;
 
 namespace QTKD.Infrastructure.ContractApprovals;
 
