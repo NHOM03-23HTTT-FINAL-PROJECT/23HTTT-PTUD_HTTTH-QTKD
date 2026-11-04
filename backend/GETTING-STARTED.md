@@ -12,6 +12,8 @@ Các module đăng nhập, đăng xuất, đổi mật khẩu, quản lý ngư�
 - `QTKD.Infrastructure`: Npgsql, SQL có tham số, transaction và lưu tệp riêng.
 - `src/QTKD.Infrastructure/Persistence/Migrations`: nguồn migration (EF Core, `QtkdDbContext`); áp bằng `QTKD.DbTool`, xem `DB/README.md`.
 
+Module hợp đồng dùng kiểu cũ (`IContractStore` + SQL qua Npgsql). Module mới theo mẫu Controller → Service → Repository (EF Core) của Notifications: [docs/architecture/STRUCTURE.md](../docs/architecture/STRUCTURE.md#mẫu-module-controller--service--repository).
+
 ## Tích hợp xác thực
 
 Sau khi ghép `origin/main` tại `17d9b18`, ứng dụng có module identity, rà soát/phê duyệt và phân công của nhóm. Module hợp đồng dùng chung JWT, kiểm tra phiên và permission của module đó; không có chức năng đăng nhập riêng. `CurrentActor` đọc UUID từ claim `sub`, rồi đọc lại vai trò, trạng thái và phòng ban từ DB để kiểm tra phạm vi hồ sơ.

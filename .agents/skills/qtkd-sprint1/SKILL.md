@@ -20,7 +20,7 @@ Nếu task không có mã, ánh xạ sang nhóm công việc phù hợp trước
 
 ## Giữ đúng phạm vi
 
-FE theo kế hoạch là React/TypeScript/Vite; BE là C#/.NET Web API, hướng Api/Application/Domain/Infrastructure; DB là PostgreSQL qua Supabase và EF Core. Phiên bản, cách xác thực cụ thể và vị trí migration chưa chốt. Kiểm tra hiện trạng repo khi triển khai thay vì giả định ứng dụng đã tồn tại.
+FE theo kế hoạch là React/TypeScript/Vite; BE là C#/.NET Web API, hướng Api/Application/Domain/Infrastructure; DB là PostgreSQL qua Supabase và EF Core. Migration EF Core do `QtkdDbContext` quản lý, nằm ở `backend/src/QTKD.Infrastructure/Persistence/Migrations` và được áp bằng `QTKD.DbTool` (xem `DB/README.md`). Module backend mới theo mẫu Controller → Service → Repository của Notifications trong `docs/architecture/STRUCTURE.md`. Kiểm tra hiện trạng repo khi triển khai thay vì giả định ứng dụng đã tồn tại.
 
 Sprint 1 tập trung nền tảng, khách hàng, khu vực, hợp đồng và workflow. US-CTR-16 chỉ làm hợp đồng. Phụ lục, bảng giá, sản lượng, thông báo, ký điện tử và AI Agent sản phẩm tuân theo phân kỳ trong context.
 
