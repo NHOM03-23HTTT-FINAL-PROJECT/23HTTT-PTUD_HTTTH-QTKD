@@ -56,6 +56,7 @@ builder.Services.AddScoped<IApprovalDbSessions, ApprovalDbSessions>();
 builder.Services.AddScoped<ContractCoordinationService>();
 builder.Services.AddScoped<ApprovalAssignmentService>();
 builder.Services.AddScoped<IApprovalStore>(sp => sp.GetRequiredService<PostgresApprovalStore>());
+builder.Services.AddScoped<INotificationStore>(sp => sp.GetRequiredService<PostgresApprovalStore>());
 builder.Services.AddScoped<IContractApprovalEngine, ContractApprovalEngine>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
@@ -191,8 +192,7 @@ app.Use(async (context, next) =>
 app.UseRateLimiter();
 app.UseAuthorization();
 app.MapContractApprovals(allowedOrigins);
-app.MapGet("/api/v1/notifications", async (HttpContext context, PostgresApprovalStore store, CancellationToken ct)
-    => Results.Ok(await store.Notifications(Guid.Parse(context.User.FindFirstValue("sub")!), ct))).RequireAuthorization();
+app.MapNotifications(allowedOrigins);
 
 const string cookieName = "__Host-qtkd-refresh";
 bool Csrf(HttpContext context) => context.Request.Headers["X-QTKD-CSRF"] == "1"

@@ -5,5 +5,8 @@
     <Project Path="src/QTKD.Infrastructure/QTKD.Infrastructure.csproj" />
     <Project Path="src/QTKD.Api/QTKD.Api.csproj" />
   </Folder>
-  <Folder Name="/tests/"><Project Path="tests/QTKD.IntegrationTests/QTKD.IntegrationTests.csproj" /></Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/QTKD.IntegrationTests/QTKD.IntegrationTests.csproj" />
+    <Project Path="tests/QTKD.UnitTests/QTKD.UnitTests.csproj" />
+  </Folder>
 </Solution>

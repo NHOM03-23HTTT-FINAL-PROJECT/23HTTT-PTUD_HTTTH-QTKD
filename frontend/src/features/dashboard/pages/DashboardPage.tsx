@@ -1,6 +1,7 @@
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { Alert } from '@/components/feedback/Alert';
+import { useNotifications } from '@/features/notifications/hooks/useNotifications';
 import { getDashboardBase } from '@/mocks/seed/dashboards';
 import { DashboardHeader, PendingTasksCard, StatGrid } from '../components/DashboardCards';
 import {
@@ -19,6 +20,7 @@ export type ForbiddenRedirectState = { forbidden?: string };
 export function DashboardPage() {
   const { user } = useAuth();
   const location = useLocation();
+  const { unread, setPanelOpen } = useNotifications();
   if (!user) return null;
 
   const workspace = user.departmentInfo.workspace;
@@ -34,7 +36,7 @@ export function DashboardPage() {
           theo vai trò.
         </Alert>
       )}
-      <PendingTasksCard pending={base.pending} />
+      <PendingTasksCard pending={base.pending} unread={unread} onOpenNotifications={() => setPanelOpen(true)} />
       <StatGrid stats={base.stats} />
       {workspace === 'kinh-doanh' && <SalesWorkspace />}
       {workspace === 'khai-thac' && <OperationsWorkspace />}

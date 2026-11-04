@@ -134,9 +134,9 @@ public sealed class ApprovalAssignmentService(IApprovalDbSessions sessions)
             if (await update.ExecuteNonQueryAsync(ct) != 1) throw new ReviewFailure(409, "ASSIGNMENT_IMMUTABLE");
 
         var label = AssignmentRules.StepLabel(step.Key);
-        await Notify(c, tx, request.AssigneeId, id, $"Bạn được phân công {label} hồ sơ {document.Title}.", ct);
+        await Notify(c, tx, request.AssigneeId, id, NotificationKinds.Assigned(label, document.Title), ct);
         if (step.AssigneeId is { } previous)
-            await Notify(c, tx, previous, id, $"Bạn không còn được phân công {label} hồ sơ {document.Title}.", ct);
+            await Notify(c, tx, previous, id, NotificationKinds.Revoked(label, document.Title), ct);
 
         await using (var audit = PostgresApprovalStore.Command(c, tx, AuditSql,
             ("id", id), ("action", step.AssigneeId is null ? "assign" : "reassign"), ("actor", actorId),

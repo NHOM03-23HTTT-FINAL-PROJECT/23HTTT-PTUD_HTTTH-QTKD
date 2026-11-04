@@ -146,6 +146,16 @@
   color: var(--text-secondary);
 }
 
+.topbar__icon-button {
+  cursor: pointer;
+}
+
+.topbar__icon-button:hover,
+.topbar__icon-button[aria-expanded='true'] {
+  color: var(--accent-strong);
+  border-color: var(--accent);
+}
+
 .topbar__unread {
   position: absolute;
   top: 7px;

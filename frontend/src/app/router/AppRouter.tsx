@@ -27,6 +27,8 @@ import { ContractListPage } from '@/features/contracts/pages/ContractListPage';
 import { ContractProgressPage } from '@/features/contracts/pages/ContractProgressPage';
 import { ApprovalAssignmentPage } from '@/features/contracts/pages/ApprovalAssignmentPage';
 import { DashboardPage } from '@/features/dashboard/pages/DashboardPage';
+import { NotificationOpenPage } from '@/features/notifications/pages/NotificationOpenPage';
+import { NotificationsPage } from '@/features/notifications/pages/NotificationsPage';
 import { MainLayout } from '@/layouts/MainLayout';
 import { PublicOnly, RequireAuth } from './guards';
 import { BusinessRoute } from './BusinessRoute';
@@ -84,6 +86,10 @@ export function AppRoutes() {
           <Route element={<MainLayout />}>
             <Route path={ROUTES.dashboard} element={<DashboardPage />} />
             <Route path={ROUTES.changePassword} element={<ChangePasswordPage />} />
+            {/* UC-CHUNG-05: mọi người dùng nội bộ đã đăng nhập; BE chỉ trả thông báo của chính họ. */}
+            <Route path={ROUTES.notifications} element={<NotificationsPage />} />
+            {/* A4: link trong email mở đúng một thông báo. */}
+            <Route path="/thong-bao/:id" element={<NotificationOpenPage />} />
             <Route
               path={ROUTES.customers}
               element={

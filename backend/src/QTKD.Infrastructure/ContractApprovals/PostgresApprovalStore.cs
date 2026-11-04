@@ -6,7 +6,7 @@ using QTKD.Application.Features.ContractApprovals;
 namespace QTKD.Infrastructure.ContractApprovals;
 
 /// <summary>Uses Prisma-owned tables; never creates/migrates a database at application startup.</summary>
-public sealed class PostgresApprovalStore(IConfiguration configuration) : IApprovalStore
+public sealed class PostgresApprovalStore(IConfiguration configuration) : IApprovalStore, INotificationStore
 {
     private async Task<NpgsqlConnection> Open(CancellationToken ct)
     {
@@ -60,17 +60,61 @@ public sealed class PostgresApprovalStore(IConfiguration configuration) : IAppro
             """, ("id", id));
         await cmd.ExecuteNonQueryAsync(ct);
     }
-    public async Task<IReadOnlyList<object>> Notifications(Guid actor, CancellationToken ct)
+    // RecordTitle is a list label only. Only contracts have one today; other record types return null.
+    private const string NotificationColumns = """
+        n.notification_id, n.record_type::text, n.record_id,
+        CASE WHEN n.record_type='Contract' THEN (SELECT k.title FROM qtkd.contract k WHERE k.contract_id=n.record_id) END,
+        n.content, n.is_read, n.created_at
+        """;
+    private static NotificationItem ReadNotification(NpgsqlDataReader r) => new(r.GetGuid(0), NotificationKinds.Of(r.GetString(4)),
+        r.GetString(1), r.GetGuid(2), r.IsDBNull(3) ? null : r.GetString(3), r.GetString(4), r.GetBoolean(5), r.GetDateTime(6));
+    public async Task<NotificationPage> Notifications(Guid actor, NotificationQuery query, CancellationToken ct)
     {
         await using var c = await Open(ct);
-        await using var cmd = Command(c, null, """
-            SELECT notification_id,record_id,content,is_read,created_at FROM qtkd.notification
-            WHERE recipient_id=@actor ORDER BY created_at DESC LIMIT 100
-            """, ("actor", actor));
-        var items = new List<object>();
+        long total, unread;
+        await using (var counts = Command(c, null, """
+            SELECT count(*) FILTER (WHERE NOT @unread OR is_read=false), count(*) FILTER (WHERE is_read=false)
+            FROM qtkd.notification WHERE recipient_id=@actor
+            """, ("actor", actor), ("unread", query.UnreadOnly)))
+        await using (var r = await counts.ExecuteReaderAsync(ct))
+        {
+            await r.ReadAsync(ct); total = r.GetInt64(0); unread = r.GetInt64(1);
+        }
+        await using var cmd = Command(c, null, $"""
+            SELECT {NotificationColumns} FROM qtkd.notification n
+            WHERE n.recipient_id=@actor AND (NOT @unread OR n.is_read=false)
+            ORDER BY n.created_at DESC, n.notification_id DESC LIMIT @limit OFFSET @offset
+            """, ("actor", actor), ("unread", query.UnreadOnly), ("limit", query.PageSize), ("offset", (query.Page - 1) * query.PageSize));
+        var items = new List<NotificationItem>();
+        await using (var r = await cmd.ExecuteReaderAsync(ct))
+            while (await r.ReadAsync(ct)) items.Add(ReadNotification(r));
+        return new(items, checked((int)total), checked((int)unread), query.Page, query.PageSize);
+    }
+    public async Task<int> UnreadCount(Guid actor, CancellationToken ct)
+    {
+        await using var c = await Open(ct);
+        await using var cmd = Command(c, null,
+            "SELECT count(*) FROM qtkd.notification WHERE recipient_id=@actor AND is_read=false", ("actor", actor));
+        return checked((int)(long)(await cmd.ExecuteScalarAsync(ct))!);
+    }
+    public async Task<NotificationItem> MarkRead(Guid actor, Guid id, CancellationToken ct)
+    {
+        await using var c = await Open(ct);
+        // recipient_id is part of the predicate: another user's row is reported as missing, not as forbidden.
+        await using var cmd = Command(c, null, $"""
+            UPDATE qtkd.notification n SET is_read=true WHERE n.notification_id=@id AND n.recipient_id=@actor
+            RETURNING {NotificationColumns}
+            """, ("id", id), ("actor", actor));
         await using var r = await cmd.ExecuteReaderAsync(ct);
-        while (await r.ReadAsync(ct)) items.Add(new { id = r.GetGuid(0), recordId = r.GetGuid(1), content = r.GetString(2), isRead = r.GetBoolean(3), createdAt = r.GetDateTime(4) });
-        return items;
+        if (!await r.ReadAsync(ct)) throw new ReviewFailure(404, "NOT_FOUND");
+        return ReadNotification(r);
+    }
+    public async Task<int> MarkAllRead(Guid actor, CancellationToken ct)
+    {
+        await using var c = await Open(ct);
+        await using var cmd = Command(c, null,
+            "UPDATE qtkd.notification SET is_read=true WHERE recipient_id=@actor AND is_read=false", ("actor", actor));
+        return await cmd.ExecuteNonQueryAsync(ct);
     }
     internal static NpgsqlCommand Command(NpgsqlConnection c, NpgsqlTransaction? tx, string sql, params (string Name, object? Value)[] parameters)
     {

@@ -4,6 +4,8 @@ import { SessionProvider } from '@/app/providers/SessionProvider';
 import { Icon } from '@/components/icon/Icon';
 import { WORKSPACE_NAV, WORKSPACE_SEARCH_PLACEHOLDER, type NavItem } from '@/constants/navigation';
 import { ROUTES } from '@/constants/routes';
+import { NotificationBell } from '@/features/notifications/components/NotificationBell';
+import { NotificationsProvider } from '@/features/notifications/hooks/useNotifications';
 import { getUnreadCount } from '@/mocks/seed/dashboards';
 import { IS_MOCK_AUTH } from '@/features/auth/api/authApi';
 import { useApprovalInboxCount } from '@/features/contracts/hooks/useApprovalInboxCount';
@@ -18,6 +20,7 @@ export function MainLayout() {
 
   return (
     <SessionProvider user={user}>
+      <NotificationsProvider userId={user.id}>
       <div className="app-shell" data-accent={workspace}>
         <Topbar user={user} />
         <div className="app-shell__body">
@@ -27,13 +30,13 @@ export function MainLayout() {
           </main>
         </div>
       </div>
+      </NotificationsProvider>
     </SessionProvider>
   );
 }
 
 function Topbar({ user }: { user: CurrentUser }) {
   const workspace = user.departmentInfo.workspace;
-  const hasUnread = getUnreadCount(workspace) > 0;
 
   return (
     <header className="topbar">
@@ -60,10 +63,7 @@ function Topbar({ user }: { user: CurrentUser }) {
         {user.departmentInfo.name}
       </span>
 
-      <button type="button" className="topbar__icon-button" aria-label="Thông báo">
-        <Icon name="bell" />
-        {hasUnread && <span className="topbar__unread" />}
-      </button>
+      <NotificationBell />
 
       <span className="topbar__divider" />
 

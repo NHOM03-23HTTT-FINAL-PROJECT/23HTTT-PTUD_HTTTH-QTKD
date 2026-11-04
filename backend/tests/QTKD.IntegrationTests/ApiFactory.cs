@@ -23,6 +23,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
 {
     public IContractApprovalEngine? ApprovalEngine { get; init; }
     public IApprovalStore? ApprovalStore { get; init; }
+    public INotificationStore? NotificationStore { get; init; }
     private readonly SqliteConnection sqlite = new("Data Source=:memory:");
     public readonly string Key = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48));
     public readonly string Password = "Identity.Test@2026";
@@ -46,6 +47,11 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
             {
                 services.RemoveAll<IApprovalStore>();
                 services.AddSingleton(ApprovalStore);
+            }
+            if (NotificationStore is not null)
+            {
+                services.RemoveAll<INotificationStore>();
+                services.AddSingleton(NotificationStore);
             }
             if (ApprovalEngine is not null)
             {
