@@ -48,6 +48,7 @@ Phụ lục hợp đồng (CTR-09..15) dùng chung vòng đời với hợp đ�
 | backend/src/QTKD.Domain/Identity/ | Entity/enum Identity không phụ thuộc HTTP/EF |
 | backend/src/QTKD.Infrastructure/ | IdentityService, custom store/hasher, TokenIssuer và DbContext |
 | backend/tests/QTKD.IntegrationTests/ | WebApplicationFactory; SQLite mặc định, PostgreSQL riêng khi cấu hình rõ |
+| backend/tests/QTKD.UnitTests/ | Unit test cho logic thuần của Application; không HTTP, DB hay mạng |
 | backend/scripts/ và Start-Api.ps1 | Launcher local và chuyển đổi cấu hình .env/URI |
 | DB/prisma/ | Schema, migration và seed; nguồn DDL duy nhất |
 | docs/decisions/, specs/identity/, setup/, testing/ | Quyết định, hợp đồng API, hướng dẫn team và bằng chứng kiểm thử |

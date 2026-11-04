@@ -29,6 +29,8 @@ export const ROUTES = {
   approvalTracking: '/phe-duyet/tien-do',
   approvalAssignments: '/phe-duyet/phan-cong',
   paymentDetail: (code: string) => `/bang-thanh-toan/${code}`,
+  notifications: '/thong-bao',
+  notificationOpen: (id: string) => `/thong-bao/${encodeURIComponent(id)}`,
 } as const;
 
 /** Tham số giữ đường dẫn người dùng định mở trước khi bị chuyển sang trang đăng nhập (A3). */

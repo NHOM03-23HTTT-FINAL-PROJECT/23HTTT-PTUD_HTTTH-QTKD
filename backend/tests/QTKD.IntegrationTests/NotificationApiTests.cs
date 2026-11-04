@@ -75,20 +75,6 @@ public sealed class NotificationApiTests : IDisposable
         await AssertError(await client.GetAsync("/api/v1/notifications?" + query), 400, "VALIDATION");
         Assert.Empty(store.Listed);
     }
-    // Kind is not stored: it is read back from content, so templates and parser must stay in step.
-    public static TheoryData<string, string> Templates => new()
-    {
-        { NotificationKinds.Assigned("rà soát Pháp chế", "HĐ: approved. A"), NotificationKinds.ReviewAssigned },
-        { NotificationKinds.Revoked("rà soát Pháp chế", "HĐ A"), NotificationKinds.AssignmentRevoked },
-        { NotificationKinds.Decision("HĐ A", "under-review", null), NotificationKinds.ReviewRequired },
-        { NotificationKinds.Decision("HĐ A", "approved", "Đồng ý"), NotificationKinds.ApprovalResult },
-        { NotificationKinds.Decision("HĐ A", "rejected", "Sai giá: approved. x"), NotificationKinds.ApprovalResult },
-        { NotificationKinds.Decision("HĐ A", "revision-requested", "Sửa điều 3"), NotificationKinds.RevisionRequested },
-        { "Hợp đồng Demo chờ rà soát; dữ liệu thử nghiệm.", NotificationKinds.General },
-    };
-    [Theory]
-    [MemberData(nameof(Templates))]
-    public void Kind_is_derived_from_the_message_template(string content, string kind) => Assert.Equal(kind, NotificationKinds.Of(content));
     [Fact]
     public async Task Mark_one_and_mark_all_are_writes_to_the_caller_only()
     {

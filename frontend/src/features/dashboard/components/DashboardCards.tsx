@@ -36,8 +36,13 @@ export function DashboardHeader({ name, greeting, actions }: { name: string; gre
   );
 }
 
-/** Khối "Hồ sơ chờ tôi xử lý" kèm số thông báo chưa đọc. */
-export function PendingTasksCard({ pending }: { pending: PendingTasks }) {
+/** Khối "Hồ sơ chờ tôi xử lý" kèm số thông báo chưa đọc lấy từ hộp thư thật (UC-CHUNG-05); null khi chưa tải xong. */
+export function PendingTasksCard({ pending, unread, onOpenNotifications }: {
+  pending: PendingTasks;
+  unread?: number | null;
+  /** Mở bảng thông báo trên Topbar (UC-CHUNG-05 trigger từ trang làm việc). */
+  onOpenNotifications?: () => void;
+}) {
   const total = pending.items.reduce((sum, item) => sum + item.count, 0);
 
   return (
@@ -59,10 +64,17 @@ export function PendingTasksCard({ pending }: { pending: PendingTasks }) {
             ))
           : pending.emptyText && <p className="pending-card__empty">{pending.emptyText}</p>}
       </div>
-      <span className="pending-card__unread">
-        <Icon name="bell" />
-        {pending.unread} thông báo chưa đọc
-      </span>
+      {onOpenNotifications ? (
+        <button type="button" className="pending-card__unread" data-notification-trigger onClick={onOpenNotifications}>
+          <Icon name="bell" />
+          {unread == null ? 'Thông báo' : `${unread} thông báo chưa đọc`}
+        </button>
+      ) : (
+        <span className="pending-card__unread">
+          <Icon name="bell" />
+          {unread == null ? 'Thông báo' : `${unread} thông báo chưa đọc`}
+        </span>
+      )}
       {pending.viewAllTo && (
         <ButtonLink to={pending.viewAllTo} variant="ghost">
           Xem tất cả
