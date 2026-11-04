@@ -8,7 +8,8 @@ public sealed record ReviewDocument(Guid Id, string Title, string CustomerName, 
     string Department, decimal Value, string Status, int Version, Guid RoundId, int RoundNo,
     int SubmittedVersion, string RoundResult, DateTime SubmittedAt, IReadOnlyList<ReviewStep> Steps,
     string Content, string PaymentTerm, IReadOnlyList<ReviewAttachment> Attachments, string? PendingTask = null,
-    string ContractType = "", DateOnly? StartDate = null, DateOnly? EndDate = null, IReadOnlyList<ReviewService>? Services = null);
+    string ContractType = "", DateOnly? StartDate = null, DateOnly? EndDate = null, IReadOnlyList<ReviewService>? Services = null,
+    string Code = "");
 public sealed record ReviewService(string Name, string Area, string Unit);
 public sealed record ReviewCoordination(Guid Id, Guid DocumentId, Guid RoundId, string Department, string Content,
     string RequestedBy, DateTime RequestedAt, string? Reply = null, string? RepliedBy = null, DateTime? RepliedAt = null);

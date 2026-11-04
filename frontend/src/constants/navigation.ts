@@ -8,6 +8,7 @@ export type NavItem = {
   icon: IconName;
   permission?: Permission;
   badge?: number;
+  approvalStep?: 'sales' | 'legal' | 'board';
   /** UC/module sẽ triển khai màn hình này; hiển thị trên trang giữ chỗ. */
   module: string;
 };
@@ -74,7 +75,7 @@ export const WORKSPACE_NAV: Record<WorkspaceKey, NavGroup[]> = {
         { ...CONTRACT_LIST, label: 'Hợp đồng của tôi' },
         { label: 'Tạo hợp đồng', path: '/hop-dong/tao-moi', icon: 'file-plus', permission: 'contracts.create', module: 'Hợp đồng (CTR)' },
         { label: 'Cần chỉnh sửa', path: '/hop-dong/can-chinh-sua', icon: 'edit', permission: 'contracts.create', badge: 1, module: 'Hợp đồng (CTR)' },
-        { label: 'Hồ sơ chờ tôi duyệt', path: '/phe-duyet/cho-duyet', icon: 'inbox', permission: 'approvals.approve', module: 'Phê duyệt (APR)' },
+        { label: 'Hồ sơ chờ tôi duyệt', path: '/phe-duyet/cho-duyet', icon: 'inbox', permission: 'approvals.approve', approvalStep: 'sales', module: 'Phê duyệt (APR)' },
       ],
     },
     { title: 'PHÊ DUYỆT', items: [APPROVAL_ASSIGNMENTS, TRACK_PROGRESS, APPROVAL_HISTORY] },
@@ -96,7 +97,7 @@ export const WORKSPACE_NAV: Record<WorkspaceKey, NavGroup[]> = {
     {
       title: 'RÀ SOÁT PHÁP LÝ',
       items: [
-        { label: 'Chờ rà soát pháp lý', path: '/phe-duyet/cho-ra-soat', icon: 'shield', permission: 'approvals.review-legal', badge: 3, module: 'Phê duyệt (APR)' },
+        { label: 'Chờ rà soát pháp lý', path: '/phe-duyet/cho-ra-soat', icon: 'shield', permission: 'approvals.review-legal', approvalStep: 'legal', module: 'Phê duyệt (APR)' },
         { label: 'Đã rà soát', path: '/phe-duyet/da-ra-soat', icon: 'check', permission: 'approvals.review-legal', module: 'Phê duyệt (APR)' },
       ],
     },
@@ -107,7 +108,7 @@ export const WORKSPACE_NAV: Record<WorkspaceKey, NavGroup[]> = {
     {
       title: 'PHÊ DUYỆT',
       items: [
-        { label: 'Hồ sơ chờ phê duyệt', path: '/phe-duyet/cho-phe-duyet', icon: 'inbox', permission: 'approvals.approve', badge: 2, module: 'Phê duyệt (APR)' },
+        { label: 'Hồ sơ chờ phê duyệt', path: '/phe-duyet/cho-phe-duyet', icon: 'inbox', permission: 'approvals.approve', approvalStep: 'board', module: 'Phê duyệt (APR)' },
         APPROVAL_ASSIGNMENTS,
         APPROVAL_HISTORY,
       ],

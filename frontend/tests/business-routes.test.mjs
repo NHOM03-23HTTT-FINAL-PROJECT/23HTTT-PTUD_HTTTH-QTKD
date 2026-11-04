@@ -55,6 +55,7 @@ async function harness(mode) {
   const { BusinessRoute } = await load('app/router/BusinessRoute.tsx');
   const { setUser } = await load('app/providers/AuthProvider.tsx');
   return {
+    ...await load('features/contracts/utils/approvalReview.ts'),
     ...await load('features/contracts/api/approvalApi.ts'),
     ...await load('features/auth/api/authApi.ts'), ...await load('lib/http/client.ts'),
     ...await load('mocks/contractsServer.ts'), ...await load('mocks/seed/users.ts'),
@@ -207,4 +208,52 @@ test('approval adapter sends snapshot and idempotency key with bearer and never 
   assert.equal(calls[1].path, `/api/v1/approvals/contracts/${user.id}/handoff`);
   assert.equal(calls[2].path, `/api/v1/approvals/contracts/${user.id}/pending-task/retry?step=legal`);
   for (const call of calls) assert.ok(!('userId' in call.body));
+});
+
+function reviewFixture(role = 'TP_KD') {
+  const actor = { id: role, roles: [role], permissions: new Set(['approvals.approve', 'approvals.review-legal']) };
+  const keys = ['sales', 'legal', 'board'];
+  const assignees = ['TP_KD', 'NV_PC', 'GD'];
+  const steps = keys.map((key, i) => ({ id: key, key, order: i + 1, assigneeId: assignees[i], assigneeName: assignees[i],
+    state: i === 0 ? 'pending-accept' : 'waiting', decision: null, reviewedVersion: null, requiresHandoff: key === 'legal' }));
+  const contract = { id: 'contract-uuid', code: 'HD-000010', status: 'submitted', version: 3,
+    rounds: [{ id: 'round-1', no: 1, result: 'in-progress', contractVersion: 3, steps: structuredClone(steps) }] };
+  const doc = { id: contract.id, code: contract.code, roundId: 'round-1', roundNo: 1, version: 3, submittedVersion: 3, roundResult: 'in-progress', status: 'submitted', steps };
+  return { actor, contract, doc };
+}
+
+test('detail review exposes sales acceptance only for the assigned reviewer on the displayed version', () => {
+  const { actor, contract, doc } = reviewFixture();
+  assert.equal(api.approvalView(contract, actor, doc).kind, 'accept');
+  assert.equal(api.approvalView({ ...contract, version: 2 }, actor, doc).kind, 'stale');
+  assert.equal(api.approvalView(contract, actor, { ...doc, roundId: 'new-round' }).kind, 'stale');
+  assert.equal(api.approvalView(contract, { ...actor, permissions: new Set() }, doc).kind, 'info');
+  assert.equal(api.approvalView(contract, { ...actor, id: 'different-manager' }, doc).kind, 'info');
+});
+
+test('legal and board controls wait for predecessors, assignment and the explicit handoff', () => {
+  const f = reviewFixture('NV_PC');
+  assert.equal(api.approvalView(f.contract, f.actor, f.doc).kind, 'info');
+  f.doc.status = 'under-review'; f.doc.steps[0] = { ...f.doc.steps[0], state: 'done', decision: 'approve', reviewedVersion: 3 };
+  f.doc.steps[1].state = 'reviewing';
+  assert.equal(api.approvalView(f.contract, f.actor, f.doc).kind, 'decide');
+  f.doc.steps[1] = { ...f.doc.steps[1], state: 'done', decision: 'approve', reviewedVersion: 3 };
+  assert.equal(api.approvalView(f.contract, f.actor, f.doc).kind, 'handoff');
+  const board = { ...f.actor, id: 'GD', roles: ['GD'] };
+  assert.equal(api.approvalView(f.contract, board, f.doc).kind, 'info');
+  f.doc.steps[2].state = 'reviewing';
+  assert.equal(api.approvalView(f.contract, board, f.doc).kind, 'decide');
+  f.doc.steps[0].reviewedVersion = 2;
+  assert.equal(api.approvalView(f.contract, board, f.doc).kind, 'info');
+});
+
+test('unassigned, concluded and new manager roles produce explicit read-only states', () => {
+  const f = reviewFixture('NV_PC');
+  f.contract.rounds[0].steps[1].assigneeId = null;
+  assert.match(api.approvalView(f.contract, f.actor, f.doc).message, /chờ phân công/);
+  f.contract.rounds[0].result = 'revision';
+  assert.match(api.approvalView(f.contract, f.actor, f.doc).message, /đã kết thúc/);
+  assert.equal(api.approvalStepFor({ roles: ['TP_PC'] }), 'legal');
+  assert.equal(api.approvalStepFor({ roles: ['TGD'] }), 'board');
+  assert.equal(api.approvalStepFor({ roles: ['NV_KD'] }), undefined);
 });

@@ -2,13 +2,31 @@
 
 Nguồn: `frontend/src/features/contracts/api/contractsApi.ts`, `approvalApi.ts`, `frontend/src/mocks/contractsServer.ts` và `backend/src/QTKD.Api/Endpoints/ContractApprovalEndpoints.cs`. Quy ước chung (tiền tố, JWT, Idempotency-Key, mã lỗi) xem [list_api.md](../../../list_api.md).
 
+> Sau khi ghép main: CRUD hợp đồng (SYS-CTR-01/02/03/05/06), tệp và US-CTR-19 có controller .NET; rà soát/phê duyệt và phân công người duyệt sử dụng implementation từ main. Trình duyệt (SYS-CTR-04) có endpoint `submit-check` và `submit` trong cùng controller. Xem [cách chạy và giới hạn](../../../backend/GETTING-STARTED.md).
+
+## Endpoint thực thi bổ sung / điều chỉnh
+
+Mọi endpoint cần Bearer JWT. Lệnh tạo, hủy, tải/xóa tệp và quyết định đề nghị hủy cần `Idempotency-Key`. BE không dùng `userId`/role từ body.
+
+| Method | Endpoint | Body / quy tắc |
+|---|---|---|
+| POST | `/contracts/{code}/attachments` | multipart `file`, `baseVersion`; tối đa 20 MiB |
+| GET | `/contracts/{code}/attachments/{id}` | Download có kiểm tra phạm vi hợp đồng |
+| DELETE | `/contracts/{code}/attachments/{id}?baseVersion=` | Xóa liên kết ở Draft/RevisionRequested |
+| POST | `/contracts/{code}/cancel` | `{baseVersion, reason}`; hủy nháp trực tiếp |
+| POST | `/contracts/{code}/cancellation-requests` | `{baseVersion, party: company\|customer, reason}` |
+| POST | `/contracts/{code}/cancellation-requests/{id}/decision` | `{baseVersion, approve, reason}`; version của đề nghị, lý do bắt buộc khi từ chối |
+
+GET chi tiết trả thêm `customerSnapshot`, `history`, `cancellationRequests`. PUT tệp theo toàn bộ danh sách trong bảng đề xuất cũ không được triển khai. Thay bằng các endpoint tệp ở trên. Đợt này chỉ xử lý document_type Contract.
 Trạng thái 03/11/2026:
 
 | Phần | BE | FE |
 |---|---|---|
 | Rà soát, phê duyệt SYS-CTR-07 → 09 | Đã có (`ContractApprovalEndpoints.cs`) | `approvalApi.ts` gọi BE |
 | Phân công người duyệt SYS-CTR-10 | Đã có (`ContractApprovalEndpoints.cs`, `ApprovalAssignmentService.cs`) | `approvalApi.ts` gọi BE (tab "Phân công người duyệt") |
-| Hồ sơ SYS-CTR-01 → 06, tiến độ SYS-CTR-11 | Chưa có | `contractsApi.ts` dùng mock |
+| CRUD hồ sơ SYS-CTR-01/02/03/05/06, tệp và US-CTR-19 | Đã có (`ContractsController.cs`) | `contractsApi.ts` gọi BE khi bật `VITE_CONTRACTS_USE_BACKEND` |
+| Trình duyệt SYS-CTR-04 | Đã có (`ContractsController.cs`, `ContractSubmissions.cs`) | `contractsApi.ts` gọi BE khi bật `VITE_CONTRACTS_USE_BACKEND` |
+| Tiến độ SYS-CTR-11 | Chưa nối hoàn chỉnh | Giữ ranh giới mock/API theo từng route |
 
 > Bảng "Hồ sơ hợp đồng" bên dưới vẫn là đề xuất từ chữ ký hàm FE, chưa được nhóm BE chốt.
 
@@ -23,8 +41,8 @@ Trạng thái 03/11/2026:
 | GET | `/contracts/filter-options` | CTR-02 | `contractsApi.getListFilterOptions` | Khu vực, loại hợp đồng, phòng ban phối hợp |
 | GET | `/contracts/{code}` | CTR-06 (dùng chung cho 03, 11) | `contractsApi.getDetail` / `getContract` | Ẩn ý kiến nội bộ Pháp chế với người ngoài Pháp chế (CTR-11 A9) |
 | PUT | `/contracts/{code}` | CTR-03 | `contractsApi.update` | `{baseVersion, draft}`; chỉ người phụ trách, chỉ khi Nháp hoặc Yêu cầu chỉnh sửa; trạng thái giữ nguyên |
-| GET | `/contracts/{code}/submit-check` | CTR-04 b3–5 | `contractsApi.checkSubmit` | → `{salesReviewer, configLabel, resubmit}`; lỗi `MISSING` (kèm `items`) / `AREA_INACTIVE` / `NO_APPROVER` |
-| POST | `/contracts/{code}/submit` | CTR-04 | `contractsApi.submit` | Idempotency-Key; tạo lượt duyệt theo snapshot cấu hình đang áp dụng, giao bước đầu cho Trưởng phòng KD; submit lặp không tạo lượt trùng |
+| GET | `/contracts/{code}/submit-check` | CTR-04 b3–5 | `contractsApi.checkSubmit` | → `{salesReviewer, resubmit}`; lỗi `NOT_OWNER` / `STATUS` / `MISSING` (kèm `items`) / `AREA_INACTIVE` (kèm `items`) / `NO_APPROVER` |
+| POST | `/contracts/{code}/submit` | CTR-04 | `contractsApi.submit` | Idempotency-Key → `{contract, replayed}`; tạo lượt duyệt 3 bước: Rà soát kinh doanh giao Trưởng phòng KD (`department.manager_id` của phòng sở hữu), Rà soát pháp lý và Phê duyệt chờ phân công; submit lặp không tạo lượt trùng |
 | POST | `/contracts/{code}/cancel` | CTR-05 | `contractsApi.cancel` | `{reason}`; chỉ người phụ trách, chỉ hồ sơ Nháp |
 
 SYS-CTR-11 (tiến độ, lịch sử phê duyệt) hiện dùng chung `GET /contracts/{code}`. Nếu muốn tách quyền xem lịch sử, có thể thêm `GET /contracts/{code}/approval-history`.

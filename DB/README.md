@@ -60,6 +60,7 @@ Sau khi migrate/seed, dùng [scripts/verify-supabase.sql](scripts/verify-supabas
 | `prisma/migrations/202611030002_workflow_config/migration.sql` | Bảng `workflow_config` (cấu hình theo phiên bản). Đã áp lên DB chung; giữ nguyên lịch sử, bị bỏ ở migration sau |
 | `prisma/migrations/202611030003_manager_roles/migration.sql` | Thêm giá trị enum `LegalManager` (Trưởng phòng Pháp chế), `BoardChair` (Tổng Giám đốc). Tách riêng vì giá trị enum mới không dùng được trong cùng transaction |
 | `prisma/migrations/202611030004_approval_assignment/migration.sql` | SYS-CTR-10: bỏ `workflow_config`; thêm vai trò LegalManager/BoardChair (quyền như nhân viên phòng + `approvals.assign`), cấp `approvals.assign` cho SalesManager; trigger cho đổi người khi bước chưa bắt đầu |
+| `prisma/migrations/202611030005_status_keeps_version/migration.sql` | SYS-CTR-04/07: đổi trạng thái hợp đồng không tăng `version`; chỉ tăng khi sửa nội dung hoặc lệnh ghi chủ động `version + 1` |
 | `prisma/seed-data.ts` | Fixture có ID cố định và snapshot riêng |
 | `prisma/seed.ts` | Dry-run hoặc seed trong một transaction |
 | `data-dictionary/source-columns.json` | Coverage trích từ bảng/cột/FK trong tài liệu nguồn |
@@ -80,3 +81,6 @@ Tài khoản seed mới dùng bcrypt cost 12 từ biến môi trường, bật b
 ID cố định, `skipDuplicates`, khóa transaction và kiểm tra ID được dùng để thiết kế seed chạy lại mà không xóa dữ liệu hoặc đổi mật khẩu đã có. Natural key trùng với ID khác làm transaction thất bại. **Tính chất chạy lại vẫn cần được kiểm thử trên Supabase thật.**
 
 Các lựa chọn kiểu dữ liệu, xử lý comment và khoảng trống so với spec nằm trong [data-dictionary/DECISIONS.md](data-dictionary/DECISIONS.md). Chưa coi các task/API Sprint 1/2/3 hoàn tất chỉ từ bộ schema này.
+
+
+Contracts CRUD and cancellation integration: [setup](../backend/GETTING-STARTED.md).
