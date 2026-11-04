@@ -9,12 +9,15 @@ import { createServer } from 'node:net';
 import { PGlite } from '@electric-sql/pglite';
 import { PGLiteSocketServer } from '@electric-sql/pglite-socket';
 import { hash } from 'bcryptjs';
-import { buildSeedData, ids } from '../prisma/seed-data.ts';
-import { readSchema } from '../scripts/schema-info.ts';
 
 // Disposable PostgreSQL in WASM only. DIRECT_URL and DB/.env are never read by this test.
 const dbRoot = fileURLToPath(new URL('..', import.meta.url));
 const repo = resolve(dbRoot, '..');
+// Same SQL files and fixture the EF Core migrations and QTKD.DbTool seed use.
+const sqlDir = join(repo, 'backend/src/QTKD.Infrastructure/Persistence/Migrations/Sql');
+const fixture = JSON.parse(await readFile(join(repo, 'backend/src/QTKD.Infrastructure/Persistence/Seed/demo-seed.json'), 'utf8'));
+const ids = fixture.ids;
+const camel = (name) => name.replace(/_([a-z0-9])/g, (_, c) => c.toUpperCase());
 const db = await PGlite.create();
 let server,
   child,
@@ -38,13 +41,16 @@ const pass = (name) => {
   console.log(`PASS ${name}`);
 };
 try {
-  for (const name of (await readdir(join(dbRoot, 'prisma/migrations'))).sort()) {
-    if (!name.startsWith('20')) continue;
-    await db.exec(await readFile(join(dbRoot, 'prisma/migrations', name, 'migration.sql'), 'utf8'));
-  }
+  // The original (pre-EF) migration files carry their own BEGIN/COMMIT; EF-native ones need the EF history table.
+  for (const name of (await readdir(sqlDir)).filter((n) => /^\d{12}_.*\.sql$/.test(n)).sort())
+    await db.exec(await readFile(join(sqlDir, name), 'utf8'));
   pass('all migrations execute on PostgreSQL');
-  const data = buildSeedData(await hash(password, 12));
-  const models = readSchema();
+  const passwordHash = await hash(password, 12);
+  // tables: database rows (snake_case) for INSERT; data: the same rows with camelCase keys for the assertions below.
+  const tables = Object.fromEntries(Object.entries(fixture.tables).map(([table, rows]) => [table,
+    rows.map((row) => (row.password_hash === fixture.passwordHashPlaceholder ? { ...row, password_hash: passwordHash } : row))]));
+  const data = Object.fromEntries(Object.entries(tables).map(([table, rows]) => [camel(table),
+    rows.map((row) => Object.fromEntries(Object.entries(row).map(([key, value]) => [camel(key), value])))]));
   // Seed only data required by this feature, in dependency order. No live session or OTP fixture is used.
   const groups = [
     'roleDefinition',
@@ -61,22 +67,22 @@ try {
     'approvalStep',
   ];
   for (const delegate of groups) {
-    const model = models.find((m) => m.delegate === delegate);
-    for (const raw of data[delegate]) {
+    const table = delegate.replace(/[A-Z]/g, (c) => '_' + c.toLowerCase());
+    for (const [index, raw] of data[delegate].entries()) {
       if (delegate === 'approvalRound' && raw.recordType !== 'Contract') continue;
       if (
         delegate === 'approvalStep' &&
         !data.approvalRound.some((r) => r.recordType === 'Contract' && r.roundId === raw.roundId)
       )
         continue;
-      const row = { ...raw };
-      if (delegate === 'department') row.managerId = null;
-      if (delegate === 'userAccount') row.mustChangePassword = false;
-      const fields = model.fields.filter((f) => f.column && row[f.name] !== undefined);
-      const values = fields.map((f) => (f.type === 'Json' ? JSON.stringify(row[f.name]) : row[f.name]));
+      const row = { ...tables[table][index] };
+      if (delegate === 'department') delete row.manager_id;
+      if (delegate === 'userAccount') row.must_change_password = false;
+      const columns = Object.keys(row).map((column) => `"${column}"`).join(',');
+      // PostgreSQL converts each JSON value to the column type (enum, uuid, numeric, date, jsonb).
       await db.query(
-        `INSERT INTO qtkd."${model.table}" (${fields.map((f) => `"${f.column}"`).join(',')}) VALUES (${fields.map((_, i) => `$${i + 1}`).join(',')}) ON CONFLICT DO NOTHING`,
-        values,
+        `INSERT INTO qtkd."${table}" (${columns}) SELECT ${columns} FROM jsonb_populate_record(NULL::qtkd."${table}", $1::jsonb) ON CONFLICT DO NOTHING`,
+        [JSON.stringify(row)],
       );
     }
   }

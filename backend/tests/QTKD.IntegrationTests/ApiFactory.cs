@@ -13,6 +13,7 @@ using Npgsql.NameTranslation;
 using QTKD.Api.Authorization;
 using QTKD.Application.Common.Interfaces;
 using QTKD.Application.Features.ContractApprovals;
+using QTKD.Application.Features.Notifications;
 using QTKD.Domain.Identity;
 using QTKD.Infrastructure.Persistence;
 
@@ -24,7 +25,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
 {
     public IContractApprovalEngine? ApprovalEngine { get; init; }
     public IApprovalStore? ApprovalStore { get; init; }
-    public INotificationStore? NotificationStore { get; init; }
+    public INotificationRepository? NotificationRepository { get; init; }
     private readonly SqliteConnection sqlite = new("Data Source=:memory:");
     public readonly string Key = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48));
     public readonly string Password = "Identity.Test@2026";
@@ -49,10 +50,10 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
                 services.RemoveAll<IApprovalStore>();
                 services.AddSingleton(ApprovalStore);
             }
-            if (NotificationStore is not null)
+            if (NotificationRepository is not null)
             {
-                services.RemoveAll<INotificationStore>();
-                services.AddSingleton(NotificationStore);
+                services.RemoveAll<INotificationRepository>();
+                services.AddSingleton(NotificationRepository);
             }
             if (ApprovalEngine is not null)
             {
@@ -104,7 +105,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
                 db.Grants.Add(new RolePermission { Role = UserRole.SalesStaff, PermissionCode = "contracts.create" });
                 await db.SaveChangesAsync();
             }
-            else if (await db.Roles.CountAsync() != 10) throw new InvalidOperationException("Apply Prisma migrations to the dedicated test DB first.");
+            else if (await db.Roles.CountAsync() != 10) throw new InvalidOperationException("Apply the EF Core migrations (QTKD.DbTool migrate) to the dedicated test DB first.");
             var departments = await db.Departments.ToDictionaryAsync(x => x.Code, x => x.DepartmentId);
             SalesDepartment = departments["KD"];
             string hash = BCrypt.Net.BCrypt.HashPassword(Password, 12);

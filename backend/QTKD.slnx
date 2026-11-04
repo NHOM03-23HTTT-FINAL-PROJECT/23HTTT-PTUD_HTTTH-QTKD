@@ -4,6 +4,7 @@
     <Project Path="src/QTKD.Application/QTKD.Application.csproj" />
     <Project Path="src/QTKD.Infrastructure/QTKD.Infrastructure.csproj" />
     <Project Path="src/QTKD.Api/QTKD.Api.csproj" />
+    <Project Path="src/QTKD.DbTool/QTKD.DbTool.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/QTKD.IntegrationTests/QTKD.IntegrationTests.csproj" />

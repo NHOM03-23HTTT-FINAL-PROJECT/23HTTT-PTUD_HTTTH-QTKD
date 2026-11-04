@@ -4,7 +4,7 @@
 
 Backend thực tế ở `backend/`, theo bốn tầng. Module đã có code chạy: Identity (TASK-022/023, trạng thái kiểm chứng ở [plan](../specs/identity/TASK-022-023-PLAN.md)), Contracts (quản lý hợp đồng), duyệt hợp đồng (`ContractApprovals` + `Workflows`) và Notifications (hộp thông báo in-app, UC-CHUNG-05). Các module khác mới có thư mục giữ chỗ (`.gitkeep`) hoặc chỉ có FE mock, chưa phải backend đã triển khai.
 
-Prisma quản lý schema, migration và seed trong `DB/`. Backend không tự tạo hay migrate DB; EF Core và Npgsql chỉ đọc/ghi vào các bảng Prisma đã tạo. Tên file dự kiến cho module mới là gợi ý để thống nhất, người chủ trì task quyết định khi triển khai.
+EF Core quản lý schema và migration (`QtkdDbContext`, `Infrastructure/Persistence/Migrations`); `QTKD.DbTool` áp migration và seed. Api không tự tạo hay migrate DB. Phần lớn module đọc/ghi bằng SQL qua Npgsql; notifications dùng EF Core LINQ. Tên file dự kiến cho module mới là gợi ý để thống nhất, người chủ trì task quyết định khi triển khai.
 
 ## Nguyên tắc tổ chức
 
@@ -68,11 +68,12 @@ Luồng một request: Controller lấy `Actor` từ `ICurrentActor` → gọi S
 
 | Cách | Dùng ở | Ghi chú |
 | --- | --- | --- |
-| EF Core (`IdentityDbContext`) | Identity | Chỉ map bảng Prisma; không dùng EF migration |
+| EF Core (`IdentityDbContext`) | Identity | Map một phần bảng Identity; không sinh migration |
+| EF Core (`QtkdDbContext`) | Toàn schema; Notifications | Sở hữu migration; LINQ cho notifications |
 | Npgsql qua `PgDatabase` (tham số `$1, $2…`) | Contracts, Notifications | Cách mặc định cho module mới theo mẫu |
 | Npgsql trực tiếp (`PostgresApprovalStore.Command`, tham số có tên) | ContractApprovals | Có khóa dòng `SELECT … FOR UPDATE`, idempotency |
 
-Khi đổi bảng phải sửa cả `DB/prisma/schema.prisma` (tạo migration) và code đọc/ghi tương ứng. SQL viết tay và mapping EF không được kiểm tra lúc build; lệch schema chỉ lộ khi chạy hoặc qua test PostgreSQL.
+Khi đổi bảng phải sửa entity/configuration trong `Infrastructure/Persistence` (tạo migration EF) và code đọc/ghi tương ứng; chạy `npm run check` trong `DB/` để so model với SQL. SQL viết tay và mapping EF không được kiểm tra lúc build; lệch schema chỉ lộ khi chạy hoặc qua test PostgreSQL.
 
 ## Kiểm thử
 
@@ -94,7 +95,8 @@ Khi đổi bảng phải sửa cả `DB/prisma/schema.prisma` (tạo migration) 
 | backend/tests/QTKD.IntegrationTests/ | WebApplicationFactory; SQLite mặc định, PostgreSQL khi cấu hình rõ |
 | backend/tests/QTKD.UnitTests/ | Unit test cho logic thuần; không HTTP, DB hay mạng |
 | backend/scripts/ và Start-Api.ps1 | Launcher local và chuyển đổi cấu hình .env/URI |
-| DB/prisma/ | Schema, migration và seed; nguồn DDL duy nhất |
+| backend/src/QTKD.Infrastructure/Persistence/Migrations/ | Migration EF Core; nguồn DDL duy nhất |
+| DB/ | Tài liệu schema, data dictionary, test PGlite và lệnh npm gọi `QTKD.DbTool` |
 | docs/decisions/, specs/, setup/, testing/ | Quyết định, use case/hợp đồng API, hướng dẫn team và bằng chứng kiểm thử |
 | context/ và AGENTS.md | Phạm vi, nghiệp vụ và hướng dẫn agent |
 
@@ -103,12 +105,12 @@ Không tạo một backend độc lập trong `BE/` để tích hợp. [README g
 ## Thêm một module mới
 
 1. Thêm dòng vào bảng bản đồ module ở trên.
-2. DB: thêm bảng/cột bằng migration Prisma trong `DB/prisma/`, không tạo schema từ backend.
+2. DB: thêm bảng/cột bằng migration EF Core (`dotnet ef migrations add ... -c QtkdDbContext`), áp bằng `QTKD.DbTool`; Api không tự tạo schema.
 3. BE theo [mẫu module](#mẫu-module-controller--service):
    - `Application/Common/Interfaces/I<Module>Store.cs` và `Application/Features/<Module>/{Dtos,Validators,Services}`.
    - `Domain/<Module>/` cho quy tắc, kiểu dùng chung giữa các tầng.
    - `Infrastructure/Persistence/Postgres<Module>Store.cs` dùng `PgDatabase`. Thao tác có ghi audit thì INSERT `qtkd.audit_log` trong cùng transaction.
-   - `Api/Controllers/<Module>/<Module>Controller.cs` với `[Authorize(Policy = …)]`, `ICurrentActor`, `[RequireCsrf]` cho action ghi. Permission mới thêm vào `PermissionCatalog` và seed Prisma.
+   - `Api/Controllers/<Module>/<Module>Controller.cs` với `[Authorize(Policy = …)]`, `ICurrentActor`, `[RequireCsrf]` cho action ghi. Permission mới thêm vào `PermissionCatalog`, migration grants và `demo-seed.json`.
    - `Program.cs`: đăng ký store và service.
 4. Test: `UnitTests/<Module>/` cho validator và quy tắc; `IntegrationTests/<Module>ApiTests.cs` với spy store (thêm thuộc tính override vào `ApiFactory`); SQL thật trong `<Module>PostgresRollbackTests.cs`.
 5. FE: tạo `features/<module>/{api,components,hooks,pages,types}` và khai báo route trong `app/router`.

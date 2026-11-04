@@ -7,13 +7,13 @@ using Microsoft.Extensions.DependencyInjection;
 using QTKD.Application.Common.Interfaces;
 using QTKD.Application.Features.Notifications;
 using QTKD.Domain.Notifications;
-using QTKD.Infrastructure.Persistence;
+using QTKD.Infrastructure.Repositories;
 using Xunit;
 
 namespace QTKD.IntegrationTests;
 
-// Real HTTP pipeline (NotificationsController), JWT/session, current actor and CSRF. The notification store is a spy only:
-// these tests verify the inbox contract (recipient scoping, read-state writes), NOT PostgreSQL.
+// Real HTTP pipeline (NotificationsController → NotificationService), JWT/session, current actor and CSRF. The repository
+// is a spy only: these tests verify the inbox contract (recipient scoping, read-state writes), NOT PostgreSQL.
 public sealed class NotificationApiTests : IDisposable
 {
     private readonly NotificationSpy store;
@@ -21,7 +21,7 @@ public sealed class NotificationApiTests : IDisposable
     public NotificationApiTests()
     {
         store = new NotificationSpy();
-        factory = new() { NotificationStore = store };
+        factory = new() { NotificationRepository = store };
     }
     public void Dispose() => factory.Dispose();
     private async Task<HttpClient> Setup()
@@ -38,8 +38,11 @@ public sealed class NotificationApiTests : IDisposable
         Assert.Equal(status, (int)response.StatusCode);
         Assert.Equal(code, (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString());
     }
-    private static NotificationItem Item(string content, bool read, string kind = NotificationKinds.ReviewRequired) =>
-        new(Guid.NewGuid(), kind, "Contract", Guid.NewGuid(), "HĐ Demo", content, read, DateTime.UtcNow);
+    private static NotificationRecord Item(string content, bool read, Guid? id = null) => new(new Notification
+    {
+        NotificationId = id ?? Guid.NewGuid(), RecordType = RecordType.Contract, RecordId = Guid.NewGuid(),
+        Content = content, IsRead = read, CreatedAt = DateTime.UtcNow,
+    }, "HĐ Demo");
     [Fact]
     public async Task List_and_unread_count_are_scoped_to_the_signed_in_user()
     {
@@ -114,38 +117,43 @@ public sealed class NotificationApiTests : IDisposable
         Assert.Empty(store.Listed);
     }
     [Fact]
-    public void Production_registers_the_postgres_notification_store()
+    public void Production_registers_the_ef_core_notification_repository_and_service()
     {
-        // Resolving it would build PgDatabase from the placeholder connection string; check the registration instead.
-        ServiceDescriptor? registered = null;
+        // Resolving them would open the placeholder connection string; check the registrations instead.
+        ServiceDescriptor? repository = null, service = null;
         using var production = new ApiFactory().WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
-            registered = services.Last(x => x.ServiceType == typeof(INotificationStore))));
+        {
+            repository = services.Last(x => x.ServiceType == typeof(INotificationRepository));
+            service = services.Last(x => x.ServiceType == typeof(NotificationService));
+        }));
         _ = production.Services;
-        Assert.Equal(typeof(PostgresNotificationStore), registered!.ImplementationType);
+        Assert.Equal(typeof(NotificationRepository), repository!.ImplementationType);
+        Assert.Equal(typeof(NotificationService), service!.ImplementationType);
     }
-    private sealed class NotificationSpy : INotificationStore
+    private sealed class NotificationSpy : INotificationRepository
     {
-        public IReadOnlyList<NotificationItem> Items = [];
+        public IReadOnlyList<NotificationRecord> Items = [];
         public List<(Guid Actor, NotificationQuery Query)> Listed = [];
         public Guid? CountActor;
         public (Guid Actor, Guid Id)? Read;
         public Guid? AllReadActor;
         public bool Missing;
-        public Task<NotificationPage> List(Guid actor, NotificationQuery query, CancellationToken ct)
+        public Task<(IReadOnlyList<NotificationRecord> Items, int Total, int Unread)> ListAsync(Guid actor, NotificationQuery query, CancellationToken ct)
         {
             Listed.Add((actor, query));
-            return Task.FromResult(new NotificationPage(Items, Items.Count, Items.Count(x => !x.IsRead), query.Page, query.PageSize));
+            return Task.FromResult((Items, Items.Count, Items.Count(x => !x.Entity.IsRead)));
         }
-        public Task<int> UnreadCount(Guid actor, CancellationToken ct)
-        { CountActor = actor; return Task.FromResult(Items.Count(x => !x.IsRead)); }
-        public Task<NotificationItem?> MarkRead(Guid actor, Guid id, CancellationToken ct)
+        public Task<int> CountUnreadAsync(Guid actor, CancellationToken ct)
+        { CountActor = actor; return Task.FromResult(Items.Count(x => !x.Entity.IsRead)); }
+        public Task<NotificationRecord?> MarkReadAsync(Guid actor, Guid id, CancellationToken ct)
         {
             Read = (actor, id);
-            if (Missing) return Task.FromResult<NotificationItem?>(null);
-            var item = Items.FirstOrDefault(x => x.Id == id) ?? Item("Thông báo", false) with { Id = id };
-            return Task.FromResult<NotificationItem?>(item with { IsRead = true });
+            if (Missing) return Task.FromResult<NotificationRecord?>(null);
+            var record = Items.FirstOrDefault(x => x.Entity.NotificationId == id) ?? Item("Thông báo", false, id);
+            record.Entity.IsRead = true;
+            return Task.FromResult<NotificationRecord?>(record);
         }
-        public Task<int> MarkAllRead(Guid actor, CancellationToken ct)
-        { AllReadActor = actor; return Task.FromResult(Items.Count(x => !x.IsRead)); }
+        public Task<int> MarkAllReadAsync(Guid actor, CancellationToken ct)
+        { AllReadActor = actor; return Task.FromResult(Items.Count(x => !x.Entity.IsRead)); }
     }
 }

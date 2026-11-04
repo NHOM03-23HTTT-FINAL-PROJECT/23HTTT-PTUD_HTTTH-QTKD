@@ -93,7 +93,7 @@ Suite mặc định dùng SQLite in-memory và middleware JWT/Identity/password 
 
 ## Gate PostgreSQL
 
-Nhóm cần cấp **project Supabase riêng dành cho test**, apply các migration qua Prisma và seed ở đó trước. Sau đó đặt riêng trong terminal kiểm thử:
+Nhóm cần cấp **project Supabase riêng dành cho test**, apply các migration bằng `QTKD.DbTool migrate` và seed ở đó trước (trước 04/11/2026 là Prisma). Sau đó đặt riêng trong terminal kiểm thử:
 
 ```powershell
 # Điền giá trị riêng tư trong terminal, không ghi vào Git hoặc báo cáo.

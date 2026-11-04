@@ -72,7 +72,7 @@ Lookup department/role cho màn quản trị hiện dành cho QTHT có bộ quy�
 | BoardMember | GD | BGD |
 | SystemAdmin | QTHT | QTHT |
 
-Ma trận grants khởi tạo nằm tại DB/prisma/identity-catalog.ts và migration 202611020003_identity.
+Ma trận grants khởi tạo nằm trong migration 202611020003_identity (backend/src/QTKD.Infrastructure/Persistence/Migrations/Sql) và bảng role_permission của fixture demo-seed.json.
 Sau khi admin thay grants, DB là nguồn quyền; chạy seed không tự phục hồi quyền đã gỡ.
 
 ## Tích hợp các module tiếp theo

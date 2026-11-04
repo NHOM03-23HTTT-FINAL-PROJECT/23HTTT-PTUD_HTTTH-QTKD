@@ -4,7 +4,7 @@
 
 Người dùng đã chốt Phase 0 và giao triển khai TASK-022/023 theo plan. Xem [plan và trạng thái kiểm chứng](../docs/specs/identity/TASK-022-023-PLAN.md), [ADR Identity](../docs/decisions/0001-identity-single-role.md) và changelog cùng thư mục specs/identity.
 
-Hiện FE đã có prototype, DB có Prisma, BE Identity được triển khai trong `backend/` .NET 10; Identity Core custom store, JWT và session DB; một role bắt buộc, grants có thể rỗng, thiếu quyền trả 403. Prisma là nguồn migration duy nhất, khác đề xuất EF migration ban đầu của TASK-049. Không tự đổi schema DB dùng chung. Migration Identity bổ sung 3 bảng, nâng schema mục tiêu từ 26 lên 29 model; trạng thái apply trên từng DB phải xem migrate:status. Người dùng đã đăng nhập thật theo bàn giao, chưa có suite integration BE/PostgreSQL PASS đầy đủ. Hướng dẫn team sau khi pull ở [README gốc](../README.md).
+Hiện FE đã có prototype, BE Identity được triển khai trong `backend/` .NET 10; Identity Core custom store, JWT và session DB; một role bắt buộc, grants có thể rỗng, thiếu quyền trả 403. Từ 04/11/2026 EF Core (`QtkdDbContext`, `backend/src/QTKD.Infrastructure/Persistence/Migrations`) là nguồn migration duy nhất; 9 migration Prisma cũ được giữ nguyên làm baseline, DB do Prisma dựng phải `adopt` qua `QTKD.DbTool` (xem DB/README.md). Không tự đổi schema DB dùng chung. Schema hiện có 32 bảng; trạng thái apply trên từng DB phải xem migrate:status. Người dùng đã đăng nhập thật theo bàn giao, chưa có suite integration BE/PostgreSQL PASS đầy đủ. Hướng dẫn team sau khi pull ở [README gốc](../README.md).
 
 Các đoạn mô tả “chưa có source/bộ khung” bên dưới là context khởi tạo, không phải báo cáo tiến độ hiện tại. Những quyết định ngoài Identity vẫn cần chốt theo phạm vi được giao.
 
