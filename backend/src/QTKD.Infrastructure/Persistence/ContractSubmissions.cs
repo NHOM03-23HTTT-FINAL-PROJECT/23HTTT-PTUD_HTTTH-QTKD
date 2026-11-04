@@ -23,63 +23,66 @@ public partial class PostgresContractStore
     }
 
     public Task<JsonObject> Submit(Actor actor, string code, string key, CancellationToken ct) =>
-        Write(actor, $"contracts:{code}:submit", key, new { code }, async (c, tx) =>
-        {
-            var current = await Read(c, tx, actor, code, true, ct);
-            var reviewer = await CheckSubmit(c, tx, actor, current, ct);
-            var reviewerId = Guid.Parse(reviewer["id"]!.GetValue<string>());
+        Write(actor, $"contracts:{code}:submit", key, new { code }, (c, tx) => SubmitIn(c, tx, actor, code, ct), ct);
 
-            // Status changes keep the content version (202611030005), so the round pins the submitted content.
-            await Execute(c, tx, "UPDATE qtkd.contract SET status = 'Submitted' WHERE contract_id = $1", ct, current.Id);
+    /// <summary>Bước 6–9 trong transaction của người gọi; tách riêng để kiểm thử rollback trên PostgreSQL thật.</summary>
+    internal async Task<JsonObject> SubmitIn(NpgsqlConnection c, NpgsqlTransaction tx, Actor actor, string code, CancellationToken ct)
+    {
+        var current = await Read(c, tx, actor, code, true, ct);
+        var reviewer = await CheckSubmit(c, tx, actor, current, ct);
+        var reviewerId = Guid.Parse(reviewer["id"]!.GetValue<string>());
 
-            var roundId = Guid.NewGuid();
-            var round = (await Object(c, tx, """
-                INSERT INTO qtkd.approval_round(
-                    round_id, record_type, contract_id, record_version, round_no, submitted_by, record_snapshot
+        // Status changes keep the content version (202611030005), so the round pins the submitted content.
+        await Execute(c, tx, "UPDATE qtkd.contract SET status = 'Submitted' WHERE contract_id = $1", ct, current.Id);
+
+        var roundId = Guid.NewGuid();
+        var round = (await Object(c, tx, """
+            INSERT INTO qtkd.approval_round(
+                round_id, record_type, contract_id, record_version, round_no, submitted_by, record_snapshot
+            )
+            SELECT $1, 'Contract', c.contract_id, c.version,
+                (SELECT coalesce(max(round_no), 0) + 1 FROM qtkd.approval_round WHERE contract_id = c.contract_id),
+                $2,
+                jsonb_build_object(
+                    'contractId', c.contract_id,
+                    'code', c.contract_code,
+                    'title', c.title,
+                    'customer', c.customer_snapshot,
+                    'contractValue', c.contract_value,
+                    'version', c.version,
+                    'items', (SELECT coalesce(jsonb_agg(to_jsonb(i)), '[]') FROM qtkd.contract_item i WHERE i.contract_id = c.contract_id),
+                    'workflow', jsonb_build_object('version', 1, 'stages', jsonb_build_array('SalesManager', 'LegalStaff', 'BoardMember'))
                 )
-                SELECT $1, 'Contract', c.contract_id, c.version,
-                    (SELECT coalesce(max(round_no), 0) + 1 FROM qtkd.approval_round WHERE contract_id = c.contract_id),
-                    $2,
-                    jsonb_build_object(
-                        'contractId', c.contract_id,
-                        'code', c.contract_code,
-                        'title', c.title,
-                        'customer', c.customer_snapshot,
-                        'contractValue', c.contract_value,
-                        'version', c.version,
-                        'items', (SELECT coalesce(jsonb_agg(to_jsonb(i)), '[]') FROM qtkd.contract_item i WHERE i.contract_id = c.contract_id),
-                        'workflow', jsonb_build_object('version', 1, 'stages', jsonb_build_array('SalesManager', 'LegalStaff', 'BoardMember'))
-                    )
-                FROM qtkd.contract c
-                WHERE c.contract_id = $3
-                RETURNING jsonb_build_object('no', round_no)
-                """, ct, roundId, actor.Id, current.Id))!;
+            FROM qtkd.contract c
+            WHERE c.contract_id = $3
+            RETURNING jsonb_build_object('no', round_no)
+            """, ct, roundId, actor.Id, current.Id))!;
 
-            // The approval module requires all three steps; legal and board wait for assignment.
-            await Execute(c, tx, """
-                INSERT INTO qtkd.approval_step(round_id, step_name, step_order, assignee_id, assigned_at, step_status)
-                VALUES($1, 'Rà soát kinh doanh', 1, $2, now(), 'Pending'),
-                      ($1, 'Rà soát pháp lý', 2, NULL, NULL, 'NotStarted'),
-                      ($1, 'Phê duyệt', 3, NULL, NULL, 'NotStarted')
-                """, ct, roundId, reviewerId);
+        // The approval module requires all three steps; legal and board wait for assignment.
+        await Execute(c, tx, """
+            INSERT INTO qtkd.approval_step(round_id, step_name, step_order, assignee_id, assigned_at, step_status)
+            VALUES($1, 'Rà soát kinh doanh', 1, $2, now(), 'Pending'),
+                  ($1, 'Rà soát pháp lý', 2, NULL, NULL, 'NotStarted'),
+                  ($1, 'Phê duyệt', 3, NULL, NULL, 'NotStarted')
+            """, ct, roundId, reviewerId);
 
-            var title = current.Data["title"]!.GetValue<string>();
-            await Execute(c, tx, """
-                INSERT INTO qtkd.notification(recipient_id, record_type, record_id, content)
-                VALUES($1, 'Contract', $2, $3)
-                """, ct, reviewerId, current.Id, $"Hồ sơ {code} – {title} cần Rà soát kinh doanh.");
+        var title = current.Data["title"]!.GetValue<string>();
+        await Execute(c, tx, """
+            INSERT INTO qtkd.notification(recipient_id, record_type, record_id, content)
+            VALUES($1, 'Contract', $2, $3)
+            """, ct, reviewerId, current.Id, $"Hồ sơ {code} – {title} cần Rà soát kinh doanh.");
 
-            var next = await Read(c, tx, actor, code, false, ct);
-            var no = round["no"]!.GetValue<int>();
-            await Audit(c, tx, actor, current.Id, "CONTRACT_SUBMITTED", current.Status, "Submitted", current.Data, next.Data,
-                current.Status == "RevisionRequested" ? $"Trình lại, lượt {no}" : $"Lượt {no}", ct);
+        var next = await Read(c, tx, actor, code, false, ct);
+        var no = round["no"]!.GetValue<int>();
+        await Audit(c, tx, actor, current.Id, "CONTRACT_SUBMITTED", current.Status, "Submitted", current.Data, next.Data,
+            current.Status == "RevisionRequested" ? $"Trình lại, lượt {no}" : $"Lượt {no}", ct);
 
-            return new JsonObject
-            {
-                ["contract"] = next.Data,
-                ["replayed"] = false
-            };
-        }, ct);
+        return new JsonObject
+        {
+            ["contract"] = next.Data,
+            ["replayed"] = false
+        };
+    }
 
     /// <summary>Bước 3–4 và E1–E5; trả về Trưởng phòng KD quản lý phòng sở hữu hồ sơ.</summary>
     private static async Task<JsonObject> CheckSubmit(NpgsqlConnection c, NpgsqlTransaction? tx, Actor actor, StoredContract current, CancellationToken ct)
