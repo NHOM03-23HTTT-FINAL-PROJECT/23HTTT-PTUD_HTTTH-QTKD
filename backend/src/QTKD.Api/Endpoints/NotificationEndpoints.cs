@@ -15,8 +15,9 @@ public static class NotificationEndpoints
                 throw new ReviewFailure(403, "CSRF_REJECTED");
         }
         var group = app.MapGroup("/api/v1/notifications").RequireAuthorization();
-        group.MapGet("", async (HttpContext c, INotificationStore store, CancellationToken ct)
-            => Results.Ok(await store.Notifications(Actor(c), ct)));
+        // ?filter=all|unread&page=1&pageSize=20 (UC-CHUNG-05 bước 2, A1). Mới nhất trước.
+        group.MapGet("", async (HttpContext c, INotificationStore store, string? filter, int? page, int? pageSize, CancellationToken ct)
+            => Results.Ok(await store.Notifications(Actor(c), NotificationQuery.From(filter, page, pageSize), ct)));
         group.MapGet("unread-count", async (HttpContext c, INotificationStore store, CancellationToken ct)
             => Results.Ok(new { count = await store.UnreadCount(Actor(c), ct) }));
         group.MapPost("{id:guid}/read", async (Guid id, HttpContext c, INotificationStore store, CancellationToken ct)

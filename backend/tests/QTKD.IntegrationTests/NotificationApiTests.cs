@@ -35,29 +35,65 @@ public sealed class NotificationApiTests : IDisposable
         Assert.Equal(status, (int)response.StatusCode);
         Assert.Equal(code, (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString());
     }
+    private static NotificationItem Item(string content, bool read, string kind = NotificationKinds.ReviewRequired) =>
+        new(Guid.NewGuid(), kind, "Contract", Guid.NewGuid(), "HĐ Demo", content, read, DateTime.UtcNow);
     [Fact]
     public async Task List_and_unread_count_are_scoped_to_the_signed_in_user()
     {
         using var client = await Setup();
-        store.Items = [new(Guid.NewGuid(), Guid.NewGuid(), "Hợp đồng chờ duyệt", false, DateTime.UtcNow)];
-        var items = await client.GetFromJsonAsync<NotificationItem[]>("/api/v1/notifications");
-        Assert.Equal(factory.StaffId, Assert.Single(store.Listed));
-        Assert.Equal("Hợp đồng chờ duyệt", Assert.Single(items!).Content);
-        // The previous inline endpoint returned an anonymous object: keep the exact wire contract for FE.
+        store.Items = [Item("Hợp đồng chờ duyệt", false)];
+        var page = await client.GetFromJsonAsync<NotificationPage>("/api/v1/notifications");
+        Assert.Equal(factory.StaffId, Assert.Single(store.Listed).Actor);
+        Assert.Equal("Hợp đồng chờ duyệt", Assert.Single(page!.Items).Content);
+        Assert.Equal((1, 1, 1, NotificationQuery.DefaultPageSize), (page.Total, page.UnreadCount, page.Page, page.PageSize));
+        // Wire contract for FE: page envelope and the fields needed to label and open the record (bước 3, 7).
         using var raw = JsonDocument.Parse(await (await client.GetAsync("/api/v1/notifications")).Content.ReadAsStringAsync());
-        Assert.Equal(["id", "recordId", "content", "isRead", "createdAt"],
-            raw.RootElement.EnumerateArray().Single().EnumerateObject().Select(p => p.Name).ToArray());
+        Assert.Equal(["items", "total", "unreadCount", "page", "pageSize"], raw.RootElement.EnumerateObject().Select(p => p.Name).ToArray());
+        Assert.Equal(["id", "kind", "recordType", "recordId", "recordTitle", "content", "isRead", "createdAt"],
+            raw.RootElement.GetProperty("items").EnumerateArray().Single().EnumerateObject().Select(p => p.Name).ToArray());
         var count = await client.GetFromJsonAsync<JsonElement>("/api/v1/notifications/unread-count");
         Assert.Equal(1, count.GetProperty("count").GetInt32());
         Assert.Equal(factory.StaffId, store.CountActor);
     }
     [Fact]
+    public async Task Filter_and_paging_are_passed_to_the_store()
+    {
+        using var client = await Setup();
+        (await client.GetAsync("/api/v1/notifications?filter=unread&page=3&pageSize=5")).EnsureSuccessStatusCode();
+        (await client.GetAsync("/api/v1/notifications?filter=all")).EnsureSuccessStatusCode();
+        Assert.Equal([new NotificationQuery(true, 3, 5), new NotificationQuery(false, 1, NotificationQuery.DefaultPageSize)],
+            store.Listed.Select(x => x.Query).ToArray());
+    }
+    [Theory]
+    [InlineData("filter=read")]
+    [InlineData("page=0")]
+    [InlineData("pageSize=0")]
+    [InlineData("pageSize=101")]
+    public async Task Invalid_filter_or_paging_is_rejected(string query)
+    {
+        using var client = await Setup();
+        await AssertError(await client.GetAsync("/api/v1/notifications?" + query), 400, "VALIDATION");
+        Assert.Empty(store.Listed);
+    }
+    // Kind is not stored: it is read back from content, so templates and parser must stay in step.
+    public static TheoryData<string, string> Templates => new()
+    {
+        { NotificationKinds.Assigned("rà soát Pháp chế", "HĐ: approved. A"), NotificationKinds.ReviewAssigned },
+        { NotificationKinds.Revoked("rà soát Pháp chế", "HĐ A"), NotificationKinds.AssignmentRevoked },
+        { NotificationKinds.Decision("HĐ A", "under-review", null), NotificationKinds.ReviewRequired },
+        { NotificationKinds.Decision("HĐ A", "approved", "Đồng ý"), NotificationKinds.ApprovalResult },
+        { NotificationKinds.Decision("HĐ A", "rejected", "Sai giá: approved. x"), NotificationKinds.ApprovalResult },
+        { NotificationKinds.Decision("HĐ A", "revision-requested", "Sửa điều 3"), NotificationKinds.RevisionRequested },
+        { "Hợp đồng Demo chờ rà soát; dữ liệu thử nghiệm.", NotificationKinds.General },
+    };
+    [Theory]
+    [MemberData(nameof(Templates))]
+    public void Kind_is_derived_from_the_message_template(string content, string kind) => Assert.Equal(kind, NotificationKinds.Of(content));
+    [Fact]
     public async Task Mark_one_and_mark_all_are_writes_to_the_caller_only()
     {
         using var client = await Setup();
-        store.Items = [new(Guid.NewGuid(), Guid.NewGuid(), "Chưa đọc 1", false, DateTime.UtcNow),
-            new(Guid.NewGuid(), Guid.NewGuid(), "Chưa đọc 2", false, DateTime.UtcNow),
-            new(Guid.NewGuid(), Guid.NewGuid(), "Đã đọc", true, DateTime.UtcNow)];
+        store.Items = [Item("Chưa đọc 1", false), Item("Chưa đọc 2", false), Item("Đã đọc", true)];
         var id = Guid.NewGuid();
         var item = await client.PostAsJsonAsync($"/api/v1/notifications/{id}/read", new { });
         item.EnsureSuccessStatusCode();
@@ -98,7 +134,7 @@ public sealed class NotificationApiTests : IDisposable
     private sealed class NotificationSpy : INotificationStore
     {
         public IReadOnlyList<NotificationItem> Items = [];
-        public List<Guid> Listed = [];
+        public List<(Guid Actor, NotificationQuery Query)> Listed = [];
         public Guid? CountActor;
         public (Guid Actor, Guid Id)? Read;
         public Guid? AllReadActor;
@@ -107,14 +143,17 @@ public sealed class NotificationApiTests : IDisposable
         {
             if (Failure is not null) throw Failure;
         }
-        public Task<IReadOnlyList<NotificationItem>> Notifications(Guid actor, CancellationToken ct)
-        { Listed.Add(actor); MaybeFail(); return Task.FromResult(Items); }
+        public Task<NotificationPage> Notifications(Guid actor, NotificationQuery query, CancellationToken ct)
+        {
+            Listed.Add((actor, query)); MaybeFail();
+            return Task.FromResult(new NotificationPage(Items, Items.Count, Items.Count(x => !x.IsRead), query.Page, query.PageSize));
+        }
         public Task<int> UnreadCount(Guid actor, CancellationToken ct)
         { CountActor = actor; MaybeFail(); return Task.FromResult(Items.Count(x => !x.IsRead)); }
         public Task<NotificationItem> MarkRead(Guid actor, Guid id, CancellationToken ct)
         {
             Read = (actor, id); MaybeFail();
-            var item = Items.FirstOrDefault(x => x.Id == id) ?? new(id, Guid.NewGuid(), "Thông báo", false, DateTime.UtcNow);
+            var item = Items.FirstOrDefault(x => x.Id == id) ?? Item("Thông báo", false) with { Id = id };
             return Task.FromResult(item with { IsRead = true });
         }
         public Task<int> MarkAllRead(Guid actor, CancellationToken ct)
