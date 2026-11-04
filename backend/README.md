@@ -1,6 +1,6 @@
 # QTKD Identity backend — TASK-022/023
 
-.NET 10, Api/Application/Domain/Infrastructure. Identity Core custom store trên schema qtkd hiện có, EF Core/Npgsql chỉ truy cập dữ liệu; Prisma quản lý migration.
+.NET 10, Api/Application/Domain/Infrastructure. Identity Core custom store trên schema qtkd hiện có, EF Core quản lý migration (`QtkdDbContext`, áp bằng `src/QTKD.DbTool`); phần lớn module vẫn đọc/ghi bằng SQL qua Npgsql.
 Đọc docs/specs/identity/TASK-022-023-PLAN.md và ADR 0001–0003 trước khi sửa hợp đồng auth.
 
 ## Hiện trạng
@@ -13,7 +13,7 @@ Tài liệu API: ../docs/specs/identity/list_api-auth.md. Bằng chứng kiểm 
 
 1. Cài .NET SDK 10.0.403 (global.json cho phép bản vá mới trong feature band), Node/npm phù hợp DB/frontend.
 2. Nhận backend/.env và DB/.env qua kênh bảo mật của nhóm. Từ backend/, chạy `dotnet restore QTKD.slnx`, rồi `dotnet build src/QTKD.Api/QTKD.Api.csproj --no-restore`; global.json áp dụng theo thư mục chạy lệnh.
-3. Với DB chung đã chuẩn bị, chỉ kiểm tra connection/migrate:status từ DB/. Chỉ phụ trách DB mới cần deploy/seed theo DB/README.md; không dùng EF migration, EnsureCreated hoặc reset DB ứng dụng.
+3. Với DB chung đã chuẩn bị, chỉ kiểm tra connection/migrate:status từ DB/. Chỉ phụ trách DB mới cần adopt/deploy/seed theo DB/README.md; không dùng `dotnet ef database update`, EnsureCreated hoặc reset DB ứng dụng.
 4. Khi dùng override: ConnectionStrings:Identity là Npgsql key=value connection string, `SSL Mode=VerifyFull`, PostgreSQL direct/session port 5432; Jwt:SigningKey ngẫu nhiên ít nhất 32 byte. Không dùng service key hoặc API URL thay connection string.
 5. dotnet run --project backend/src/QTKD.Api --launch-profile https. API mặc định https://localhost:7156.
 

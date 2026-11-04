@@ -129,7 +129,9 @@ builder.Services.AddScoped<IContractStore>(sp => new PostgresContractStore(
     sp.GetRequiredService<PgDatabase>(),
     Path.GetFullPath(builder.Configuration["Storage:Root"] ?? Path.Combine(builder.Environment.ContentRootPath, ".data", "uploads"))));
 builder.Services.AddScoped<ContractService>();
-builder.Services.AddScoped<INotificationStore, PostgresNotificationStore>();
+builder.Services.AddQtkdPersistence(
+    sp => sp.GetRequiredService<IConfiguration>().GetConnectionString("Identity") ?? throw new InvalidOperationException("ConnectionStrings:Identity is required."),
+    enumNames);
 builder.Services.AddScoped<NotificationService>();
 
 var app = builder.Build();

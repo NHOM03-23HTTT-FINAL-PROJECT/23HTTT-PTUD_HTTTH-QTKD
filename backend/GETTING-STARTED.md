@@ -10,7 +10,9 @@ Các module đăng nhập, đăng xuất, đổi mật khẩu, quản lý ngư�
 - `QTKD.Application`: service, DTO class thông thường, validation và interface.
 - `QTKD.Domain`: quy tắc trạng thái, quyền sở hữu và lỗi nghiệp vụ.
 - `QTKD.Infrastructure`: Npgsql, SQL có tham số, transaction và lưu tệp riêng.
-- `DB/prisma`: nguồn migration hiện tại; không chạy EF migration song song.
+- `src/QTKD.Infrastructure/Persistence/Migrations`: nguồn migration (EF Core, `QtkdDbContext`); áp bằng `QTKD.DbTool`, xem `DB/README.md`.
+
+Module hợp đồng dùng kiểu cũ (`IContractStore` + SQL qua Npgsql). Module mới theo mẫu Controller → Service → Repository (EF Core) của Notifications: [docs/architecture/STRUCTURE.md](../docs/architecture/STRUCTURE.md#mẫu-module-controller--service--repository).
 
 ## Tích hợp xác thực
 
@@ -46,7 +48,7 @@ Chạy `npm run dev` trong `frontend/`. Vite proxy `/api` sang HTTPS cổng 7156
 
 Đăng nhập bằng `demo.sales`, `demo.sales.manager`, `demo.board.chair` hoặc tài khoản tương ứng có sẵn trong seed. Với seed mới từ main, `demo.board.chair` là trưởng Ban Giám đốc nhận cấp quyết định cuối cho đề nghị hủy hợp đồng Approved; `demo.board` vẫn là thành viên BGĐ cho các hồ sơ được phân công. Mật khẩu là `SEED_PASSWORD` đã dùng khi chạy seed, không phải mật khẩu Supabase. Đổi giá trị trong `.env` không tự đổi mật khẩu các tài khoản đã seed. Seed mặc định yêu cầu đổi mật khẩu ở lần đăng nhập đầu; hoàn tất màn đổi mật khẩu rồi vào hợp đồng. Không cần tạo endpoint giả hoặc bỏ `[Authorize]`.
 
-Migration `202611020004_contracts` bổ sung mã hợp đồng, snapshot, metadata tệp, đề nghị hủy, idempotency và dữ liệu bàn giao kết quả hủy. Hai migration cũ giữ nguyên. `DB/data-dictionary/baseline.prisma` đối chiếu schema gốc. Review migration trước khi nhóm áp dụng; backend không tự migrate/seed. Lượt chỉnh sửa này không ghi Supabase.
+Migration `202611020004_contracts` bổ sung mã hợp đồng, snapshot, metadata tệp, đề nghị hủy, idempotency và dữ liệu bàn giao kết quả hủy. Hai migration cũ giữ nguyên. `DB/data-dictionary/baseline.prisma` đối chiếu schema gốc. Review migration trước khi nhóm áp dụng; Api không tự migrate/seed (dùng `QTKD.DbTool`). Lượt chỉnh sửa này không ghi Supabase.
 
 ## Quy tắc và điểm bàn giao
 

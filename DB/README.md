@@ -1,86 +1,105 @@
 # Database QTKD trên Supabase
 
-## Cập nhật TASK-022/023 ngày 02/11/2026
+## Cập nhật 04/11/2026: EF Core sở hữu schema
 
-Giữ nguyên 26 bảng từ dictionary và hai migration cũ, bổ sung ba bảng role_definition/permission/role_permission cùng metadata Identity trong migration `202611020003_identity`. Schema hiện có 29 model. Bảng `workflow_config` (migration `202611030002`) đã được bỏ bằng migration `202611030003_approval_assignment` khi SYS-CTR-10 đổi sang phân công người duyệt. Một role bắt buộc; grants có thể rỗng. Nguồn dictionary 239 cột vẫn được giữ trong source-columns.json để đối chiếu, không sửa nguồn nghiệp vụ thành quyết định mới.
+Từ ngày này, **EF Core quản lý migration của toàn bộ schema `qtkd`** và Prisma đã bị gỡ khỏi repo. Schema giữ nguyên: 32 bảng, gồm 26 bảng dictionary, 3 bảng Identity và 3 bảng vận hành hợp đồng (`contract_cancellation_request`, `contract_delivery`, `idempotency_request`), cùng 20 enum, CHECK, trigger, RLS và dữ liệu quyền ban đầu. Code hợp đồng/phê duyệt vẫn dùng SQL thô. Notifications dùng EF Core LINQ.
 
-Nhận DB/.env qua kênh bảo mật của nhóm và đặt CA tại DB/.env.supabase-ca.crt nếu dùng file CA riêng. Chạy connection:check và migrate:status từ DB/ để biết trạng thái DB đích. Thành viên pull code dùng DB chung đã chuẩn bị không cần tự deploy/seed. Số bảng và migration trong tài liệu mô tả schema mục tiêu; không thay thế kiểm tra môi trường thực tế. Integration/replay/seed hai lần trên PostgreSQL test riêng vẫn chưa có bằng chứng PASS đầy đủ.
+| Nội dung | Vị trí |
+| --- | --- |
+| DbContext sở hữu migration | `backend/src/QTKD.Infrastructure/Persistence/QtkdDbContext.cs` (`IdentityDbContext` chỉ map một phần cho Identity, không sinh migration) |
+| Model bảng | `Persistence/Schema/` (entity, enum) và `Persistence/Configurations/<Module>/` |
+| Migration | `Persistence/Migrations/`; SQL viết tay ở `Persistence/Migrations/Sql/` |
+| Bảng lịch sử | `qtkd."__EFMigrationsHistory"` (`qtkd._prisma_migrations` giữ lại làm lịch sử) |
+| Công cụ DB | `backend/src/QTKD.DbTool` (connection-check, status, adopt, migrate, seed) |
+| Fixture demo | `Persistence/Seed/demo-seed.json` (chuyển nguyên từ `seed-data.ts`) |
 
-Ma trận ban đầu nằm trong `prisma/identity-catalog.ts`, được bootstrap bằng migration; seed không khôi phục grants admin đã gỡ. Native checks không cần dependencies: `node --experimental-transform-types --test tests/identity-offline.test.mjs`. Đây là kiểm tra nguồn/mapping, không thực thi PostgreSQL. `npm run check` cần cài dependencies và vẫn không chứng minh migration chạy được trên DB thật.
+**9 migration đầu** (`2026110x000x00_Prisma*`) là bản sao 1:1 của 9 migration Prisma cũ. Mỗi migration chạy đúng file SQL gốc, chỉ bỏ dòng `BEGIN;`/`COMMIT;` vì EF tự bọc transaction. `PrismaManagerRoles` chạy ngoài transaction vì giá trị enum mới phải commit trước khi dùng. Migration `*_EfHistoryRls` là migration EF đầu tiên: bật RLS cho bảng lịch sử EF, và snapshot của nó chứa model đầy đủ, nên các migration sau sinh tự động bằng `dotnet ef migrations add`.
 
-Bộ Prisma độc lập này dựng toàn bộ **26 bảng, 239 cột còn hiệu lực, 59 khóa ngoại** trong `data-dictionary.md` được cung cấp ngày 02/11/2026, đối chiếu `spec nghiệp vụ + hệ thống (8).docx`. DB đích là PostgreSQL trên Supabase; không dùng PostgreSQL/Docker local. Backend ứng dụng vẫn là C#/.NET Web API.
+Model EF mô tả bảng, cột, kiểu, default, PK/FK, index thường, sequence và enum. **CHECK, trigger, function, RLS, index biểu thức/partial** chỉ có trong SQL. Muốn đổi những phần này thì thêm `migrationBuilder.Sql(...)`, hoặc thêm file vào `Migrations/Sql` rồi gọi `MigrationSql.Run`. EF không biểu diễn được `ON UPDATE` của FK. FK cũ giữ nguyên `ON UPDATE RESTRICT/CASCADE` trong DB; FK mới sẽ là `NO ACTION`.
 
-Kiểm tra offline không chứng minh trigger, RLS, transaction hay việc chạy lại seed đã hoạt động trên PostgreSQL thật. Chín tài khoản demo trên DB chung đã được reset theo phê duyệt riêng, xem [changelog Identity](../docs/specs/identity/CHANGELOG.md); thao tác đó không phải hành vi tự động của seed.
+## Kiểm tra offline
 
-## Kiểm tra khi chưa có DB
-
-Cần Node.js 22.18+ thuộc nhánh 22, hoặc 24.11+. Prisma được khóa ở bản ổn định 7.10.1. Chạy trong thư mục `DB/`:
+Cần .NET SDK theo `backend/global.json`, công cụ `dotnet-ef` 10, và Node.js 22.18+ (nhánh 22) hoặc 24.11+. Chạy trong `DB/`:
 
 ```powershell
 npm ci
 npm run check
 ```
 
-`check` validate schema, sinh Prisma Client, kiểm tra TypeScript, chạy test fixture, dry-run seed và đối chiếu migration với schema. Không mở kết nối DB. Lần đầu cài dependency/generate có thể cần mạng để tải package/engine.
+`check` gồm 3 phần, không phần nào kết nối Supabase:
 
-`npm run seed:check` chỉ kiểm tra dữ liệu seed. URL `.invalid` trong `prisma.config.ts` chỉ giúp các lệnh offline đọc cấu hình; không phải DB local hoặc DB có thể kết nối.
+- `npm test`: catalog quyền trong fixture khớp FE (`frontend/src/constants/roles.ts`), BE (`IdentityPolicies.cs`) và SQL grants.
+- `npm run test:ef-parity`: dựng 2 PostgreSQL bằng PGlite (WASM). Một DB chạy các file SQL migration, một DB chạy DDL sinh từ model EF (`dotnet ef dbcontext script`). Sau đó so bảng, cột, PK/FK, index, sequence và enum. Phần chỉ có ở SQL phải nằm trong danh sách cho phép trong test.
+- `npm run test:dbtool`: chạy `QTKD.DbTool` thật trên PGlite. Kịch bản 1 là DB trống: `migrate`, `seed` 2 lần (lần 2 không đổi gì, không reset mật khẩu), `status`. Kịch bản 2 là DB kiểu Prisma: `migrate` bị chặn, `adopt` 2 lần, rồi `migrate` chỉ chạy migration EF.
 
-Generator `prisma-client` xuất `generated/prisma/client.ts`, không phải client.js. Repo import trực tiếp `.ts` và đặt importFileExtension=ts cho tsx. `npm run seed` tự chạy generate qua preseed; nếu gọi `npx prisma db seed` hoặc `npm run seed:check` trực tiếp thì chạy `npm run generate` trước. Dùng Node 24 LTS theo hướng dẫn local; cảnh báo DEP0205 trên Node 26 không phải lỗi thiếu Prisma Client.
+Thêm các lệnh sau:
 
-## Chạy khi đã có project Supabase
+- `npm run seed:check`: kiểm tra fixture offline.
+- `npm run test:contracts`: E2E Api + PGlite.
+- Trong `backend/`: `dotnet test` (gồm `DatabaseToolingTests`: validator seed, đối chiếu 239 cột dictionary, chặn URL, chẩn đoán lỗi kết nối) và `dotnet ef migrations has-pending-model-changes -p src/QTKD.Infrastructure -s src/QTKD.Infrastructure -c QtkdDbContext`.
 
-Nếu seed lỗi P1011, chạy `npm run connection:check` để kiểm tra kết nối bằng SELECT 1 mà không ghi dữ liệu. Xem [hướng dẫn TLS/CA và mã lỗi](../docs/setup/DATABASE-TLS.md). Khuyến nghị sslmode=verify-full; khi cần CA, dùng sslrootcert trỏ file tải từ Supabase Database Settings.
+PGlite là PostgreSQL thật nhưng không chứng minh hành vi riêng của Supabase (role `anon`/`authenticated`, pooler, TLS).
 
-1. Trong **Supabase > Connect**, lấy URI **Direct connection** cổng 5432. Nếu mạng không hỗ trợ IPv6, dùng **Session pooler** cổng 5432. Không dùng Transaction pooler cổng 6543 cho migration.
-2. Dùng DB/.env nhận riêng từ nhóm, hoặc copy .env.example nếu dựng DB riêng. Giữ `schema=qtkd` và `sslmode=verify-full`; URL-encode ký tự đặc biệt trong mật khẩu. Khi CA nằm cùng .env, dùng `sslrootcert=./.env.supabase-ca.crt` và chạy lệnh từ DB/. Đặt SEED_PASSWORD riêng cho demo khi tạo mới, tối thiểu 12 ký tự, tối đa 72 byte UTF-8.
-3. Trên DB chung đã chuẩn bị, chỉ chạy `npm run connection:check` và `npm run migrate:status`. Phần ghi dữ liệu sau dành cho người phụ trách dựng DB mới hoặc cập nhật schema đã được nhóm thống nhất, chạy từ `DB/`:
+## Chạy với Supabase
+
+Nếu kết nối lỗi, chạy `npm run connection:check` (chỉ `SELECT 1`, không ghi). Lệnh in mã lỗi an toàn, không in URI. Xem thêm [hướng dẫn TLS/CA](../docs/setup/DATABASE-TLS.md).
+
+1. Trong **Supabase > Connect**, lấy URI **Direct connection** cổng 5432. Nếu mạng không hỗ trợ IPv6, dùng **Session pooler** cổng 5432. Không dùng Transaction pooler cổng 6543.
+2. Dùng DB/.env nhận riêng từ nhóm, hoặc copy `.env.example`. Giữ `schema=qtkd` và `sslmode=verify-full`; URL-encode ký tự đặc biệt trong mật khẩu. Nếu `sslrootcert` là đường dẫn tương đối, nó được tính từ thư mục chứa `.env`, ví dụ `sslrootcert=./.env.supabase-ca.crt`. `SEED_PASSWORD` chỉ cần khi seed: tối thiểu 12 ký tự, tối đa 72 byte UTF-8.
+3. Thành viên chỉ dùng DB chung thì chỉ chạy `npm run connection:check` và `npm run migrate:status`. Các lệnh ghi dưới đây dành cho người phụ trách DB.
+
+**DB chung hiện có (do Prisma dựng), chỉ làm một lần:**
 
 ```powershell
-npm run migrate:status
-npm run migrate:deploy
-npm run seed
+npm run migrate:status   # báo "DB do Prisma dựng, chưa adopt"
+npm run migrate:adopt    # kiểm tra đủ 9 dòng _prisma_migrations, ghi 9 id EF; không chạy DDL
+npm run migrate:deploy   # chỉ chạy migration EF mới (EfHistoryRls)
+npm run migrate:status   # 10 applied, 0 pending
 ```
 
-Các lệnh này **kết nối/ghi lên Supabase thật**. Wrapper từ chối host local, URL mẫu và Transaction pooler. `.env` đã được Git ignore. API URL/anon key không thay thế PostgreSQL connection URI; không commit password, service key hoặc connection string.
+`adopt` từ chối nếu `_prisma_migrations` thiếu một migration trong baseline, có migration lạ, hoặc có migration đã rollback. `migrate` từ chối DB Prisma chưa adopt, để không chạy lại DDL baseline.
 
-Trong Table Editor chọn schema **qtkd**. Bộ migration tạo bảng trong database `postgres` sẵn có, không chạy `CREATE DATABASE` và không sửa schema `auth`/`storage`. Không dùng `migrate reset`, `db push` hoặc áp dụng lại SQL thủ công trên DB dùng chung. Prisma Migrate quản lý lịch sử áp dụng.
+**DB mới:** `npm run migrate:deploy`, rồi `npm run seed` nếu cần dữ liệu demo.
 
-Sau khi migrate/seed, dùng [scripts/verify-supabase.sql](scripts/verify-supabase.sql) để kiểm tra đọc. Script này hiện chưa chạy trên Supabase.
+Các lệnh trên **kết nối và ghi lên Supabase thật**. Công cụ từ chối host local, URL mẫu và Transaction pooler. Riêng tùy chọn `--disposable-local` cho phép `127.0.0.1`, và chỉ dùng cho test PGlite. `.env` đã được Git ignore. Không commit password, service key hoặc connection string. Không dùng `dotnet ef database update` lên DB chung vì lệnh này bỏ qua bước kiểm tra adopt. Không chạy lại SQL thủ công.
 
-## File và quyền sở hữu schema
+Sau khi migrate/seed, dùng [scripts/verify-supabase.sql](scripts/verify-supabase.sql) để kiểm tra đọc.
+
+## Thêm migration mới
+
+Chạy trong `backend/`:
+
+```powershell
+dotnet ef migrations add <Ten> -p src/QTKD.Infrastructure -s src/QTKD.Infrastructure -c QtkdDbContext -o Persistence/Migrations
+```
+
+Sửa entity/configuration trước, rồi review file sinh ra. Thêm SQL cho CHECK/trigger/RLS nếu cần. Bảng mới phải bật RLS và thu hồi quyền `anon`/`authenticated` như các bảng khác. Sau đó chạy `npm run check` trong `DB/`.
+
+Các module duyệt/hợp đồng ghi DB bằng SQL thô. Đổi tên cột/enum thì phải sửa cả những chỗ đó.
+
+## File
 
 | File | Vai trò |
 | --- | --- |
-| `prisma/schema.prisma` | Nguồn cấu trúc 29 model (26 dictionary + 3 Identity) và 20 enum |
-| `prisma.config.ts` | Cấu hình CLI và lệnh seed |
-| `prisma/migrations/202611020001_dictionary/migration.sql` | DDL sinh offline, bọc transaction và đặt search path `qtkd` |
-| `prisma/migrations/202611020002_constraints/migration.sql` | CHECK, index có điều kiện, trigger và RLS |
-| `prisma/migrations/202611020003_identity/migration.sql` | Bảng quyền Identity, `department.code`, metadata mật khẩu/phiên |
-| `prisma/migrations/202611030001_approval_unassigned/migration.sql` | Cho phép bước duyệt tương lai chưa có người được giao (SYS-CTR-08 A4) |
-| `prisma/migrations/202611030002_workflow_config/migration.sql` | Bảng `workflow_config` (cấu hình theo phiên bản). Đã áp lên DB chung; giữ nguyên lịch sử, bị bỏ ở migration sau |
-| `prisma/migrations/202611030003_manager_roles/migration.sql` | Thêm giá trị enum `LegalManager` (Trưởng phòng Pháp chế), `BoardChair` (Tổng Giám đốc). Tách riêng vì giá trị enum mới không dùng được trong cùng transaction |
-| `prisma/migrations/202611030004_approval_assignment/migration.sql` | SYS-CTR-10: bỏ `workflow_config`; thêm vai trò LegalManager/BoardChair (quyền như nhân viên phòng + `approvals.assign`), cấp `approvals.assign` cho SalesManager; trigger cho đổi người khi bước chưa bắt đầu |
-| `prisma/migrations/202611030005_status_keeps_version/migration.sql` | SYS-CTR-04/07: đổi trạng thái hợp đồng không tăng `version`; chỉ tăng khi sửa nội dung hoặc lệnh ghi chủ động `version + 1` |
-| `prisma/seed-data.ts` | Fixture có ID cố định và snapshot riêng |
-| `prisma/seed.ts` | Dry-run hoặc seed trong một transaction |
-| `data-dictionary/source-columns.json` | Coverage trích từ bảng/cột/FK trong tài liệu nguồn |
-| `tests/database.test.ts` | Kiểm tra dữ liệu và cấu hình không cần DB |
-
-Theo yêu cầu chuẩn bị Prisma, bộ này dùng **Prisma làm nguồn migration**. Không tạo bộ EF Core migration song song. Khi dựng backend .NET, ánh xạ entity vào DB này; nếu nhóm chuyển sang EF Core quản lý schema, phải baseline lịch sử và chốt chuyển đổi trước.
+| `data-dictionary/source-columns.json` | Bảng/cột/FK trích từ tài liệu nguồn; `DatabaseToolingTests` đối chiếu với model EF |
+| `data-dictionary/baseline.prisma` | Bản schema gốc từ dictionary, chỉ để tham chiếu (không chạy) |
+| `data-dictionary/DECISIONS.md` | Quyết định kiểu dữ liệu, ràng buộc, chuyển sang EF Core |
+| `scripts/verify-supabase.sql` | Truy vấn đọc để kiểm tra sau migrate/seed |
+| `scripts/bcrypt-interop.mjs` | Cầu nối bcryptjs cho test Identity của backend |
+| `tests/*.mjs` | Test PGlite/E2E nêu trên |
 
 ## Dữ liệu demo
 
 Dữ liệu thử phân công người duyệt (SYS-CTR-10): 3 hồ sơ "Chờ TP Kinh doanh / TP Pháp chế / Tổng Giám đốc phân công Demo" có lượt đang chạy với bước chưa có người duyệt; hồ sơ "Hợp đồng chờ rà soát Demo" có đủ người nên dùng để thử đổi người.
 
-Seed có 6 phòng ban, 11 tài khoản thuộc 10 vai trò, khách hàng Active/Suspended, cây khu vực 3 cấp, dịch vụ, hợp đồng/phụ lục, bảng giá, sản lượng, thanh toán, lượt duyệt và phiên ký giả lập. Username dạng `demo.*`, email `example.invalid`; không có dữ liệu cá nhân thật.
+Seed có 6 phòng ban, 11 tài khoản thuộc 10 vai trò, khách hàng Active/Suspended, cây khu vực 3 cấp, dịch vụ, hợp đồng/phụ lục, bảng giá, sản lượng, thanh toán, lượt duyệt và phiên ký giả lập. Username dạng `demo.*`, email `example.invalid`; không có dữ liệu cá nhân thật. Fixture nằm trong `demo-seed.json` (tên bảng/cột thật). Seed .NET và test E2E dùng chung file này.
 
-Tài khoản seed mới dùng bcrypt cost 12 từ biến môi trường, bật bắt buộc đổi mật khẩu. Chín tài khoản hiện có trên QTKD_DATH được bỏ bắt đổi lần đầu theo thao tác reset riêng ngày 02/11/2026, không thay đổi fixture tạo mới. Backend .NET đã có custom hasher và test bcrypt hai chiều; lần chạy gần nhất bị abort do testhost không kết nối, chưa PASS. Đây không phải định dạng mặc định của ASP.NET Identity PasswordHasher. Không ghi mật khẩu thật vào source. Phiên đăng nhập mẫu đã thu hồi; OTP mẫu đã dùng và hết hạn.
+Tài khoản seed mới dùng bcrypt cost 12 từ `SEED_PASSWORD`, bật bắt buộc đổi mật khẩu. Chín tài khoản hiện có trên QTKD_DATH được bỏ bắt đổi lần đầu theo thao tác reset riêng ngày 02/11/2026 (xem [changelog Identity](../docs/specs/identity/CHANGELOG.md)), không thay đổi fixture tạo mới. Phiên đăng nhập mẫu đã thu hồi; OTP mẫu đã dùng và hết hạn. Grants ban đầu do migration `202611020003_identity` chèn; seed không khôi phục grants admin đã gỡ.
 
 Đường dẫn `demo-placeholder/...` chỉ là metadata, không có file thật. Seed không upload Storage, gửi email hoặc gọi dịch vụ ký. Các trạng thái lịch sử Approved/Issued/Succeeded được nhập sẵn làm fixture, không phải kết quả đã chạy luồng nghiệp vụ.
 
-ID cố định, `skipDuplicates`, khóa transaction và kiểm tra ID được dùng để thiết kế seed chạy lại mà không xóa dữ liệu hoặc đổi mật khẩu đã có. Natural key trùng với ID khác làm transaction thất bại. **Tính chất chạy lại vẫn cần được kiểm thử trên Supabase thật.**
+Seed chạy trong một transaction: khóa advisory, `INSERT ... ON CONFLICT DO NOTHING` từng dòng, chỉ đặt `manager_id` khi còn trống, rồi kiểm tra ID. Natural key trùng với ID khác làm transaction thất bại. Đã kiểm tra seed chạy lại 2 lần trên PGlite; **chưa kiểm tra trên Supabase thật.**
 
-Các lựa chọn kiểu dữ liệu, xử lý comment và khoảng trống so với spec nằm trong [data-dictionary/DECISIONS.md](data-dictionary/DECISIONS.md). Chưa coi các task/API Sprint 1/2/3 hoàn tất chỉ từ bộ schema này.
-
+Chưa coi các task/API Sprint 1/2/3 hoàn tất chỉ từ bộ schema này.
 
 Contracts CRUD and cancellation integration: [setup](../backend/GETTING-STARTED.md).
