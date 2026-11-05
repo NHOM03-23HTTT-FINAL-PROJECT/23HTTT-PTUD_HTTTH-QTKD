@@ -27,7 +27,7 @@ EF Core quản lý schema và migration (`QtkdDbContext`, `Infrastructure/Persis
 | `Catalogs` (dịch vụ, nhóm dịch vụ, đơn vị tính, thuế suất) | `catalogs` | 1 | PB-04 | Đan Anh | Giữ chỗ |
 | `Customers` | `customers` | 1 (mở rộng S2, S3) | CUS-01, 02, 04, 05, 06, 07 | Hiếu | Giữ chỗ |
 | `Areas` | `areas` | 1 (mở rộng S2, S3) | ARE-01, 02, 04, 12, 13 | Tuấn | Giữ chỗ |
-| `Contracts` | `contracts` | 1 (phụ lục S2, ký/chấm dứt/gia hạn S3) | CTR-01, 02, 03, 04, 05, 06, 16, 18 | Phong; CTR-04..06: Minh | Có code; Controller + Service + Store Npgsql (kiểu cũ) |
+| `Contracts` | `contracts` | 1 (phụ lục S2, ký/chấm dứt/gia hạn S3) | CTR-01, 02, 03, 04, 05, 06, 16, 18 | Phong; CTR-04..06: Minh | Có code; Controller + Service + Store Npgsql (kiểu cũ). Đang chuyển sang mẫu mới: trình duyệt (SYS-CTR-04) đã theo Controller → `ContractService` → `IContractRepository`/`ContractRepository` (EF Core LINQ, không SQL) |
 | `Approvals` (workflow engine) | `approvals` | 1 (rút hồ sơ, chuyển người duyệt S2) | APR-01..06, 09, 10 | Lộc (BE), Đan Anh (FE tiến độ, cấu hình) | Có code: `Workflows` + `ContractApprovals`; Minimal API |
 | `Pricing` (báo giá, bảng giá, phiên bản) | `pricing` | 2 | PRC-01..14 | Xuân, Đan Anh, Hiếu | Giữ chỗ |
 | `Outputs` (sản lượng, khóa kỳ) | `outputs` | 2 (mở khóa S3) | OUT-01..07, 13 | Minh | Giữ chỗ |
@@ -89,7 +89,7 @@ Khi cần khóa dòng (`SELECT … FOR UPDATE`) hoặc SQL đặc thù, reposito
 | --- | --- | --- |
 | EF Core (`IdentityDbContext`) | Identity | Map một phần bảng Identity; không sinh migration |
 | EF Core (`QtkdDbContext`) | Toàn schema; Notifications | Sở hữu migration; LINQ cho notifications |
-| EF Core LINQ trong `Infrastructure/Repositories/<Module>Repository.cs` | Notifications | **Mặc định cho module mới** |
+| EF Core LINQ trong `Infrastructure/Repositories/<Module>Repository.cs` | Notifications; Contracts – trình duyệt (SYS-CTR-04) | **Mặc định cho module mới** |
 | Npgsql qua `PgDatabase` (tham số `$1, $2…`) | Contracts | Kiểu cũ; module mới chỉ dùng bên trong repository khi LINQ không đủ |
 | Npgsql trực tiếp (`PostgresApprovalStore.Command`, tham số có tên) | ContractApprovals | Có khóa dòng `SELECT … FOR UPDATE`, idempotency |
 

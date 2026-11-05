@@ -25,7 +25,7 @@ Trạng thái 03/11/2026:
 | Rà soát, phê duyệt SYS-CTR-07 → 09 | Đã có (`ContractApprovalEndpoints.cs`) | `approvalApi.ts` gọi BE |
 | Phân công người duyệt SYS-CTR-10 | Đã có (`ContractApprovalEndpoints.cs`, `ApprovalAssignmentService.cs`) | `approvalApi.ts` gọi BE (tab "Phân công người duyệt") |
 | CRUD hồ sơ SYS-CTR-01/02/03/05/06, tệp và US-CTR-19 | Đã có (`ContractsController.cs`) | `contractsApi.ts` gọi BE khi bật `VITE_CONTRACTS_USE_BACKEND` |
-| Trình duyệt SYS-CTR-04 | Đã có (`ContractsController.cs`, `ContractSubmissions.cs`) | `contractsApi.ts` gọi BE khi bật `VITE_CONTRACTS_USE_BACKEND` |
+| Trình duyệt SYS-CTR-04 | Đã có (`ContractsController.cs`, `ContractService.cs`, `ContractRepository.cs`; `POST submit` yêu cầu CSRF) | `contractsApi.ts` gọi BE khi bật `VITE_CONTRACTS_USE_BACKEND` |
 | Tiến độ SYS-CTR-11 | Chưa nối hoàn chỉnh | Giữ ranh giới mock/API theo từng route |
 
 > Bảng "Hồ sơ hợp đồng" bên dưới vẫn là đề xuất từ chữ ký hàm FE, chưa được nhóm BE chốt.
@@ -42,7 +42,7 @@ Trạng thái 03/11/2026:
 | GET | `/contracts/{code}` | CTR-06 (dùng chung cho 03, 11) | `contractsApi.getDetail` / `getContract` | Ẩn ý kiến nội bộ Pháp chế với người ngoài Pháp chế (CTR-11 A9) |
 | PUT | `/contracts/{code}` | CTR-03 | `contractsApi.update` | `{baseVersion, draft}`; chỉ người phụ trách, chỉ khi Nháp hoặc Yêu cầu chỉnh sửa; trạng thái giữ nguyên |
 | GET | `/contracts/{code}/submit-check` | CTR-04 b3–5 | `contractsApi.checkSubmit` | → `{salesReviewer, resubmit}`; lỗi `NOT_OWNER` / `STATUS` / `MISSING` (kèm `items`) / `AREA_INACTIVE` (kèm `items`) / `NO_APPROVER` |
-| POST | `/contracts/{code}/submit` | CTR-04 | `contractsApi.submit` | Idempotency-Key → `{contract, replayed}`; tạo lượt duyệt 3 bước: Rà soát kinh doanh giao Trưởng phòng KD (`department.manager_id` của phòng sở hữu), Rà soát pháp lý và Phê duyệt chờ phân công; submit lặp không tạo lượt trùng |
+| POST | `/contracts/{code}/submit` | CTR-04 | `contractsApi.submit` | Idempotency-Key → `{contract, replayed}`; tạo lượt duyệt 3 bước: Rà soát kinh doanh giao Trưởng phòng KD (`department.manager_id` của phòng sở hữu), Rà soát pháp lý và Phê duyệt chờ phân công; submit lặp không tạo lượt trùng; cần `X-QTKD-CSRF: 1` và `Origin` hợp lệ, sai trả 403 `CSRF_REJECTED` |
 | POST | `/contracts/{code}/cancel` | CTR-05 | `contractsApi.cancel` | `{reason}`; chỉ người phụ trách, chỉ hồ sơ Nháp |
 
 SYS-CTR-11 (tiến độ, lịch sử phê duyệt) hiện dùng chung `GET /contracts/{code}`. Nếu muốn tách quyền xem lịch sử, có thể thêm `GET /contracts/{code}/approval-history`.

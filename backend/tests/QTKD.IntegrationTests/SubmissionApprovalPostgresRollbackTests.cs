@@ -1,22 +1,31 @@
+using System.Text.Json.Nodes;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
+using QTKD.Application.Common.Interfaces;
 using QTKD.Application.Features.ContractApprovals;
+using QTKD.Application.Features.Contracts;
 using QTKD.Domain.Contracts;
 using QTKD.Infrastructure.ContractApprovals;
 using QTKD.Infrastructure.Persistence;
+using QTKD.Infrastructure.Repositories;
 using Xunit;
 
 namespace QTKD.IntegrationTests;
 
-// Opt-in (QTKD_APPROVAL_ROLLBACK_CONNECTION). SYS-CTR-04 → 09 trên PostgreSQL thật: trình bằng SQL của module hợp đồng,
+// Opt-in (QTKD_APPROVAL_ROLLBACK_CONNECTION). SYS-CTR-04 → 09 trên PostgreSQL thật: trình qua ContractService + ContractRepository (EF Core),
 // rồi tiếp nhận, phân công, chấp thuận, bàn giao bằng module duyệt. Mọi thay đổi nằm trong một transaction và luôn rollback.
 public sealed class SubmissionApprovalPostgresRollbackTests
 {
     [ApprovalPostgresRollbackFact]
     public async Task Submitted_contract_runs_sales_legal_board_with_a_stable_version_then_rollback()
     {
-        await using var connection = new NpgsqlConnection(Environment.GetEnvironmentVariable("QTKD_APPROVAL_ROLLBACK_CONNECTION"));
-        await connection.OpenAsync();
-        await using var transaction = await connection.BeginTransactionAsync();
+        // The connection comes from QtkdDbContext so EF's PostgreSQL enum mapping applies to the contract repository.
+        await using var db = new QtkdDbContext(QtkdPersistence.Options(Environment.GetEnvironmentVariable("QTKD_APPROVAL_ROLLBACK_CONNECTION")!));
+        await db.Database.OpenConnectionAsync();
+        await using var efTransaction = await db.Database.BeginTransactionAsync();
+        var connection = (NpgsqlConnection)db.Database.GetDbConnection();
+        var transaction = (NpgsqlTransaction)efTransaction.GetDbTransaction();
         var ct = CancellationToken.None;
         var prefix = "submit.rollback." + Guid.NewGuid().ToString("N")[..12];
         async Task Exec(string sql, params (string Name, object? Value)[] args)
@@ -65,8 +74,9 @@ public sealed class SubmissionApprovalPostgresRollbackTests
                 """, ("id", id), ("owner", owner));
 
             var actor = new Actor(owner, "SalesStaff", sales, prefix);
-            var contracts = new PostgresContractStore(null!, "");
-            var submitted = await contracts.SubmitIn(connection, transaction, actor, code, ct);
+            var contracts = new ContractService(null!, new RollbackContracts(new ContractRepository(db)));
+            Task<JsonObject> Submit() => contracts.Submit(actor, code, Guid.NewGuid().ToString(), ct);
+            var submitted = await Submit();
             Assert.Equal("submitted", submitted["contract"]!["status"]!.GetValue<string>());
 
             var store = new RollbackStore(connection, transaction);
@@ -87,14 +97,14 @@ public sealed class SubmissionApprovalPostgresRollbackTests
             Assert.Equal(salesHead, document.Steps[0].AssigneeId);
             Assert.Equal(document.Version, document.SubmittedVersion);
             Assert.Equal(1L, await Scalar("SELECT count(*) FROM qtkd.notification WHERE record_id=@id AND recipient_id=@m", ("id", id), ("m", salesHead)));
-            var twice = await Assert.ThrowsAsync<BusinessException>(() => contracts.SubmitIn(connection, transaction, actor, code, ct));
+            var twice = await Assert.ThrowsAsync<BusinessException>(Submit);
             Assert.Equal("STATUS", twice.Code);
 
             // A1: TP KD yêu cầu chỉnh sửa, người phụ trách trình lại → lượt 2 bắt đầu lại từ TP KD.
             await Act("sales", "accept");
             await Act("sales", "revision");
             Assert.Equal(("revision-requested", "revision"), ((await Read()).Status, (await Read()).RoundResult));
-            await contracts.SubmitIn(connection, transaction, actor, code, ct);
+            await Submit();
             document = await Read();
             Assert.Equal(("submitted", 2), (document.Status, document.RoundNo));
             Assert.Equal(["pending-accept", "unassigned", "unassigned"], document.Steps.Select(s => s.State));
@@ -116,7 +126,7 @@ public sealed class SubmissionApprovalPostgresRollbackTests
             Assert.All(approved.Steps, s => Assert.Equal(("done", "approve"), (s.State, s.Decision)));
             Assert.Equal(approved.SubmittedVersion, approved.Version);
         }
-        finally { await transaction.RollbackAsync(); }
+        finally { await efTransaction.RollbackAsync(); }
         await using var cleanup = new NpgsqlCommand("SELECT count(*) FROM qtkd.user_account WHERE username LIKE @prefix", connection);
         cleanup.Parameters.AddWithValue("prefix", prefix + "%");
         Assert.Equal(0L, await cleanup.ExecuteScalarAsync());
@@ -132,6 +142,23 @@ public sealed class SubmissionApprovalPostgresRollbackTests
             return await action(new PostgresApprovalTransaction(c, tx, stored.Document, stored.OwnerId));
         }
         public Task RetryNotifications(Guid document, CancellationToken ct) => throw new NotSupportedException();
+    }
+
+    // The test transaction is already open and always rolls back: run the submission in it, like the API's
+    // idempotent transaction would, and delegate everything else to the real repository.
+    private sealed class RollbackContracts(IContractRepository inner) : IContractRepository
+    {
+        public Task<JsonObject> IdempotentAsync(Actor actor, string operation, string key, object payload, Func<Task<JsonObject>> action, CancellationToken ct) => action();
+        public Task<ContractRecord?> FindAsync(Actor actor, string code, CancellationToken ct) => inner.FindAsync(actor, code, ct);
+        public Task<bool> HasPendingCancellationAsync(Guid contractId, CancellationToken ct) => inner.HasPendingCancellationAsync(contractId, ct);
+        public Task<IReadOnlyList<string>> InactiveAreaItemsAsync(Guid contractId, CancellationToken ct) => inner.InactiveAreaItemsAsync(contractId, ct);
+        public Task<SalesReviewer?> FindSalesReviewerAsync(Guid contractId, CancellationToken ct) => inner.FindSalesReviewerAsync(contractId, ct);
+        public Task<bool> TryMarkSubmittedAsync(Guid contractId, string status, int version, CancellationToken ct) => inner.TryMarkSubmittedAsync(contractId, status, version, ct);
+        public Task<int> StartRoundAsync(Guid contractId, Guid submittedBy, Guid reviewerId, CancellationToken ct) => inner.StartRoundAsync(contractId, submittedBy, reviewerId, ct);
+        public Task NotifyAsync(Guid recipientId, Guid contractId, string content, CancellationToken ct) => inner.NotifyAsync(recipientId, contractId, content, ct);
+        public Task AuditAsync(Guid contractId, string action, Guid actorId, string? beforeStatus, string afterStatus,
+            JsonObject? before, JsonObject after, string? note, CancellationToken ct) =>
+            inner.AuditAsync(contractId, action, actorId, beforeStatus, afterStatus, before, after, note, ct);
     }
 
     private sealed class RollbackSessions(NpgsqlConnection c, NpgsqlTransaction tx) : IApprovalDbSessions

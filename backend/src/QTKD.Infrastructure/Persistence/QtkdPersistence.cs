@@ -25,6 +25,7 @@ public static class QtkdPersistence
         services.AddDbContext<QtkdDbContext>((sp, options) =>
             options.UseNpgsql(connectionString(sp), pg => Configure(pg, enumNames)));
         services.AddScoped<INotificationRepository, NotificationRepository>();
+        services.AddScoped<IContractRepository, ContractRepository>();
         return services;
     }
 

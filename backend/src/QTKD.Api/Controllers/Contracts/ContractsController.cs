@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using QTKD.Api.Filters;
 using QTKD.Application.Features.Contracts;
 using QTKD.Domain.Contracts;
 using QTKD.Application.Common.Interfaces;
@@ -70,6 +71,7 @@ public class ContractsController : ControllerBase
 
     [HttpPost("{code}/submit")]
     [Authorize(Policy = "contracts.create")]
+    [RequireCsrf]
     public async Task<System.Text.Json.Nodes.JsonObject> Submit(string code, CancellationToken ct) =>
         await _service.Submit(
             await _actor.Get(ct), code, Key, ct);

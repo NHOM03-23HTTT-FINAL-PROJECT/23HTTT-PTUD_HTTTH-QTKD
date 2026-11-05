@@ -18,10 +18,6 @@ public interface IContractStore
 
     Task<JsonObject> Update(Actor actor, string code, UpdateContract request, decimal value, CancellationToken ct);
 
-    Task<JsonObject> SubmitCheck(Actor actor, string code, CancellationToken ct);
-
-    Task<JsonObject> Submit(Actor actor, string code, string key, CancellationToken ct);
-
     Task<JsonObject> Cancel(Actor actor, string code, CancelContract request, string key, CancellationToken ct);
 
     Task<JsonObject> RequestCancellation(Actor actor, string code, CancellationDraft request, string key, CancellationToken ct);
