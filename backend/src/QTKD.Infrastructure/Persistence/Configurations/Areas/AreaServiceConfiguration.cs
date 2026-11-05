@@ -6,6 +6,9 @@ using SessionEndReason = QTKD.Domain.Identity.SessionEndReason;
 using RecordType = QTKD.Domain.Notifications.RecordType;
 using SendStatus = QTKD.Domain.Notifications.SendStatus;
 using QTKD.Infrastructure.Persistence.Schema;
+using AreaService = QTKD.Domain.Entities.AreaService;
+using Area = QTKD.Domain.Entities.Area;
+using Service = QTKD.Domain.Entities.Service;
 
 namespace QTKD.Infrastructure.Persistence.Configurations.Areas;
 
@@ -20,9 +23,9 @@ public sealed class AreaServiceConfiguration : IEntityTypeConfiguration<AreaServ
         b.Property(x => x.ServiceId).HasColumnName("service_id").HasColumnType("uuid");
         b.HasIndex(x => x.AreaId).HasDatabaseName("area_service_area_id_idx");
         b.HasIndex(x => x.ServiceId).HasDatabaseName("area_service_service_id_idx");
-        b.HasOne<Area>().WithMany().HasForeignKey(x => x.AreaId)
+        b.HasOne(x => x.Area).WithMany(a => a.AreaServices).HasForeignKey(x => x.AreaId)
             .HasConstraintName("area_service_area_id_fkey").OnDelete(DeleteBehavior.Restrict);
-        b.HasOne<Service>().WithMany().HasForeignKey(x => x.ServiceId)
+        b.HasOne(x => x.Service).WithMany(s => s.AreaServices).HasForeignKey(x => x.ServiceId)
             .HasConstraintName("area_service_service_id_fkey").OnDelete(DeleteBehavior.Restrict);
     }
 }

@@ -6,6 +6,8 @@ using SessionEndReason = QTKD.Domain.Identity.SessionEndReason;
 using RecordType = QTKD.Domain.Notifications.RecordType;
 using SendStatus = QTKD.Domain.Notifications.SendStatus;
 using QTKD.Infrastructure.Persistence.Schema;
+using AreaAssignment = QTKD.Domain.Entities.AreaAssignment;
+using Area = QTKD.Domain.Entities.Area;
 
 namespace QTKD.Infrastructure.Persistence.Configurations.Areas;
 
@@ -23,7 +25,7 @@ public sealed class AreaAssignmentConfiguration : IEntityTypeConfiguration<AreaA
         b.Property(x => x.ToDate).HasColumnName("to_date").HasColumnType("timestamp(6) with time zone");
         b.HasIndex(x => x.AreaId).HasDatabaseName("area_assignment_area_id_idx");
         b.HasIndex(x => x.UserId).HasDatabaseName("area_assignment_user_id_idx");
-        b.HasOne<Area>().WithMany().HasForeignKey(x => x.AreaId)
+        b.HasOne(x => x.Area).WithMany(a => a.AreaAssignments).HasForeignKey(x => x.AreaId)
             .HasConstraintName("area_assignment_area_id_fkey").OnDelete(DeleteBehavior.Restrict);
         b.HasOne<UserAccount>().WithMany().HasForeignKey(x => x.UserId)
             .HasConstraintName("area_assignment_user_id_fkey").OnDelete(DeleteBehavior.Restrict);

@@ -680,7 +680,8 @@ export const areasApi = {
         _lastDashboard = res;
         return res;
       }
-    } catch {
+    } catch (err) {
+      console.error('[areasApi] fetchDashboardAsync error:', err);
       // Giữ fallback về dữ liệu cached gần nhất khi API chưa sẵn sàng hoặc gián đoạn
     }
     return _lastDashboard;

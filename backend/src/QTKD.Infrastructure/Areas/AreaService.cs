@@ -6,6 +6,7 @@ using QTKD.Domain.Entities;
 using QTKD.Domain.Enums;
 using QTKD.Domain.Identity;
 using QTKD.Infrastructure.Persistence;
+using UserAccount = QTKD.Infrastructure.Persistence.Schema.UserAccount;
 
 namespace QTKD.Infrastructure.Areas;
 
@@ -334,6 +335,22 @@ public class AreaService : IAreaService
         if (area == null) return null;
 
         var dto = MapToDto(area);
+        if (dto.Assignments.Any())
+        {
+            var userIds = dto.Assignments.Select(a => a.UserId).Distinct().ToList();
+            var users = await _context.UserAccounts.AsNoTracking()
+                .Where(u => userIds.Contains(u.UserId))
+                .ToDictionaryAsync(u => u.UserId, ct);
+
+            foreach (var ass in dto.Assignments)
+            {
+                if (users.TryGetValue(ass.UserId, out var u))
+                {
+                    ass.StaffName = u.FullName;
+                    ass.Username = u.Username;
+                }
+            }
+        }
         dto.History = await GetAreaHistoryAsync(area.AreaId, ct);
         if (!dto.History.Any())
         {
@@ -636,7 +653,7 @@ public class AreaService : IAreaService
         return await _context.Areas
             .Include(a => a.ParentArea)
             .Include(a => a.AreaServices).ThenInclude(asv => asv.Service)
-            .Include(a => a.AreaAssignments).ThenInclude(aa => aa.User)
+            .Include(a => a.AreaAssignments)
             .FirstOrDefaultAsync(a => (isGuid && a.AreaId == guid) || a.AreaCode.ToLower() == idOrCode.ToLower(), ct);
     }
 
@@ -682,8 +699,8 @@ public class AreaService : IAreaService
             {
                 AssignmentId = aa.AssignmentId,
                 UserId = aa.UserId,
-                StaffName = aa.User?.FullName ?? string.Empty,
-                Username = aa.User?.Username ?? string.Empty,
+                StaffName = string.Empty,
+                Username = string.Empty,
                 FromDate = aa.FromDate,
                 ToDate = aa.ToDate
             }).ToList() ?? new List<AreaAssignmentSummaryDto>()
@@ -775,11 +792,15 @@ public class AreaService : IAreaService
             var area = await FindAreaByIdOrCodeAsync(idOrCode, ct);
             if (area != null)
             {
-                assignment = await _context.AreaAssignments
-                    .Include(aa => aa.User)
-                    .FirstOrDefaultAsync(aa => aa.AreaId == area.AreaId &&
-                        (aa.User.Username == assignmentIdOrStaffCode || aa.User.FullName == assignmentIdOrStaffCode) &&
-                        (aa.ToDate == null || aa.ToDate > DateTime.UtcNow), ct);
+                var user = await _context.UserAccounts.FirstOrDefaultAsync(
+                    u => u.Username == assignmentIdOrStaffCode || u.FullName == assignmentIdOrStaffCode, ct);
+                if (user != null)
+                {
+                    assignment = await _context.AreaAssignments
+                        .FirstOrDefaultAsync(aa => aa.AreaId == area.AreaId &&
+                            aa.UserId == user.UserId &&
+                            (aa.ToDate == null || aa.ToDate > DateTime.UtcNow), ct);
+                }
             }
         }
 

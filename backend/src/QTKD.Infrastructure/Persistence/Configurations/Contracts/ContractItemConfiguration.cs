@@ -29,9 +29,9 @@ public sealed class ContractItemConfiguration : IEntityTypeConfiguration<Contrac
         b.HasIndex(x => x.AreaId).HasDatabaseName("contract_item_area_id_idx");
         b.HasOne<Contract>().WithMany().HasForeignKey(x => x.ContractId)
             .HasConstraintName("contract_item_contract_id_fkey").OnDelete(DeleteBehavior.Restrict);
-        b.HasOne<Service>().WithMany().HasForeignKey(x => x.ServiceId)
+        b.HasOne<QTKD.Domain.Entities.Service>().WithMany().HasForeignKey(x => x.ServiceId)
             .HasConstraintName("contract_item_service_id_fkey").OnDelete(DeleteBehavior.Restrict);
-        b.HasOne<Area>().WithMany().HasForeignKey(x => x.AreaId)
+        b.HasOne<QTKD.Domain.Entities.Area>().WithMany().HasForeignKey(x => x.AreaId)
             .HasConstraintName("contract_item_area_id_fkey").OnDelete(DeleteBehavior.Restrict);
     }
 }

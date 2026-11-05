@@ -1,5 +1,3 @@
-using QTKD.Domain.Identity;
-
 namespace QTKD.Domain.Entities;
 
 public class AreaAssignment
@@ -11,5 +9,4 @@ public class AreaAssignment
     public DateTime? ToDate { get; set; }
 
     public Area Area { get; set; } = null!;
-    public UserAccount User { get; set; } = null!;
 }

@@ -26,9 +26,9 @@ public sealed class VolumeLineConfiguration : IEntityTypeConfiguration<VolumeLin
         b.HasIndex(x => x.AreaId).HasDatabaseName("volume_line_area_id_idx");
         b.HasOne<VolumePeriod>().WithMany().HasForeignKey(x => x.VolumePeriodId)
             .HasConstraintName("volume_line_volume_period_id_fkey").OnDelete(DeleteBehavior.Restrict);
-        b.HasOne<Service>().WithMany().HasForeignKey(x => x.ServiceId)
+        b.HasOne<QTKD.Domain.Entities.Service>().WithMany().HasForeignKey(x => x.ServiceId)
             .HasConstraintName("volume_line_service_id_fkey").OnDelete(DeleteBehavior.Restrict);
-        b.HasOne<Area>().WithMany().HasForeignKey(x => x.AreaId)
+        b.HasOne<QTKD.Domain.Entities.Area>().WithMany().HasForeignKey(x => x.AreaId)
             .HasConstraintName("volume_line_area_id_fkey").OnDelete(DeleteBehavior.Restrict);
     }
 }
