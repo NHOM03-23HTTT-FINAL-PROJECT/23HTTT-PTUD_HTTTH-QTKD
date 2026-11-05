@@ -21,7 +21,9 @@ using QTKD.Application.Features.ContractApprovals;
 using QTKD.Application.Features.Workflows;
 using QTKD.Infrastructure.ContractApprovals;
 using QTKD.Application.Features.Identity;
+using QTKD.Domain.Enums;
 using QTKD.Domain.Identity;
+using QTKD.Infrastructure;
 using QTKD.Infrastructure.Identity;
 using QTKD.Infrastructure.Persistence;
 using TokenOptions = QTKD.Infrastructure.Identity.TokenOptions;
@@ -33,14 +35,24 @@ builder.Logging.AddJsonConsole(options => options.IncludeScopes = true);
 builder.Services.AddOptions<TokenOptions>().BindConfiguration("Jwt").ValidateDataAnnotations().ValidateOnStart();
 builder.Services.AddOptions<DatabaseOptions>().BindConfiguration("ConnectionStrings").ValidateDataAnnotations().ValidateOnStart();
 builder.Services.AddSingleton(TimeProvider.System);
+
 // One translator for the whole app. The options lambda runs per request scope; a new translator each time
 // makes EF build a new internal service provider per request and throw ManyServiceProvidersCreatedWarning
 // after 20, which turned every later request into 500 SYSTEM_ERROR.
 var enumNames = new NpgsqlNullNameTranslator();
-builder.Services.AddDbContext<IdentityDbContext>((sp, options) => options.UseNpgsql(
-    sp.GetRequiredService<IConfiguration>().GetConnectionString("Identity") ?? throw new InvalidOperationException("ConnectionStrings:Identity is required."),
-    pg => { pg.MapEnum<UserRole>("user_role", "qtkd", enumNames);
-        pg.MapEnum<UserStatus>("user_status", "qtkd", enumNames); pg.MapEnum<SessionEndReason>("session_end_reason", "qtkd", enumNames); }));
+builder.Services.AddDbContext<IdentityDbContext>((sp, options) =>
+{
+    var connectionString = sp.GetRequiredService<IConfiguration>().GetConnectionString("Identity") ?? throw new InvalidOperationException("ConnectionStrings:Identity is required.");
+    options.UseNpgsql(connectionString, pg =>
+    {
+        pg.MapEnum<UserRole>("user_role", "qtkd", enumNames);
+        pg.MapEnum<UserStatus>("user_status", "qtkd", enumNames);
+        pg.MapEnum<SessionEndReason>("session_end_reason", "qtkd", enumNames);
+        pg.MapEnum<ActiveStatus>("active_status", "qtkd", enumNames);
+    });
+    options.ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.CoreEventId.ManyServiceProvidersCreatedWarning));
+});
+
 builder.Services.AddIdentityCore<UserAccount>(options =>
 {
     options.User.RequireUniqueEmail = true;
@@ -128,9 +140,12 @@ builder.Services.AddRateLimiter(options =>
 });
 var allowedOrigins = builder.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? [];
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy.WithOrigins(allowedOrigins)
-    .WithMethods("GET", "POST", "PUT").WithHeaders("Content-Type", "Authorization", "X-QTKD-CSRF", "Idempotency-Key").AllowCredentials()));
+    .WithMethods("GET", "POST", "PUT", "PATCH", "DELETE").WithHeaders("Content-Type", "Authorization", "X-QTKD-CSRF", "Idempotency-Key").AllowCredentials()));
 
-builder.Services.AddControllers();
+builder.Services.AddControllers().AddJsonOptions(options =>
+{
+    options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+});
 builder.Services.Configure<FormOptions>(o => o.MultipartBodyLengthLimit = 21 * 1024 * 1024);
 builder.Services.AddSingleton(sp => NpgsqlDataSource.Create(
     sp.GetRequiredService<IConfiguration>().GetConnectionString("Identity")!));
@@ -144,6 +159,7 @@ builder.Services.AddQtkdPersistence(
     sp => sp.GetRequiredService<IConfiguration>().GetConnectionString("Identity") ?? throw new InvalidOperationException("ConnectionStrings:Identity is required."),
     enumNames);
 builder.Services.AddScoped<NotificationService>();
+builder.Services.AddAreaInfrastructure(builder.Configuration);
 
 var app = builder.Build();
 app.Use(async (context, next) =>
@@ -161,47 +177,50 @@ app.Use(async (context, next) =>
     }
     catch (NpgsqlException error)
     {
-        var conflict = (error as PostgresException)?.SqlState is "23505" or "40001" or "40P01" or "23514";
-        context.Response.StatusCode = conflict ? 409 : 503;
-        await context.Response.WriteAsJsonAsync(new { code = conflict ? "CONFLICT" : "DATABASE_UNAVAILABLE" });
-    }
-    catch (BadHttpRequestException)
-    {
-        context.Response.StatusCode = 400;
-        await context.Response.WriteAsJsonAsync(new { code = "VALIDATION", traceId = context.TraceIdentifier });
-    }
-    catch (ReviewFailure error)
-    {
-        context.Response.StatusCode = error.Status;
-        await context.Response.WriteAsJsonAsync(new { code = error.Code, traceId = context.TraceIdentifier });
+        app.Logger.LogError(error, "DB_ERROR: Postgres driver error");
+        context.Response.StatusCode = 500;
+        await context.Response.WriteAsJsonAsync(new { code = "SYSTEM_ERROR", traceId = context.TraceIdentifier });
     }
     catch (IdentityFailure error)
     {
         context.Response.StatusCode = error.Status;
         await context.Response.WriteAsJsonAsync(new { code = error.Code, remainingAttempts = error.RemainingAttempts, lockedUntil = error.LockedUntil, traceId = context.TraceIdentifier });
     }
+    catch (ArgumentException error)
+    {
+        context.Response.StatusCode = 400;
+        await context.Response.WriteAsJsonAsync(new { code = "VALIDATION", message = error.Message, traceId = context.TraceIdentifier });
+    }
+    catch (InvalidOperationException error)
+    {
+        context.Response.StatusCode = 400;
+        await context.Response.WriteAsJsonAsync(new { code = "BUSINESS_RULE_VIOLATION", message = error.Message, traceId = context.TraceIdentifier });
+    }
+    catch (KeyNotFoundException error)
+    {
+        context.Response.StatusCode = 404;
+        await context.Response.WriteAsJsonAsync(new { code = "NOT_FOUND", message = error.Message, traceId = context.TraceIdentifier });
+    }
+    catch (DbUpdateConcurrencyException)
+    {
+        context.Response.StatusCode = 409;
+        await context.Response.WriteAsJsonAsync(new { code = "CONCURRENCY_CONFLICT", message = "Dữ liệu đã bị thay đổi bởi người khác. Vui lòng tải lại trang.", traceId = context.TraceIdentifier });
+    }
     catch (Exception error)
     {
         // Never log raw provider exceptions: they may contain connection details or SQL values.
-        app.Logger.LogError("REQUEST_FAILED {ExceptionType} {TraceId}", error.GetType().Name, context.TraceIdentifier);
+        app.Logger.LogError(error, "REQUEST_FAILED {ExceptionType}: {ErrorMessage} {TraceId}", error.GetType().Name, error.Message, context.TraceIdentifier);
         context.Response.StatusCode = 500;
-        await context.Response.WriteAsJsonAsync(new { code = "SYSTEM_ERROR", traceId = context.TraceIdentifier });
+        await context.Response.WriteAsJsonAsync(new { code = "SYSTEM_ERROR", message = error.Message, traceId = context.TraceIdentifier });
     }
 });
 app.UseCors();
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi().AllowAnonymous();
-    app.UseSwaggerUI(options => options.SwaggerEndpoint("/openapi/v1.json", "QTKD Authentication v1"));
-}
 app.UseAuthentication();
 var temporaryPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
 { "/api/v1/auth/login", "/api/v1/auth/session", "/api/v1/auth/activity", "/api/v1/auth/refresh", "/api/v1/auth/logout", "/api/v1/auth/password/change" };
 app.Use(async (context, next) =>
 {
-    using var scope = app.Logger.BeginScope(new Dictionary<string, object?> { ["TraceId"] = context.TraceIdentifier, ["ActorId"] = context.User.FindFirstValue("sub") });
-    if (context.User.FindFirstValue("must_change_password") == "true" && context.Request.Path.StartsWithSegments("/api/v1")
-        && !temporaryPaths.Contains(context.Request.Path.Value?.TrimEnd('/') ?? ""))
+    if (context.User.Identity?.IsAuthenticated == true && !temporaryPaths.Contains(context.Request.Path) && context.User.FindFirstValue("must_change_password") == "true")
     {
         context.Response.StatusCode = 403;
         await context.Response.WriteAsJsonAsync(new { code = "PASSWORD_CHANGE_REQUIRED", traceId = context.TraceIdentifier });
@@ -209,16 +228,47 @@ app.Use(async (context, next) =>
     }
     await next(context);
 });
-app.UseRateLimiter();
 app.UseAuthorization();
 app.MapContractApprovals(allowedOrigins);
 
 const string cookieName = "__Host-qtkd-refresh";
-bool Csrf(HttpContext context) => context.Request.Headers["X-QTKD-CSRF"] == "1"
-    && allowedOrigins.Contains(context.Request.Headers.Origin.ToString(), StringComparer.Ordinal);
+bool IsClientHttps(HttpContext context)
+{
+    var proto = context.Request.Headers["X-Forwarded-Proto"].ToString();
+    if (!string.IsNullOrEmpty(proto))
+        return proto.Equals("https", StringComparison.OrdinalIgnoreCase);
+    var origin = context.Request.Headers.Origin.ToString();
+    if (!string.IsNullOrEmpty(origin))
+        return origin.StartsWith("https:", StringComparison.OrdinalIgnoreCase);
+    var referer = context.Request.Headers.Referer.ToString();
+    if (!string.IsNullOrEmpty(referer))
+        return referer.StartsWith("https:", StringComparison.OrdinalIgnoreCase);
+    return context.Request.IsHttps;
+}
+string CookieName(HttpContext context) => IsClientHttps(context) ? "__Host-qtkd-refresh" : "qtkd-refresh";
+string? GetRefreshCookie(HttpContext context) => context.Request.Cookies["qtkd-refresh"] ?? context.Request.Cookies["__Host-qtkd-refresh"];
+
+bool Csrf(HttpContext context)
+{
+    if (context.Request.Headers["X-QTKD-CSRF"] != "1") return false;
+    var origin = context.Request.Headers.Origin.ToString();
+    if (string.IsNullOrEmpty(origin) && Uri.TryCreate(context.Request.Headers.Referer.ToString(), UriKind.Absolute, out var refUri))
+    {
+        origin = $"{refUri.Scheme}://{refUri.Authority}";
+    }
+    if (string.IsNullOrEmpty(origin)) return true;
+    return allowedOrigins.Contains(origin, StringComparer.OrdinalIgnoreCase);
+}
 void RequireCsrf(HttpContext context) { if (!Csrf(context)) throw new IdentityFailure(403, "CSRF_REJECTED"); }
-void SetRefresh(HttpContext context, AuthResult result) => context.Response.Cookies.Append(cookieName, result.RefreshToken,
-    new CookieOptions { HttpOnly = true, Secure = true, SameSite = SameSiteMode.Strict, Path = "/", Expires = result.Remember ? new DateTimeOffset(DateTime.SpecifyKind(result.ExpiresAt, DateTimeKind.Utc)) : null });
+
+void SetRefresh(HttpContext context, AuthResult result)
+{
+    var isHttps = IsClientHttps(context);
+    var name = isHttps ? "__Host-qtkd-refresh" : "qtkd-refresh";
+    context.Response.Cookies.Append(name, result.RefreshToken,
+        new CookieOptions { HttpOnly = true, Secure = isHttps, SameSite = isHttps ? SameSiteMode.Strict : SameSiteMode.Lax, Path = "/", Expires = result.Remember ? new DateTimeOffset(DateTime.SpecifyKind(result.ExpiresAt, DateTimeKind.Utc)) : null });
+}
+
 (Guid User, Guid Session) Subject(HttpContext context) => (Guid.Parse(context.User.FindFirstValue("sub")!), Guid.Parse(context.User.FindFirstValue("sid")!));
 
 app.MapGet("/health/live", () => Results.Ok(new { status = "up" })).AllowAnonymous();
@@ -228,22 +278,24 @@ auth.MapPost("/login", async (LoginRequest request, IIdentityService identity, H
     RequireCsrf(context);
     var result = await identity.Login(request, context.Connection.RemoteIpAddress?.ToString(), context.Request.Headers.UserAgent.ToString(), ct);
     // One current refresh cookie per browser. Another device uses a separate cookie jar.
-    await identity.Logout(context.Request.Cookies[cookieName], ct);
+    var currentCookie = GetRefreshCookie(context) ?? context.Request.Cookies[cookieName];
+    if (!string.IsNullOrEmpty(currentCookie)) await identity.Logout(currentCookie, ct);
     SetRefresh(context, result); return TypedResults.Ok(AuthResponse.From(result));
 }).AllowAnonymous().RequireRateLimiting("auth")
     .WithDescription("Returns an access JWT and sets the refresh cookie. Errors: VALIDATION, INVALID_CREDENTIALS, DISABLED, LOCKED, CSRF_REJECTED, RATE_LIMITED.")
     .AuthErrors(400, 401, 403, 423, 429);
 auth.MapPost("/refresh", async (IIdentityService identity, HttpContext context, CancellationToken ct) =>
 {
-    RequireCsrf(context); var result = await identity.Refresh(context.Request.Cookies[cookieName] ?? "", ct);
+    RequireCsrf(context); var result = await identity.Refresh(GetRefreshCookie(context) ?? context.Request.Cookies[cookieName] ?? "", ct);
     SetRefresh(context, result); return TypedResults.Ok(AuthResponse.From(result));
 }).AllowAnonymous().RequireRateLimiting("auth")
     .WithDescription("Rotates the HttpOnly refresh cookie. Requires the current cookie. A rejected session returns 401.")
     .AuthErrors(401, 403, 429);
 auth.MapPost("/logout", async (IIdentityService identity, HttpContext context, CancellationToken ct) =>
 {
-    RequireCsrf(context); await identity.Logout(context.Request.Cookies[cookieName], ct);
+    RequireCsrf(context); await identity.Logout(GetRefreshCookie(context) ?? context.Request.Cookies[cookieName], ct);
     context.Response.Cookies.Delete(cookieName, new CookieOptions { Secure = true, HttpOnly = true, SameSite = SameSiteMode.Strict, Path = "/" });
+    context.Response.Cookies.Delete("qtkd-refresh", new CookieOptions { Secure = false, HttpOnly = true, SameSite = SameSiteMode.Lax, Path = "/" });
     return TypedResults.NoContent();
 }).AllowAnonymous().RequireRateLimiting("auth")
     .WithDescription("Revokes the session identified by the refresh cookie and clears the cookie.").AuthErrors(403, 429);
@@ -258,7 +310,8 @@ auth.MapPost("/activity", async (IIdentityService identity, HttpContext context,
 auth.MapPost("/password/change", async (PasswordRequest request, IIdentityService identity, HttpContext context, CancellationToken ct) =>
 {
     RequireCsrf(context); var subject = Subject(context);
-    var result = await identity.ChangePassword(subject.User, subject.Session, request, context.Request.Cookies[cookieName], ct);
+    var currentCookie = GetRefreshCookie(context) ?? context.Request.Cookies[cookieName];
+    var result = await identity.ChangePassword(subject.User, subject.Session, request, currentCookie, ct);
     SetRefresh(context, result); return TypedResults.Ok(AuthResponse.From(result));
 }).RequireAuthorization().RequireRateLimiting("auth")
     .WithDescription("Requires the current password, Bearer JWT and refresh cookie. Errors include WRONG_CURRENT, LOCKED, WEAK_PASSWORD and SAME_AS_CURRENT.")
@@ -294,6 +347,7 @@ recovery.MapPost("/reset", async (ResetPasswordRequest request, PasswordRecovery
     return TypedResults.Ok(await service.Reset(request, ct));
 }).WithDescription("Consumes a reset token and revokes all account sessions. Errors include TOKEN_EXPIRED, WEAK_PASSWORD and SAME_AS_CURRENT.")
     .AuthErrors(400, 403, 429);
+
 app.MapGet("/api/v1/users", async (IIdentityService identity, CancellationToken ct) => Results.Ok(await identity.Users(ct))).RequireAuthorization("users.manage");
 app.MapGet("/api/v1/users/{id:guid}", async (Guid id, IIdentityService identity, CancellationToken ct) => Results.Ok(await identity.User(id, ct))).RequireAuthorization("users.manage");
 app.MapPost("/api/v1/users", async (CreateUserRequest request, IIdentityService identity, CancellationToken ct) =>

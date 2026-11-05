@@ -123,6 +123,9 @@ test('API identity opens approval inboxes and reviewer assignment while other mo
       // SYS-CTR-10 đã nối BE: render màn thật, không phải placeholder.
       assert.ok(!html.includes('Chức năng chưa sẵn sàng'), path);
       assert.ok(html.includes('Phân công người duyệt'), path);
+    } else if (path.startsWith('/khu-vuc')) {
+      // Phân hệ Khu vực (ARE) đã nối BE: render màn thật.
+      assert.ok(!html.includes('Chức năng chưa sẵn sàng'), path);
     } else {
       assert.ok(html.includes('Chức năng chưa sẵn sàng'), path);
       assert.ok(html.includes('Bạn vẫn đang đăng nhập'), path);

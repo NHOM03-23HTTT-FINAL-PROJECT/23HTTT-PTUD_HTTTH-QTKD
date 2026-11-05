@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { useSession, useUnsavedChanges } from '@/app/providers/SessionProvider';
@@ -47,6 +47,12 @@ export function AreaCreatePage() {
   const [hierarchyTouched, setHierarchyTouched] = useState(false);
   // Đọc lại sơ đồ mỗi lần mở hộp thoại để thấy khu vực vừa được tạo/điều chỉnh.
   const [tree, setTree] = useState<Area[]>(() => areasApi.getTree());
+
+  useEffect(() => {
+    areasApi.fetchTreeAsync?.().then((t) => {
+      if (t?.length) setTree(t);
+    });
+  }, []);
 
   const form = useCreateAreaForm({
     onCreated: ({ area, replayed }) => {

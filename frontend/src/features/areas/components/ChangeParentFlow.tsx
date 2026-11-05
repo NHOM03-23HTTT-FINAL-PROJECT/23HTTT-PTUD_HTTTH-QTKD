@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { useSession } from '@/app/providers/SessionProvider';
 import { Button } from '@/components/button/Button';
@@ -44,7 +44,13 @@ type ChangeParentFlowProps = {
 export function ChangeParentFlow({ area, onClose, onChanged }: ChangeParentFlowProps) {
   const { user } = useAuth();
   const { endSession } = useSession();
-  const [tree] = useState<Area[]>(() => areasApi.getTree());
+  const [tree, setTree] = useState<Area[]>(() => areasApi.getTree());
+
+  useEffect(() => {
+    areasApi.fetchTreeAsync?.().then((t) => {
+      if (t?.length) setTree(t);
+    });
+  }, []);
   const [parent, setParent] = useState<Area | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<{ title: string; body: string } | null>(null);

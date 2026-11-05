@@ -32,7 +32,7 @@ async function raw<T>(path: string, init: RequestInit = {}, bearer?: string | nu
   headers.set('Accept', 'application/json');
   if (init.method && init.method !== 'GET') { headers.set('Content-Type', 'application/json'); headers.set('X-QTKD-CSRF', '1'); }
   if (bearer) headers.set('Authorization', `Bearer ${bearer}`);
-  const response = await fetch(`/api/v1${path}`, { ...init, headers, credentials: init.credentials ?? 'include', signal: init.signal ?? AbortSignal.timeout(10000) });
+  const response = await fetch(`/api/v1${path}`, { ...init, headers, credentials: init.credentials ?? 'include', signal: init.signal ?? AbortSignal.timeout(30000) });
   if (!response.ok) {
     const body = await response.json().catch(() => ({ code: 'SYSTEM_ERROR' }));
     throw new ApiError(response.status, body.code ?? 'SYSTEM_ERROR', body);

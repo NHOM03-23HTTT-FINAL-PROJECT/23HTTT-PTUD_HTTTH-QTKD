@@ -9,7 +9,7 @@ import { areasApi } from '../api/areasApi';
 import type { AreaRecordsState } from '../hooks/useAreaRecords';
 import type { Area } from '../types/area';
 import { AREA_FIELD_LABELS } from '../utils/areaChanges';
-import { AREA_STATUS_BADGE, areaTypeLabel, formatAreaSize, formatCapacity } from '../utils/areaFormat';
+import { areaTypeLabel, formatAreaSize, formatCapacity, getAreaStatusBadge } from '../utils/areaFormat';
 
 type SectionKey = 'identity' | 'hierarchy' | 'services' | 'staff' | 'priceLists' | 'contracts' | 'history';
 
@@ -47,7 +47,7 @@ function buildProfileHtml(area: Area, chain: Area[], children: Area[], records: 
       ['Mã khu vực', area.code],
       ['Tên khu vực', area.name],
       ['Loại mặt bằng', areaTypeLabel(area.type)],
-      ['Trạng thái', AREA_STATUS_BADGE[area.status].label],
+      ['Trạng thái', getAreaStatusBadge(area.status).label],
       ['Cấp phân cấp', `Cấp ${area.level}`],
       [AREA_FIELD_LABELS.gps, area.gps || '—'],
       [AREA_FIELD_LABELS.areaSize, formatAreaSize(area.areaSize)],
@@ -80,7 +80,7 @@ function buildProfileHtml(area: Area, chain: Area[], children: Area[], records: 
     parts.push(
       `<h2>Nhân sự phụ trách</h2>${
         s.status === 'ok'
-          ? table(['Nhân viên', 'Chức danh', 'Ca trực', 'Phụ trách từ'], s.data.map((x) => [`${x.name} (${x.staffCode})`, x.title, x.shift, formatDate(x.since)]))
+          ? table(['Nhân viên', 'Phụ trách từ'], s.data.map((x) => [`${x.name} (${x.staffCode})`, formatDate(x.since)]))
           : unavailable('nhân sự')
       }`,
     );

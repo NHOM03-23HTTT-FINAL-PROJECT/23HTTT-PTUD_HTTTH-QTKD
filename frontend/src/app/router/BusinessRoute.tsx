@@ -7,16 +7,17 @@ import { IS_MOCK_AUTH } from '@/features/auth/api/authApi';
 import { RequirePermission } from './guards';
 import './PlaceholderPages.css';
 
-/** Các màn nghiệp vụ hiện chỉ có mock. Chỉ mount khi dùng danh tính prototype. */
+/** Các màn nghiệp vụ: cho phép mount khi dùng danh tính prototype hoặc các phân hệ đã có Backend API (Khu vực - ARE, Hợp đồng - CTR). */
 export function BusinessRoute({ permission, label, children, apiReady = false }: {
   permission?: Permission;
   label: string;
   children: ReactNode;
   apiReady?: boolean;
 }) {
+  const isAvailable = IS_MOCK_AUTH || apiReady || permission?.startsWith('areas.');
   return (
     <RequirePermission permission={permission} label={label}>
-      {IS_MOCK_AUTH || apiReady ? children : (
+      {isAvailable ? children : (
         <div className="placeholder-page">
           <h1 className="placeholder-page__title">{label}</h1>
           <Alert tone="info" title="Chức năng chưa sẵn sàng">
