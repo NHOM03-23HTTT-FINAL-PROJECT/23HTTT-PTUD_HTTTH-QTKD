@@ -10,9 +10,7 @@ import { PasswordPolicy, PasswordStrength } from '../PasswordRules';
 
 type NewPasswordStepProps = {
   busy: boolean;
-  /** Server báo trùng mật khẩu hiện tại (E8). */
-  sameAsCurrent: boolean;
-  /** Lỗi khi lưu (E9) – mật khẩu cũ vẫn giữ nguyên. */
+  passwordError: 'SAME_AS_CURRENT' | 'WEAK_PASSWORD' | null;
   saveFailed: boolean;
   onPasswordEdited: () => void;
   onSubmit: (password: string) => void;
@@ -23,7 +21,7 @@ type FieldErrors = { password?: string; confirm?: string };
 const POLICY_ERROR = 'Mật khẩu chưa đạt chính sách – xem các tiêu chí bên dưới.';
 
 /** Bước 3 – Mật khẩu mới (frame 02.8 → 02.10). */
-export function NewPasswordStep({ busy, sameAsCurrent, saveFailed, onPasswordEdited, onSubmit }: NewPasswordStepProps) {
+export function NewPasswordStep({ busy, passwordError, saveFailed, onPasswordEdited, onSubmit }: NewPasswordStepProps) {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -36,11 +34,12 @@ export function NewPasswordStep({ busy, sameAsCurrent, saveFailed, onPasswordEdi
   }, []);
 
   useEffect(() => {
-    if (sameAsCurrent) {
-      setErrors((e) => ({ ...e, password: POLICY_ERROR }));
+    if (passwordError) {
+      const message = passwordError === 'SAME_AS_CURRENT' ? 'Mật khẩu mới trùng mật khẩu hiện tại.' : POLICY_ERROR;
+      setErrors((e) => ({ ...e, password: message }));
       passwordRef.current?.focus();
     }
-  }, [sameAsCurrent]);
+  }, [passwordError]);
 
   // Kiểm tra hai trường khớp nhau theo thời gian thực khi đã nhập đủ độ dài.
   const confirmReady = confirm.length > 0 && confirm.length >= password.length;
@@ -85,9 +84,7 @@ export function NewPasswordStep({ busy, sameAsCurrent, saveFailed, onPasswordEdi
   return (
     <form className="recovery-step" noValidate onSubmit={handleSubmit} aria-busy={busy}>
       {saveFailed && (
-        <Alert tone="danger" title="Không thể đặt lại mật khẩu, vui lòng thử lại.">
-          Mật khẩu cũ vẫn được giữ nguyên; chưa có phiên nào bị thu hồi.
-        </Alert>
+        <Alert tone="danger" title="Chưa xác nhận được kết quả đặt lại mật khẩu. Vui lòng thử lại." />
       )}
 
       <InputField
@@ -113,7 +110,7 @@ export function NewPasswordStep({ busy, sameAsCurrent, saveFailed, onPasswordEdi
       <PasswordStrength password={password} />
       <PasswordPolicy
         password={password}
-        notCurrent={{ label: 'Không trùng mật khẩu hiện tại', state: sameAsCurrent ? 'fail' : 'pending' }}
+        notCurrent={{ label: 'Không trùng mật khẩu hiện tại', state: passwordError === 'SAME_AS_CURRENT' ? 'fail' : 'pending' }}
       />
 
       <InputField

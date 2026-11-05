@@ -1,0 +1,91 @@
+@startuml UC-CHUNG-02-quen-mat-khau
+<style>
+    sequenceDiagram {
+        actor {
+            BackgroundColor #E7F0F7
+            BorderColor #32536C
+        }
+        participant {
+            BackgroundColor #E7F0F7
+            BorderColor #32536C
+        }
+        arrow {
+            LineColor #32536C
+        }
+    }
+</style>
+
+title UC-CHUNG-02 · Quên mật khẩu
+hide footbox
+autonumber "<b>[000]"
+
+actor "Người dùng" as User
+boundary "Giao diện quên mật khẩu" as Web
+control "Dịch vụ khôi phục mật khẩu" as Auth
+database "Cơ sở dữ liệu" as Db
+participant "Dịch vụ gửi email" as Mail
+
+group Yêu cầu mã xác minh
+    User -> Web: Chọn Quên mật khẩu và nhập tài khoản
+    break Tên đăng nhập hoặc email không hợp lệ
+        Web --> User: Báo lỗi tại trường nhập
+    end
+    Web -> Auth: Yêu cầu gửi mã
+    break Dịch vụ tạm gián đoạn hoặc yêu cầu vượt giới hạn
+        Auth --> Web: Từ chối tiếp nhận yêu cầu
+        Web --> User: Báo lỗi và hướng dẫn thử lại
+    end
+    Auth --> Web: Xác nhận đã tiếp nhận yêu cầu
+    Web --> User: Hiện thông báo chung và mở bước nhập mã
+
+    Auth -> Db: Tra tài khoản và kiểm tra giới hạn gửi
+    opt Tài khoản đủ điều kiện nhận mã
+        Auth -> Db: Vô hiệu mã xác minh và mã đặt lại trước đó.\nGhi nhận mã xác minh mới có hạn 5 phút.
+        Auth -> Mail: Gửi mã 6 chữ số đến email công ty đã đăng ký
+        Mail ->> User: Chuyển email chứa mã xác minh
+    end
+end
+
+group Xác minh mã
+    loop Người dùng nhập mã cho tới khi xác minh thành công hoặc dừng
+        User -> Web: Nhập mã 6 chữ số
+        Web -> Auth: Gửi mã để xác minh
+        Auth -> Db: Đọc mã hiện hành và số lần thử
+        alt Mã hợp lệ và còn hạn
+            Auth -> Db: Đánh dấu mã xác minh đã dùng.\nGhi nhận mã đặt lại dùng một lần, hạn 10 phút.
+            Auth --> Web: Xác nhận và trả mã đặt lại
+            Web --> User: Mở bước nhập mật khẩu mới
+        else Mã sai, hết hạn, đã dùng hoặc bị chặn
+            opt Nhập sai khi mã còn hiệu lực
+                Auth -> Db: Ghi nhận lần sai.\nĐủ 5 lần thì vô hiệu mã và tạm dừng gửi trong 15 phút.
+            end
+            Auth --> Web: Mã không hợp lệ
+            Web --> User: Báo lỗi và hướng dẫn thử lại hoặc yêu cầu mã mới
+        end
+    end
+end
+
+opt Người dùng đã xác minh thành công và tiếp tục đặt lại
+    group Đặt lại mật khẩu
+        User -> Web: Nhập và xác nhận mật khẩu mới
+        Web -> Auth: Gửi mật khẩu mới kèm mã đặt lại
+        Auth -> Db: Kiểm tra mã đặt lại và thông tin tài khoản
+        alt Mã đặt lại hợp lệ và mật khẩu đạt yêu cầu
+            Auth -> Db: Lưu mật khẩu mới, gỡ khóa tạm nếu có,\nvô hiệu mã đặt lại và thu hồi mọi phiên trong cùng giao dịch
+            Auth --> Web: Xác nhận đặt lại mật khẩu thành công
+            Web --> User: Về trang đăng nhập để dùng mật khẩu mới
+        else Mã đặt lại hết hạn hoặc đã dùng
+            Auth --> Web: Yêu cầu xác minh lại
+            Web --> User: Về bước yêu cầu mã mới
+        else Mật khẩu mới chưa đạt yêu cầu
+            Auth --> Web: Báo lỗi mật khẩu mới
+            Web --> User: Yêu cầu sửa mật khẩu
+        end
+    end
+end
+
+note over Auth, Mail
+    Dịch vụ xử lý việc gửi email sau khi tiếp nhận yêu cầu.
+end note
+
+@enduml

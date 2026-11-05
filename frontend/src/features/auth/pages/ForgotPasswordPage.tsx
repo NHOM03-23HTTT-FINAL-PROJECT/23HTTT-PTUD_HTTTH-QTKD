@@ -26,7 +26,7 @@ function subtitle(flow: Flow) {
   if (flow.step === 'account') {
     return 'Nhập tên đăng nhập hoặc email công ty. Mã xác thực sẽ được gửi đến email công ty đã đăng ký.';
   }
-  if (flow.step === 'otp') return 'Nhập mã 6 chữ số vừa được gửi đến email công ty của bạn.';
+  if (flow.step === 'otp') return 'Nhập mã 6 chữ số từ email công ty đã đăng ký.';
   return `Thiết lập mật khẩu mới cho tài khoản ${flow.accountLabel}.`;
 }
 
@@ -35,6 +35,7 @@ function statusFromSendError(error: unknown): OtpStatus {
   if (error instanceof RecoveryError && error.code === 'SUSPENDED' && error.until) {
     return { kind: 'suspended', until: error.until };
   }
+  if (error instanceof RecoveryError && error.code === 'RATE_LIMITED') return { kind: 'rate-limited' };
   return { kind: 'email-failed' };
 }
 
@@ -49,7 +50,7 @@ export function ForgotPasswordPage() {
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [sessionExpired, setSessionExpired] = useState(false);
-  const [sameAsCurrent, setSameAsCurrent] = useState(false);
+  const [passwordError, setPasswordError] = useState<'SAME_AS_CURRENT' | 'WEAK_PASSWORD' | null>(null);
   const [saveFailed, setSaveFailed] = useState(false);
   const now = useNow(flow.step === 'otp' ? 1000 : null, flow);
 
@@ -72,13 +73,13 @@ export function ForgotPasswordPage() {
     setBusy(true);
     try {
       const result = await passwordRecoveryApi.verifyOtp(identifier, code);
-      setSameAsCurrent(false);
+      setPasswordError(null);
       setSaveFailed(false);
       setFlow({ step: 'password', resetToken: result.resetToken, accountLabel: result.accountLabel });
     } catch (error) {
       setCode('');
       if (error instanceof RecoveryError && error.code === 'INVALID_CODE') {
-        setFlow({ ...flow, status: { kind: 'invalid', remainingAttempts: error.remainingAttempts ?? 0 } });
+        setFlow({ ...flow, status: { kind: 'invalid', remainingAttempts: error.remainingAttempts } });
       } else if (error instanceof RecoveryError && error.code === 'EXPIRED' && flow.dispatch) {
         setFlow({ ...flow, dispatch: { ...flow.dispatch, expiresAt: Date.now() } });
       } else {
@@ -100,7 +101,7 @@ export function ForgotPasswordPage() {
     } catch (error) {
       const codeOf = error instanceof RecoveryError ? error.code : 'SAVE_FAILED';
       if (codeOf === 'SAME_AS_CURRENT' || codeOf === 'WEAK_PASSWORD') {
-        setSameAsCurrent(codeOf === 'SAME_AS_CURRENT');
+        setPasswordError(codeOf);
       } else if (codeOf === 'TOKEN_EXPIRED') {
         setSessionExpired(true);
         setFlow({ step: 'account' });
@@ -148,9 +149,9 @@ export function ForgotPasswordPage() {
         {flow.step === 'password' && (
           <NewPasswordStep
             busy={busy}
-            sameAsCurrent={sameAsCurrent}
+            passwordError={passwordError}
             saveFailed={saveFailed}
-            onPasswordEdited={() => setSameAsCurrent(false)}
+            onPasswordEdited={() => setPasswordError(null)}
             onSubmit={resetPassword}
           />
         )}

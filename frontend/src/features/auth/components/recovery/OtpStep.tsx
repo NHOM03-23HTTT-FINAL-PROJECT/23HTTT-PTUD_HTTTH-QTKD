@@ -11,8 +11,9 @@ export const OTP_LENGTH = 6;
 
 export type OtpStatus =
   | { kind: 'sent' }
-  | { kind: 'invalid'; remainingAttempts: number } // E4
+  | { kind: 'invalid'; remainingAttempts?: number } // E4
   | { kind: 'email-failed' } // E3
+  | { kind: 'rate-limited' }
   | { kind: 'suspended'; until: number }; // E6 / E7
 
 type OtpStepProps = {
@@ -125,6 +126,9 @@ export function OtpStep({ dispatch, status, code, onCodeChange, now, busy, onVer
 }
 
 function OtpStatusAlert({ status, expired }: { status: OtpStatus; expired: boolean }) {
+  if (status.kind === 'rate-limited') {
+    return <Alert tone="warning" title="Bạn đã gửi quá nhiều yêu cầu. Vui lòng đợi một phút rồi thử lại." />;
+  }
   if (status.kind === 'suspended') {
     return (
       <Alert tone="danger" title="Tạm ngưng chức năng quên mật khẩu">
@@ -148,13 +152,15 @@ function OtpStatusAlert({ status, expired }: { status: OtpStatus; expired: boole
   }
   if (status.kind === 'invalid') {
     return (
-      <Alert tone="danger" title="Mã xác thực không chính xác">
-        Bạn còn {status.remainingAttempts} lần thử. Có thể nhập lại hoặc gửi lại mã mới.
+      <Alert tone="danger" title="Mã xác thực không hợp lệ">
+        {status.remainingAttempts === undefined
+          ? 'Kiểm tra mã hoặc yêu cầu mã mới. Nếu đã thử nhiều lần, vui lòng đợi 15 phút.'
+          : `Bạn còn ${status.remainingAttempts} lần thử. Có thể nhập lại hoặc gửi lại mã mới.`}
       </Alert>
     );
   }
   return (
-    <Alert tone="info" title="Nếu tài khoản tồn tại, mã xác thực đã được gửi đến email đăng ký">
+    <Alert tone="info" title="Nếu tài khoản đủ điều kiện, mã sẽ được gửi đến email đăng ký">
       Mã gồm 6 chữ số, hiệu lực 5 phút. Vui lòng kiểm tra cả thư mục Spam.
     </Alert>
   );

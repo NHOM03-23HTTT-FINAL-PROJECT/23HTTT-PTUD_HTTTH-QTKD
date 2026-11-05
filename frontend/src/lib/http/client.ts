@@ -10,7 +10,16 @@ export type ApiAuthResult = {
   passwordChangedAt?: string;
 };
 export class ApiError extends Error {
-  constructor(readonly status: number, readonly code: string, readonly detail: { remainingAttempts?: number; lockedUntil?: string } = {}) { super(code); }
+  readonly status: number;
+  readonly code: string;
+  readonly detail: { remainingAttempts?: number; lockedUntil?: string };
+
+  constructor(status: number, code: string, detail: ApiError['detail'] = {}) {
+    super(code);
+    this.status = status;
+    this.code = code;
+    this.detail = detail;
+  }
 }
 let token: string | null = null;
 let generation = 0;
@@ -23,12 +32,16 @@ async function raw<T>(path: string, init: RequestInit = {}, bearer?: string | nu
   headers.set('Accept', 'application/json');
   if (init.method && init.method !== 'GET') { headers.set('Content-Type', 'application/json'); headers.set('X-QTKD-CSRF', '1'); }
   if (bearer) headers.set('Authorization', `Bearer ${bearer}`);
-  const response = await fetch(`/api/v1${path}`, { ...init, headers, credentials: 'include', signal: init.signal ?? AbortSignal.timeout(10000) });
+  const response = await fetch(`/api/v1${path}`, { ...init, headers, credentials: init.credentials ?? 'include', signal: init.signal ?? AbortSignal.timeout(10000) });
   if (!response.ok) {
     const body = await response.json().catch(() => ({ code: 'SYSTEM_ERROR' }));
     throw new ApiError(response.status, body.code ?? 'SYSTEM_ERROR', body);
   }
   return response.status === 204 ? undefined as T : response.json() as Promise<T>;
+}
+
+export function postAnonymous<T>(path: string, body: unknown) {
+  return raw<T>(path, { method: 'POST', body: JSON.stringify(body), credentials: 'omit' });
 }
 export function acceptAuth(result: ApiAuthResult) {
   // The server contract requires exactly one recognized role; never infer permissions from an absent field.

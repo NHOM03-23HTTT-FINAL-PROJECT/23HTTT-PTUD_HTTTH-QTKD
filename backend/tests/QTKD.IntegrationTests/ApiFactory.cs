@@ -15,6 +15,7 @@ using QTKD.Application.Common.Interfaces;
 using QTKD.Application.Features.ContractApprovals;
 using QTKD.Application.Features.Notifications;
 using QTKD.Domain.Identity;
+using QTKD.Infrastructure.Identity;
 using QTKD.Infrastructure.Persistence;
 
 namespace QTKD.IntegrationTests;
@@ -26,6 +27,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
     public IContractApprovalEngine? ApprovalEngine { get; init; }
     public IApprovalStore? ApprovalStore { get; init; }
     public INotificationRepository? NotificationRepository { get; init; }
+    public IPasswordRecoveryMailSender? RecoveryMail { get; init; }
+    public TimeProvider? Clock { get; init; }
+    public string EnvironmentName { get; init; } = "Testing";
     private readonly SqliteConnection sqlite = new("Data Source=:memory:");
     public readonly string Key = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48));
     public readonly string Password = "Identity.Test@2026";
@@ -40,11 +44,27 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        builder.UseEnvironment("Testing");
+        builder.UseEnvironment(EnvironmentName);
         builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
         { ["Jwt:SigningKey"] = Key, ["Jwt:Issuer"] = "qtkd-api", ["Jwt:Audience"] = "qtkd-web", ["ConnectionStrings:Identity"] = "test-context-replaced-by-factory" }));
         builder.ConfigureTestServices(services =>
         {
+            if (Clock is not null)
+            {
+                services.RemoveAll<TimeProvider>();
+                services.AddSingleton(Clock);
+            }
+            if (RecoveryMail is not null)
+            {
+                services.RemoveAll<IPasswordRecoveryMailSender>();
+                services.AddSingleton(RecoveryMail);
+                services.Configure<PasswordRecoveryMailOptions>(options =>
+                {
+                    options.Enabled = true;
+                    options.Host = "example.invalid";
+                    options.From = "recovery@example.invalid";
+                });
+            }
             if (ApprovalStore is not null)
             {
                 services.RemoveAll<IApprovalStore>();
@@ -126,6 +146,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
             // Only this factory's synthetic rows, after explicit test-project acknowledgement.
             var ids = db.Users.Where(x => x.Username.StartsWith(Prefix + ".")).Select(x => x.UserId).ToArray();
             db.Sessions.Where(x => ids.Contains(x.UserId)).ExecuteDelete();
+            db.PasswordOtps.Where(x => ids.Contains(x.UserId)).ExecuteDelete();
             db.Users.Where(x => ids.Contains(x.UserId)).ExecuteDelete();
         }
         base.Dispose(disposing); if (disposing) sqlite.Dispose();

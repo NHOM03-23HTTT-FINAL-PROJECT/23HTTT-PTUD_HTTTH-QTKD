@@ -57,7 +57,8 @@ async function harness(mode) {
   return {
     ...await load('features/contracts/utils/approvalReview.ts'),
     ...await load('features/contracts/api/approvalApi.ts'),
-    ...await load('features/auth/api/authApi.ts'), ...await load('lib/http/client.ts'),
+    ...await load('features/auth/api/authApi.ts'), ...await load('features/auth/api/passwordRecoveryApi.ts'),
+    ...await load('lib/http/client.ts'), ...await load('constants/routes.ts'),
     ...await load('mocks/contractsServer.ts'), ...await load('mocks/seed/users.ts'),
     renderRoute(path, user) {
       setUser(user);
@@ -184,6 +185,34 @@ test('API session verification uses BE for a real UUID and still ends expired or
   }
   assert.deepEqual(ended, ['disabled', 'expired']);
   assert.ok(calls.includes('/api/v1/auth/session'));
+});
+
+test('API mode opens password recovery and calls the real send, verify and reset adapter', async t => {
+  assert.match(api.renderRoute(api.ROUTES.forgotPassword, null), /Quên mật khẩu/);
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  const identifier = 'synthetic-user';
+  const resetToken = 'synthetic-reset-token';
+  const dispatch = { expiresAt: 1234, resendAvailableAt: 567 };
+  const verified = { resetToken, accountLabel: 'test@example.invalid' };
+  const requests = [
+    ['send', { identifier }, 202, dispatch],
+    ['verify', { identifier, code: '123456' }, 400, { code: 'INVALID_CODE' }],
+    ['verify', { identifier, code: '123456' }, 200, verified],
+    ['reset', { resetToken, newPassword: 'Synthetic@123' }, 200, { identifier }],
+  ];
+  globalThis.fetch = async (path, init) => {
+    const [action, body, status, response] = requests.shift();
+    assert.equal(path, `/api/v1/auth/password/recovery/${action}`);
+    assert.deepEqual(JSON.parse(init.body), body);
+    return new Response(JSON.stringify(response), { status });
+  };
+
+  assert.deepEqual(await api.passwordRecoveryApi.sendOtp(identifier), dispatch);
+  await assert.rejects(api.passwordRecoveryApi.verifyOtp(identifier, '123456'), { name: 'RecoveryError', code: 'INVALID_CODE' });
+  assert.deepEqual(await api.passwordRecoveryApi.verifyOtp(identifier, '123456'), verified);
+  assert.deepEqual(await api.passwordRecoveryApi.resetPassword({ resetToken, newPassword: 'Synthetic@123' }), { identifier });
+  assert.equal(requests.length, 0);
 });
 
 test('approval adapter sends snapshot and idempotency key with bearer and never sends a client actor', async t => {

@@ -29,6 +29,7 @@ export type RecoveryErrorCode =
   | 'WEAK_PASSWORD' // E8
   | 'SAME_AS_CURRENT' // E8
   | 'SAVE_FAILED' // E9
+  | 'RATE_LIMITED'
   | 'TOKEN_EXPIRED';
 
 export class RecoveryError extends Error {

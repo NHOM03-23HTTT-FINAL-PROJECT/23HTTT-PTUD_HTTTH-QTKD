@@ -1,6 +1,5 @@
 import { BACKEND_ENABLED as CONTRACTS_API_ENABLED } from '@/features/contracts/config/backend';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
-import { IS_MOCK_AUTH } from '@/features/auth/api/authApi';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { ACCOUNT_NAV, WORKSPACE_NAV } from '@/constants/navigation';
 import { ROUTES } from '@/constants/routes';
 import { ChangePasswordPage } from '@/features/auth/pages/ChangePasswordPage';
@@ -78,7 +77,7 @@ export function AppRoutes() {
       <Routes>
         <Route element={<PublicOnly />}>
           <Route path={ROUTES.login} element={<LoginPage />} />
-          <Route path={ROUTES.forgotPassword} element={IS_MOCK_AUTH ? <ForgotPasswordPage /> : <Navigate to={ROUTES.login} replace />} />
+          <Route path={ROUTES.forgotPassword} element={<ForgotPasswordPage />} />
         </Route>
 
         <Route element={<RequireAuth />}>
