@@ -50,7 +50,6 @@ export function AccountMenu({ user }: { user: CurrentUser }) {
         ref={triggerRef}
         type="button"
         className="topbar__user"
-        aria-label={`Tài khoản của ${user.fullName}`}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={menuId}

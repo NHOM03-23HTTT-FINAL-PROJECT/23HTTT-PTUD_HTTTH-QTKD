@@ -71,6 +71,9 @@ try {
   expect(await call('/customers', { ...request, key: randomUUID() }), 409, 'DUPLICATE_TAX_CODE');
   expect(await call('/customers', { ...request, key: randomUUID(), body: { draft: { ...draft, taxCode: '123', phone: '', email: '' } } }), 400, 'VALIDATION');
   expect(await call('/customers', { ...request, key: undefined }), 400, 'IDEMPOTENCY_KEY_REQUIRED');
+  for (const field of ['ownerId', 'status', 'code', 'version']) {
+    expect(await call('/customers', { ...request, key: randomUUID(), body: { draft: { ...draft, [field]: 'tampered' } } }), 400, 'IMMUTABLE_FIELD');
+  }
   const malformed = await fetch(base + '/customers', { method: 'POST', headers: { Authorization: `Bearer ${tokens.staff}`,
     'Content-Type': 'application/json', 'Idempotency-Key': randomUUID() }, body: '{' });
   assert.equal(malformed.status, 400, 'Malformed JSON must be rejected as a client error');
@@ -78,6 +81,10 @@ try {
   const list = await call(`/customers?keyword=${encodeURIComponent('anh duong')}&status=all&sort=name-asc&page=1&size=8`, { token: tokens.other });
   expect(list, 200); assert(list.data.items.some(x => x.code === created.code));
   expect(await call('/customers?page=0&size=8', { token: tokens.staff }), 400, 'INVALID_QUERY');
+  expect(await call('/customers?page=1&size=999', { token: tokens.staff }), 400, 'INVALID_QUERY');
+  expect(await call('/customers?status=invalid', { token: tokens.staff }), 400, 'INVALID_QUERY');
+  const injection = await call('/customers?status=all&keyword=' + encodeURIComponent("' OR 1=1 --"), { token: tokens.staff });
+  expect(injection, 200); assert.equal(injection.data.total, 0);
   expect(await call(`/customers/${created.code}`, { token: tokens.other }), 200);
   const { taxCode: _, ...editable } = draft;
   const changed = { ...editable, name: `${draft.name} mới` };
@@ -117,6 +124,10 @@ try {
   const legacy = await db.query(`INSERT INTO qtkd.customer(customer_name,tax_code,address,legal_representative,phone,account_manager_id,status,customer_group,interested_services)
     SELECT 'Khách tạm ngưng', $1, 'Địa chỉ thử', 'Người thử', '0900000000', user_id, 'Suspended', 'Nhóm cũ', 'Dịch vụ cũ' FROM qtkd.user_account WHERE username=$2 RETURNING customer_code`, [suspendedTax, names.staff]);
   const legacyCode = legacy.rows[0].customer_code;
+  const activeDefault = await call('/customers?keyword=' + suspendedTax, { token: tokens.staff });
+  expect(activeDefault, 200); assert.equal(activeDefault.data.total, 0);
+  const allStatuses = await call('/customers?keyword=' + suspendedTax + '&status=all', { token: tokens.staff });
+  expect(allStatuses, 200); assert.equal(allStatuses.data.total, 1);
   await db.query(`INSERT INTO qtkd.customer_status_decision(customer_id,decision_type,reason,basis,follow_up_plan,confirmed_by)
     SELECT c.customer_id, 'Suspend', 'Lý do thử nghiệm', 'Căn cứ thử nghiệm', 'Phương án thử nghiệm', u.user_id
     FROM qtkd.customer c JOIN qtkd.user_account u ON u.username=$1 WHERE c.customer_code=$2`, [names.manager, legacyCode]);
@@ -142,30 +153,15 @@ try {
       FROM qtkd.customer c JOIN qtkd.user_account u ON u.username=$2 WHERE c.customer_code=$3 RETURNING contract_code`, [title, owner, created.code]);
     contractCodes.push(contract.rows[0].contract_code);
   }
-  expect(await call(`/customers/${created.code}/suspension-review`, { token: tokens.staff }), 403);
-  const review = await call(`/customers/${created.code}/suspension-review`, { token: tokens.manager });
-  expect(review, 200);
-  assert(review.data.failedKinds.includes('job') && review.data.missingSources.includes('debt'));
-  assert.deepEqual(review.data.items.map(item => item.code).sort(), contractCodes.sort());
-  try {
-    // A role grant alone must not authorize every employee.
-    await db.query("INSERT INTO qtkd.role_permission(role,permission_code) VALUES ('SalesStaff','customers.change-status') ON CONFLICT DO NOTHING");
-    expect(await call(`/customers/${created.code}/suspension-review`, { token: tokens.staff }), 403);
-    const staffId = (await db.query('SELECT user_id FROM qtkd.user_account WHERE username=$1', [names.staff])).rows[0].user_id;
-    const delegation = await call('/customers/delegations', { method: 'POST', token: tokens.manager,
-      body: { granteeId: staffId, action: 'suspend', expiresAt: null, reason: 'Thử phạm vi hợp đồng' } });
-    expect(delegation, 200);
-    const scoped = await call(`/customers/${created.code}/suspension-review`, { token: tokens.staff });
-    expect(scoped, 200); assert(scoped.data.failedKinds.includes('contract'));
-    assert.equal(scoped.data.items.length, 1);
-    assert.equal(scoped.data.items[0].title, 'Hợp đồng của người phụ trách');
-    expect(await call(`/customers/delegations/${delegation.data.id}/revoke`, { method: 'POST', token: tokens.manager, body: {} }), 200);
-  } finally {
-    await db.query("DELETE FROM qtkd.role_permission WHERE role='SalesStaff' AND permission_code='customers.change-status'");
+  // SYS-CUS-03 backend was explicitly removed; the main UI prototype is unchanged.
+  for (const token of [tokens.staff, tokens.manager]) {
+    expect(await call(`/customers/${created.code}/suspension-review`, { token }), 404);
+    expect(await call(`/customers/${created.code}/suspend`, { token, method: 'POST', key: randomUUID(),
+      body: { baseVersion: 1, reasonGroup: 'KHAC', reason: 'API removed', evidence: [], plan: [] } }), 404);
   }
-  const statusVersion = (await call(`/customers/${created.code}`, { token: tokens.manager })).data.version;
-  expect(await call(`/customers/${created.code}/suspend`, { token: tokens.manager, method: 'POST', key: randomUUID(),
-    body: { baseVersion: statusVersion, reasonGroup: 'CONG_NO', reason: 'Kiểm tra công nợ', evidence: [], plan: [], coordinationNote: '' } }), 503, 'REVIEW_INCOMPLETE');
+  const staffId = (await db.query('SELECT user_id FROM qtkd.user_account WHERE username=$1', [names.staff])).rows[0].user_id;
+  expect(await call('/customers/delegations', { method: 'POST', token: tokens.manager,
+    body: { granteeId: staffId, action: 'suspend' } }), 400, 'VALIDATION');
   expect(await call(`/customers/${created.code}/records/payments`, { token: tokens.staff }), 403, 'FORBIDDEN');
   expect(await call(`/customers/${created.code}/records/contracts`, { token: tokens.staff }), 503, 'SOURCE_UNAVAILABLE');
   expect(await call(`/customers/${created.code}/records/priceLists`, { token: tokens.staff }), 503, 'SOURCE_UNAVAILABLE');
@@ -224,6 +220,18 @@ try {
     await db.query('ROLLBACK').catch(() => {});
     await db.query("INSERT INTO qtkd.role_permission(role,permission_code) VALUES ('SalesStaff','customers.view') ON CONFLICT DO NOTHING");
   }
+  // Customer selection after merging main: Active and visible can create a real Draft;
+  // Suspended and out-of-scope customers must not become new contract references.
+  const options = await call('/contracts/form-options', { token: tokens.staff });
+  expect(options, 200);
+  assert(options.data.customers.some(c => c.code === created.code));
+  assert(!options.data.customers.some(c => c.code === legacyCode || c.code === outside.rows[0].customer_code));
+  const validContract = await call('/contracts', { method: 'POST', token: tokens.staff, key: randomUUID(), body: { draft: contractDraft } });
+  expect(validContract, 200); assert.equal(validContract.data.contract.status, 'draft');
+  expect(await call('/contracts', { method: 'POST', token: tokens.staff, key: randomUUID(),
+    body: { draft: { ...contractDraft, customerCode: legacyCode } } }), 409, 'CUSTOMER_INACTIVE');
+  expect(await call('/contracts', { method: 'POST', token: tokens.staff, key: randomUUID(),
+    body: { draft: { ...contractDraft, customerCode: outside.rows[0].customer_code } } }), 409, 'CUSTOMER_INACTIVE');
   console.log('Customer API business checks passed on disposable PostgreSQL.');
   console.log(`Local browser test user: ${names.staff}`);
   console.log(`Local browser test manager: ${names.manager}`);

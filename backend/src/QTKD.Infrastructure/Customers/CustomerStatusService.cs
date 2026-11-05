@@ -2,13 +2,12 @@ using System.Text.Json;
 using Npgsql;
 using NpgsqlTypes;
 using QTKD.Application.Features.Customers;
+using static QTKD.Application.Features.Customers.CustomerValidator;
 
 namespace QTKD.Infrastructure.Customers;
 
 public sealed partial class CustomerService
 {
-    private static readonly HashSet<string> SuspensionReasons =
-        ["CONG_NO", "VI_PHAM_HD", "TRANH_CHAP", "VAN_HANH", "DE_NGHI_KH", "KHAC"];
     private sealed record StoredReview(string? ReasonGroup, StatusPlanItem[]? Plan, string? CoordinationNote);
     private sealed record PreviousSuspension(string Reason, string By, DateTime At, StoredReview? Review);
 
@@ -24,16 +23,6 @@ public sealed partial class CustomerService
         if (files is { Length: > 0 }) throw new CustomerFailure(400, "EVIDENCE_UNAVAILABLE");
     }
 
-    private static void RequireComplete(SuspensionReview review)
-    {
-        if (review.Items is null || review.FailedKinds is null || review.FailedKinds.Length > 0
-            || review.MissingSources is { Length: > 0 })
-            throw new CustomerFailure(503, "REVIEW_INCOMPLETE", new
-            {
-                sources = (review.FailedKinds ?? []).Concat(review.MissingSources ?? []).Distinct().ToArray()
-            });
-    }
-
     private static void RequireReady(ReactivationSourceResult result)
     {
         if (!result.Complete || result.Checks is null || result.MissingSources is { Length: > 0 })
@@ -42,21 +31,6 @@ public sealed partial class CustomerService
             throw new CustomerFailure(409, "CONDITIONS_NOT_MET");
         if (string.IsNullOrWhiteSpace(result.VerifiedBasis))
             throw new CustomerFailure(503, "REVIEW_INCOMPLETE", new { sources = result.MissingSources });
-    }
-
-    private static StatusPlanItem[] ValidatePlan(SuspensionReview review, StatusPlanItem[]? supplied)
-    {
-        var plan = supplied ?? [];
-        if (plan.Length != review.Items.Length || plan.Any(p => string.IsNullOrWhiteSpace(p.Id) || string.IsNullOrWhiteSpace(p.Option))
-            || plan.Select(p => p.Id).Distinct(StringComparer.Ordinal).Count() != plan.Length)
-            throw new CustomerFailure(409, "CONFLICT");
-        foreach (var item in review.Items)
-        {
-            var choice = plan.SingleOrDefault(p => p.Id == item.Id);
-            if (choice is null || item.Options is null || !item.Options.Contains(choice.Option, StringComparer.Ordinal))
-                throw new CustomerFailure(409, "CONFLICT");
-        }
-        return plan;
     }
 
     private static async Task<PreviousSuspension?> LastSuspension(NpgsqlConnection c, NpgsqlTransaction tx, Guid customerId, CancellationToken ct)
@@ -71,18 +45,6 @@ public sealed partial class CustomerService
         if (!await r.ReadAsync(ct) || r.GetString(0) != "Suspend") return null;
         var metadata = r.IsDBNull(4) ? null : JsonSerializer.Deserialize<StoredReview>(r.GetString(4), Json);
         return new PreviousSuspension(r.GetString(1), r.GetString(2), r.GetDateTime(3), metadata);
-    }
-
-    public async Task<SuspensionReview> GetSuspensionReview(Guid actorId, string code, CancellationToken ct)
-    {
-        var actor = await GetActor(actorId, ct);
-        await using var c = Connection(); await c.OpenAsync(ct); await using var tx = await c.BeginTransactionAsync(ct);
-        var row = await Find(c, tx, actor, ParseCode(code), false, ct);
-        await RequireStatusPermission(c, tx, actor, row, "Suspend", ct);
-        if (row.Status != "Active") throw new CustomerFailure(409, "ALREADY_IN_STATUS");
-        var review = await statusSource.Suspension(c, tx, row.Id, actorId, ct);
-        if (review.Items is null || review.FailedKinds is null) throw new CustomerFailure(503, "REVIEW_INCOMPLETE");
-        await tx.CommitAsync(ct); return review;
     }
 
     public async Task<ReactivationContext> GetReactivationContext(Guid actorId, string code, CancellationToken ct)
@@ -102,40 +64,6 @@ public sealed partial class CustomerService
             && !string.IsNullOrWhiteSpace(result.VerifiedBasis)
             && result.Checks.All(check => check.Status is "met" or "exception");
         await tx.CommitAsync(ct); return new ReactivationContext(suspension, result.Checks, result.VerifiedBasis, canReactivate, result.MissingSources);
-    }
-
-    public async Task<StatusChangeResult> Suspend(Guid actorId, Guid sessionId, string code, string key,
-        SuspendCustomerRequest request, CancellationToken ct)
-    {
-        Key(key); var customerCode = ParseCode(code); var hash = Hash(new { customerCode, request });
-        var reason = RequiredReason(request.Reason);
-        if (request.ReasonGroup is null || !SuspensionReasons.Contains(request.ReasonGroup)) throw new CustomerFailure(400, "VALIDATION");
-        RequireNoUnstoredEvidence(request.Evidence);
-        var note = (request.CoordinationNote ?? "").Trim();
-        if (note.Length > 5000) throw new CustomerFailure(400, "VALIDATION");
-        await using var c = Connection(); await c.OpenAsync(ct); await using var tx = await c.BeginTransactionAsync(ct);
-        var actor = await AuthorizeMutation(c, tx, actorId, sessionId, "customers.view", ct);
-        await LockKey(c, tx, actorId, "suspend", key, ct);
-        var row = await Find(c, tx, actor, customerCode, true, ct);
-        await RequireStatusPermission(c, tx, actor, row, "Suspend", ct);
-        var receipt = await Receipt(c, tx, actorId, "suspend", key, hash, ct);
-        if (receipt is not null)
-        {
-            if (receipt.Value.Id != row.Id) throw new CustomerFailure(409, "IDEMPOTENCY_KEY_REUSED");
-            return JsonSerializer.Deserialize<StatusChangeResult>(receipt.Value.Json, Json)! with { Replayed = true };
-        }
-        if (row.Status != "Active") throw new CustomerFailure(409, "ALREADY_IN_STATUS");
-        if (row.Version != request.BaseVersion) throw new CustomerFailure(409, "CONFLICT");
-        var review = await statusSource.Suspension(c, tx, row.Id, actorId, ct); RequireComplete(review);
-        var plan = ValidatePlan(review, request.Plan);
-        // A time-limited delegation can expire while the review source is loading.
-        await RequireStatusPermission(c, tx, actor, row, "Suspend", ct);
-        var descriptions = review.Items.Select(item => $"{item.Title}: {plan.Single(p => p.Id == item.Id).Option}").ToArray();
-        var followUp = string.Join("; ", descriptions.Concat(string.IsNullOrEmpty(note) ? [] : [note]));
-        var metadata = new StoredReview(request.ReasonGroup, plan, note);
-        var result = await SaveStatus(c, tx, actor, row, "Suspend", reason, null, followUp, metadata, review.Items, ct);
-        await SaveReceipt(c, tx, actorId, "suspend", key, hash, row.Id, result, ct);
-        await tx.CommitAsync(ct); return result;
     }
 
     public async Task<StatusChangeResult> Reactivate(Guid actorId, Guid sessionId, string code, string key,
@@ -161,15 +89,15 @@ public sealed partial class CustomerService
         RequireReady(review);
         await RequireStatusPermission(c, tx, actor, row, "Reactivate", ct);
         var result = await SaveStatus(c, tx, actor, row, "Reactivate", reason, review.VerifiedBasis, null,
-            new { previous.Review?.ReasonGroup, checks = review.Checks }, [], ct);
+            new { previous.Review?.ReasonGroup, checks = review.Checks }, ct);
         await SaveReceipt(c, tx, actorId, "reactivate", key, hash, row.Id, result, ct);
         await tx.CommitAsync(ct); return result;
     }
 
     private static async Task<StatusChangeResult> SaveStatus(NpgsqlConnection c, NpgsqlTransaction tx, Actor actor, Row row,
-        string type, string reason, string? basis, string? plan, object metadata, StatusImpactItem[] impacts, CancellationToken ct)
+        string type, string reason, string? basis, string? plan, object metadata, CancellationToken ct)
     {
-        var newStatus = type == "Suspend" ? "Suspended" : "Active";
+        const string newStatus = "Active";
         await using (var update = Cmd(c, tx, $"UPDATE qtkd.customer SET status='{newStatus}'::qtkd.active_status, customer_updated_at=clock_timestamp(), flow_revision=flow_revision+1 WHERE customer_id=@id", ("id", row.Id)))
             await update.ExecuteNonQueryAsync(ct);
         Guid decision;
@@ -182,7 +110,7 @@ public sealed partial class CustomerService
             decision = (Guid)(await insert.ExecuteScalarAsync(ct))!;
         }
         var updated = await Find(c, tx, actor, row.Id, false, ct);
-        var action = type == "Suspend" ? "CUSTOMER_SUSPENDED" : "CUSTOMER_REACTIVATED";
+        const string action = "CUSTOMER_REACTIVATED";
         var audit = new { decisionId = decision, before = Status(row.Status), after = Status(updated.Status),
             fromVersion = row.Version, version = updated.Version, reason, basis, plan };
         await using (var log = Cmd(c, tx, "INSERT INTO qtkd.audit_log(entity_type,entity_id,action,actor_id,acted_at,value_after,note) VALUES ('Customer',@customer,@action,@actor,clock_timestamp(),@value,@reason)",
@@ -194,7 +122,7 @@ public sealed partial class CustomerService
         await using (var outbox = Cmd(c, tx, "INSERT INTO qtkd.customer_status_outbox(decision_id,payload) VALUES (@decision,@payload)", ("decision", decision)))
         {
             outbox.Parameters.AddWithValue("payload", NpgsqlDbType.Jsonb, JsonSerializer.Serialize(new { customerCode = row.Code, type, reason, plan,
-                departments = impacts.Select(i => i.Department).Distinct().ToArray() }, Json));
+                departments = Array.Empty<string>() }, Json));
             await outbox.ExecuteNonQueryAsync(ct);
         }
         return new StatusChangeResult(await View(c, tx, updated, ct), false);

@@ -11,6 +11,6 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    proxy: { '/api': { target: process.env.QTKD_API_PROXY ?? process.env.QTKD_DEV_API_TARGET ?? 'https://localhost:7156', secure: false } },
+    proxy: { '/api': { target: process.env.QTKD_API_PROXY ?? 'https://localhost:7156', secure: false } },
   },
 });

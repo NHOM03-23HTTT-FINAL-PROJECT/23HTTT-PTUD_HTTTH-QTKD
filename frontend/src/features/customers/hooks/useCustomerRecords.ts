@@ -4,8 +4,7 @@ import { useSession } from '@/app/providers/SessionProvider';
 import { customerRecordsApi } from '../api/customerRecordsApi';
 import { CustomerRecordsError, type CustomerRecordGroup, type CustomerRecordsByGroup } from '../types/customerRecords';
 
-export type GroupErrorReason = 'unavailable' | 'forbidden' | 'failed';
-export type GroupState<T> = { status: 'loading' } | { status: 'ok'; data: T } | { status: 'error'; reason: GroupErrorReason };
+export type GroupState<T> = { status: 'loading' } | { status: 'ok'; data: T } | { status: 'error' };
 
 export type CustomerRecordsState = { [G in CustomerRecordGroup]: GroupState<CustomerRecordsByGroup[G]> };
 
@@ -36,9 +35,7 @@ export function useCustomerRecords(code: string) {
             endSession(error.sessionStatus ?? 'expired');
             return;
           }
-          const reason: GroupErrorReason = error instanceof CustomerRecordsError && error.code === 'SOURCE_UNAVAILABLE'
-            ? 'unavailable' : error instanceof CustomerRecordsError && error.code === 'FORBIDDEN' ? 'forbidden' : 'failed';
-          setState((current) => ({ ...current, [group]: { status: 'error', reason } }));
+          setState((current) => ({ ...current, [group]: { status: 'error' } }));
         });
     },
     [code, endSession, user],

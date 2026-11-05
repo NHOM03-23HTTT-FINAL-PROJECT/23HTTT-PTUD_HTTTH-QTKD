@@ -16,8 +16,6 @@ import { isOnlyMissingContact, normalizeCustomerDraft, validateCustomerDraft } f
 
 type ServerAlert =
   | { kind: 'no-changes' } // 02.6 – A6.1
-  | { kind: 'server-invalid' }
-  | { kind: 'request-changed' }
   | { kind: 'save-failed' } // 02.8 – A6.2
   | { kind: 'network' } // 02.8 – A6.3
   | { kind: 'forbidden' } // 02.8 – A5.5
@@ -132,11 +130,7 @@ export function useEditCustomerForm(initial: Customer, { onUpdated, onSessionEnd
         case 'IMMUTABLE_FIELD':
           setServerAlert({ kind: 'immutable' });
           break;
-        case 'IDEMPOTENCY_KEY_REUSED':
-          setServerAlert({ kind: 'request-changed' });
-          break;
         case 'VALIDATION':
-          setServerAlert({ kind: 'server-invalid' });
           return 'invalid';
         default:
           setServerAlert({ kind: 'network' });

@@ -11,6 +11,8 @@ import {
   type SetContractAttachmentsRequest,
   type UpdateContractRequest,
   type CancelContractRequest,
+  type SubmitCheck,
+  type SubmitContractRequest,
 } from '../types/contract';
 
 type Options = ReturnType<typeof mockGetContractFormOptions>;
@@ -118,6 +120,19 @@ export const serverContractsApi = {
         body: json({ baseVersion: request.baseVersion, draft: request.draft }),
       }),
     );
+  },
+
+  async checkSubmit(request: { code: string }) {
+    return action<SubmitCheck>(`/contracts/${encodeURIComponent(request.code)}/submit-check`);
+  },
+
+  async submit(request: SubmitContractRequest) {
+    const result = await action<CreateContractResult>(`/contracts/${encodeURIComponent(request.code)}/submit`, {
+      method: 'POST',
+      headers: { 'Idempotency-Key': request.idempotencyKey },
+    });
+    remember(result.contract);
+    return result;
   },
 
   async cancel(request: CancelContractRequest) {

@@ -279,8 +279,8 @@ function ContractAlertBanner({
   if (alert.kind === 'customer-inactive')
     return (
       <Alert tone="danger" title="Khách hàng không thể dùng để lập hợp đồng">
-        {customer ? `${customer.code} · ${customer.name}` : 'Khách hàng đã chọn'} không còn hợp lệ hoặc không thuộc phạm vi bạn được chọn.
-        Chọn khách hàng khác để tiếp tục; hồ sơ chưa được lưu.
+        {customer ? `${customer.code} · ${customer.name}` : 'Khách hàng đã chọn'} không còn ở trạng thái Hoạt
+        động. Chọn khách hàng khác để tiếp tục; hồ sơ chưa được lưu.
       </Alert>
     );
   if (alert.kind === 'area-inactive')

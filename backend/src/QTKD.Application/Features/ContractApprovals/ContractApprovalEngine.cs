@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using QTKD.Application.Features.Workflows;
+using QTKD.Domain.Notifications;
 
 namespace QTKD.Application.Features.ContractApprovals;
 
@@ -53,7 +54,7 @@ public sealed class ContractApprovalEngine(IApprovalStore store, WorkflowEngine 
         }
         if (recipients.Count > 0) next = next with { PendingTask = string.Join(" ", new[] { pending, "Thông báo đang chờ gửi; kết quả duyệt đã được lưu." }.Where(s => s is not null)) };
         await tx.Save(command, next, fingerprint, recipients.Distinct().Select(id => new ApprovalMessage(id,
-            $"Hồ sơ {document.Title}: {next.Status}. {command.Comment}")).ToArray(), ct);
+            NotificationKinds.Decision(document.Title, next.Status, command.Comment))).ToArray(), ct);
         return new ReviewOutcome(next, next.PendingTask);
     }, ct);
     public async Task<ReviewOutcome> RetryPending(Guid id, ReviewActor actor, string key, CancellationToken ct)

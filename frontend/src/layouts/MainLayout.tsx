@@ -1,60 +1,44 @@
-import { useEffect, useRef, useState, type RefObject } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth, type CurrentUser } from '@/app/providers/AuthProvider';
 import { SessionProvider } from '@/app/providers/SessionProvider';
-import { IS_MOCK_AUTH } from '@/features/auth/api/authApi';
 import { Icon } from '@/components/icon/Icon';
 import { WORKSPACE_NAV, WORKSPACE_SEARCH_PLACEHOLDER, type NavItem } from '@/constants/navigation';
 import { ROUTES } from '@/constants/routes';
-import { getUnreadCount } from '@/mocks/seed/dashboards';
+import { NotificationBell } from '@/features/notifications/components/NotificationBell';
+import { NotificationsProvider } from '@/features/notifications/hooks/useNotifications';
+import { IS_MOCK_AUTH } from '@/features/auth/api/authApi';
+import { useApprovalInboxCount } from '@/features/contracts/hooks/useApprovalInboxCount';
 import { AccountMenu } from './AccountMenu';
 import './MainLayout.css';
 
 /** App shell sau đăng nhập: Topbar + Sidebar theo vai trò + vùng làm việc (frame 05.x). */
 export function MainLayout() {
   const { user } = useAuth();
-  const { pathname } = useLocation();
-  const [navOpen, setNavOpen] = useState(false);
-  const navToggle = useRef<HTMLButtonElement>(null);
-  useEffect(() => setNavOpen(false), [pathname]);
-  useEffect(() => {
-    if (!navOpen) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') { setNavOpen(false); navToggle.current?.focus(); }
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [navOpen]);
   if (!user) return null;
   const workspace = user.departmentInfo.workspace;
 
   return (
     <SessionProvider user={user}>
+      <NotificationsProvider userId={user.id}>
       <div className="app-shell" data-accent={workspace}>
-        <Topbar user={user} navOpen={navOpen} navToggle={navToggle} onToggleNav={() => setNavOpen((open) => !open)} />
+        <Topbar user={user} />
         <div className="app-shell__body">
-          {navOpen && <button type="button" className="mobile-nav-backdrop" aria-hidden="true" tabIndex={-1} onClick={() => setNavOpen(false)} />}
-          <Sidebar user={user} open={navOpen} onNavigate={() => setNavOpen(false)} />
+          <Sidebar user={user} />
           <main className="app-shell__workspace">
             <Outlet />
           </main>
         </div>
       </div>
+      </NotificationsProvider>
     </SessionProvider>
   );
 }
 
-function Topbar({ user, navOpen, navToggle, onToggleNav }: { user: CurrentUser; navOpen: boolean;
-  navToggle: RefObject<HTMLButtonElement>; onToggleNav: () => void }) {
+function Topbar({ user }: { user: CurrentUser }) {
   const workspace = user.departmentInfo.workspace;
-  const hasUnread = IS_MOCK_AUTH && getUnreadCount(workspace) > 0;
 
   return (
     <header className="topbar">
-      <button ref={navToggle} type="button" className="topbar__menu" aria-controls="app-navigation"
-        aria-expanded={navOpen} aria-label={navOpen ? 'Đóng menu điều hướng' : 'Mở menu điều hướng'} onClick={onToggleNav}>
-        <Icon name={navOpen ? 'x' : 'list'} />
-      </button>
       <NavLink to={ROUTES.dashboard} className="topbar__logo">
         <span className="topbar__mark">
           <Icon name="layers" />
@@ -78,10 +62,7 @@ function Topbar({ user, navOpen, navToggle, onToggleNav }: { user: CurrentUser; 
         {user.departmentInfo.name}
       </span>
 
-      <button type="button" className="topbar__icon-button" aria-label="Thông báo">
-        <Icon name="bell" />
-        {hasUnread && <span className="topbar__unread" />}
-      </button>
+      <NotificationBell />
 
       <span className="topbar__divider" />
 
@@ -91,7 +72,8 @@ function Topbar({ user, navOpen, navToggle, onToggleNav }: { user: CurrentUser; 
 }
 
 /** "Đổi mật khẩu" và "Đăng xuất" nằm trong menu tài khoản trên Topbar, không lặp lại ở Sidebar. */
-function Sidebar({ user, open, onNavigate }: { user: CurrentUser; open: boolean; onNavigate: () => void }) {
+function Sidebar({ user }: { user: CurrentUser }) {
+  const inbox = useApprovalInboxCount(user);
   const areaRecordNavPath = user.departmentInfo.workspace === 'khai-thac' ? ROUTES.areas : ROUTES.areaLookup;
   const groups = WORKSPACE_NAV[user.departmentInfo.workspace]
     .map((group) => ({
@@ -101,8 +83,7 @@ function Sidebar({ user, open, onNavigate }: { user: CurrentUser; open: boolean;
     .filter((group) => group.items.length > 0);
 
   return (
-    <nav id="app-navigation" className={open ? 'sidebar sidebar--open' : 'sidebar'} aria-label="Điều hướng chính"
-      onClick={(event) => { if ((event.target as Element).closest('a')) onNavigate(); }}>
+    <nav className="sidebar" aria-label="Điều hướng chính">
       <p className="sidebar__group">TỔNG QUAN</p>
       <SidebarLink item={{ label: 'Bảng điều khiển', path: ROUTES.dashboard, icon: 'grid', module: '' }} />
 
@@ -112,7 +93,9 @@ function Sidebar({ user, open, onNavigate }: { user: CurrentUser; open: boolean;
           {group.items.map((item) => (
             <SidebarLink
               key={item.path}
-              item={item}
+              item={{ ...item, badge: item.approvalStep
+                ? item.approvalStep === inbox.step ? inbox.count : undefined
+                : IS_MOCK_AUTH ? item.badge : undefined }}
               activeForAreaRecord={item.path === areaRecordNavPath}
               activeForContractRecord={item.path === ROUTES.contracts}
               activeForTrackedProgress={item.path === ROUTES.approvalTracking}
@@ -162,7 +145,7 @@ function SidebarLink({
     >
       <Icon name={item.icon} />
       <span className="sidebar__label">{item.label}</span>
-      {IS_MOCK_AUTH && item.badge ? <span className="sidebar__badge">{item.badge}</span> : null}
+      {item.badge ? <span className="sidebar__badge" aria-label={`${item.badge} hồ sơ chờ xử lý`}>{item.badge}</span> : null}
     </NavLink>
   );
 }

@@ -1,0 +1,77 @@
+@startuml UC-CHUNG-01-dang-nhap
+<style>
+    sequenceDiagram {
+        actor {
+            BackgroundColor #E7F0F7
+            BorderColor #32536C
+        }
+        participant {
+            BackgroundColor #E7F0F7
+            BorderColor #32536C
+        }
+        arrow {
+            LineColor #32536C
+        }
+    }
+</style>
+
+title UC-CHUNG-01 · Đăng nhập
+hide footbox
+autonumber "<b>[000]"
+
+actor "Người dùng" as User
+boundary "Giao diện đăng nhập" as Web
+control "Dịch vụ xác thực" as Auth
+database "Cơ sở dữ liệu" as Db
+
+User -> Web: Mở trang đăng nhập
+Web --> User: Hiển thị biểu mẫu
+User -> Web: Nhập tên đăng nhập hoặc email công ty,\nmật khẩu và tùy chọn ghi nhớ
+
+break Thiếu trường bắt buộc
+    Web --> User: Báo lỗi tại trường nhập
+end
+
+Web -> Auth: Gửi yêu cầu đăng nhập
+break Dữ liệu không hợp lệ hoặc yêu cầu bị chặn
+    Auth --> Web: Từ chối yêu cầu
+    Web --> User: Báo đăng nhập chưa thành công
+end
+
+group Kiểm tra tài khoản
+    Auth -> Db: Tìm tài khoản theo tên đăng nhập hoặc email công ty
+    Db --> Auth: Thông tin tài khoản nếu tìm thấy
+    Auth -> Auth: Xác minh mật khẩu
+end
+
+alt Không tìm thấy tài khoản hoặc mật khẩu sai
+    opt Có tài khoản và có thể ghi nhận lần sai
+        Auth -> Db: Ghi nhận lần sai.\nĐủ 5 lần thì khóa 15 phút và thu hồi các phiên.
+    end
+    Auth --> Web: Thông tin đăng nhập không hợp lệ
+    Web --> User: Yêu cầu kiểm tra và nhập lại
+else Mật khẩu đúng nhưng tài khoản bị vô hiệu hóa hoặc đang khóa
+    Auth --> Web: Lý do từ chối hoặc thời điểm hết khóa
+    Web --> User: Hiển thị thông báo tương ứng
+else Mật khẩu đúng và tài khoản được phép đăng nhập
+    Auth -> Db: Lấy phòng ban, vai trò và quyền hiện hành
+    Db --> Auth: Thông tin phân quyền
+    alt Cấu hình tài khoản không hợp lệ
+        Auth --> Web: Báo lỗi hệ thống
+        Web --> User: Hiển thị thông báo đăng nhập chưa thành công
+    else Cấu hình tài khoản hợp lệ
+        Auth -> Db: Tạo phiên mới và đặt lại số lần nhập sai
+        opt Trình duyệt có phiên cũ
+            Auth -> Db: Thu hồi phiên gắn với cookie cũ
+        end
+        Auth --> Web: Cấp phiên đăng nhập và trả thông tin người dùng
+        alt Tài khoản đang dùng mật khẩu tạm
+            Web --> User: Mở màn đổi mật khẩu bắt buộc
+            ref over User, Web : UC-CHUNG-04 · Đổi mật khẩu
+        else Tài khoản dùng mật khẩu chính thức
+            Web --> User: Mở trang đích hoặc tổng quan.\nHiển thị chức năng theo quyền.
+        end
+    end
+end
+
+@enduml

@@ -13,7 +13,7 @@ import { StatusBadge, type BadgeTone } from '@/components/status-badge/StatusBad
 import { ROUTES } from '@/constants/routes';
 import { formatDate, formatTime, formatMoney, todayIso } from '@/utils/format';
 import { customerRecordsApi } from '../api/customerRecordsApi';
-import type { GroupErrorReason, GroupState } from '../hooks/useCustomerRecords';
+import type { GroupState } from '../hooks/useCustomerRecords';
 import type { Customer, CustomerField } from '../types/customer';
 import type { ContractRecord, PaymentRecord, PriceListVersion } from '../types/customerRecords';
 import { CUSTOMER_FIELD_LABELS } from '../utils/customerChanges';
@@ -49,17 +49,7 @@ function FilterBar({ children, onApply }: { children: ReactNode; onApply: () => 
 }
 
 /** Một nhóm hồ sơ không tải được: báo đúng nhóm, không coi là rỗng, cho thử lại riêng (06.9). */
-export function GroupError({ label, reason, onRetry }: { label: string; reason: GroupErrorReason; onRetry: () => void }) {
-  if (reason === 'unavailable') return (
-    <Alert tone="info" title={`Chưa kết nối ${label}`}>
-      Thông tin này chưa được kết nối với hồ sơ khách hàng. Các phần khác vẫn xem được.
-    </Alert>
-  );
-  if (reason === 'forbidden') return (
-    <Alert tone="warning" title={`Chưa thể xem ${label}`}>
-      Quyền hiện tại chưa cho phép truy cập nhóm hồ sơ này.
-    </Alert>
-  );
+export function GroupError({ label, onRetry }: { label: string; onRetry: () => void }) {
   return (
     <Alert
       tone="danger"
@@ -116,7 +106,7 @@ export function ContractsTab({ state, onRetry }: { state: GroupState<ContractRec
   const dateRef = useRef<HTMLInputElement>(null);
 
   if (state.status === 'loading') return <Loading label="hợp đồng" />;
-  if (state.status === 'error') return <GroupError label="danh sách hợp đồng" reason={state.reason} onRetry={onRetry} />;
+  if (state.status === 'error') return <GroupError label="danh sách hợp đồng" onRetry={onRetry} />;
 
   const contracts = state.data;
   const services = [...new Set(contracts.map((c) => c.service))];
@@ -285,7 +275,7 @@ export function PriceListsTab({
   const [applied, setApplied] = useState(draft);
 
   if (state.status === 'loading') return <Loading label="bảng giá" />;
-  if (state.status === 'error') return <GroupError label="bảng giá" reason={state.reason} onRetry={onRetry} />;
+  if (state.status === 'error') return <GroupError label="bảng giá" onRetry={onRetry} />;
   if (state.data.length === 0) {
     return (
       <section className="customer-results">
@@ -506,7 +496,7 @@ export function PaymentsTab({ state, customer, onRetry }: { state: GroupState<Pa
   const [reported, setReported] = useState<Record<string, string>>({});
 
   if (state.status === 'loading') return <Loading label="bảng thanh toán" />;
-  if (state.status === 'error') return <GroupError label="bảng thanh toán" reason={state.reason} onRetry={onRetry} />;
+  if (state.status === 'error') return <GroupError label="bảng thanh toán" onRetry={onRetry} />;
   if (state.data.length === 0) {
     return (
       <section className="customer-results">

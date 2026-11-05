@@ -60,18 +60,6 @@ public sealed class PostgresApprovalStore(IConfiguration configuration) : IAppro
             """, ("id", id));
         await cmd.ExecuteNonQueryAsync(ct);
     }
-    public async Task<IReadOnlyList<object>> Notifications(Guid actor, CancellationToken ct)
-    {
-        await using var c = await Open(ct);
-        await using var cmd = Command(c, null, """
-            SELECT notification_id,record_id,content,is_read,created_at FROM qtkd.notification
-            WHERE recipient_id=@actor ORDER BY created_at DESC LIMIT 100
-            """, ("actor", actor));
-        var items = new List<object>();
-        await using var r = await cmd.ExecuteReaderAsync(ct);
-        while (await r.ReadAsync(ct)) items.Add(new { id = r.GetGuid(0), recordId = r.GetGuid(1), content = r.GetString(2), isRead = r.GetBoolean(3), createdAt = r.GetDateTime(4) });
-        return items;
-    }
     internal static NpgsqlCommand Command(NpgsqlConnection c, NpgsqlTransaction? tx, string sql, params (string Name, object? Value)[] parameters)
     {
         var cmd = new NpgsqlCommand(sql, c, tx);
@@ -84,7 +72,7 @@ public sealed class PostgresApprovalStore(IConfiguration configuration) : IAppro
         await using var cmd = Command(c, tx, """
             SELECT c.title,cu.customer_name,u.full_name,d.code,c.contract_value,c.status::text,c.version,
                 r.round_id,r.round_no,r.record_version,r.result::text,r.submitted_at,c.content,c.payment_terms,c.owner_id,r.record_snapshot::text,
-                c.contract_type,c.start_date,c.end_date
+                c.contract_type,c.start_date,c.end_date,c.contract_code
             FROM qtkd.contract c JOIN qtkd.customer cu ON cu.customer_id=c.customer_id
             JOIN qtkd.user_account u ON u.user_id=c.owner_id JOIN qtkd.department d ON d.department_id=u.department_id
             JOIN LATERAL (SELECT * FROM qtkd.approval_round WHERE contract_id=c.contract_id ORDER BY round_no DESC LIMIT 1) r ON true
@@ -96,7 +84,7 @@ public sealed class PostgresApprovalStore(IConfiguration configuration) : IAppro
             if (!await r.ReadAsync(ct)) return null;
             doc = new(id, r.GetString(0), r.GetString(1), r.GetString(2), r.GetString(3), r.GetDecimal(4),
                 Status(r.GetString(5)), r.GetInt32(6), r.GetGuid(7), r.GetInt32(8), r.GetInt32(9), Result(r.GetString(10)),
-                r.GetDateTime(11), [], r.GetString(12), r.GetString(13), [], ContractType: r.GetString(16), StartDate: r.GetFieldValue<DateOnly>(17), EndDate: r.GetFieldValue<DateOnly>(18));
+                r.GetDateTime(11), [], r.GetString(12), r.GetString(13), [], ContractType: r.GetString(16), StartDate: r.GetFieldValue<DateOnly>(17), EndDate: r.GetFieldValue<DateOnly>(18), Code: r.GetString(19));
             owner = r.GetGuid(14); snapshot = r.GetString(15);
         }
         using var json = JsonDocument.Parse(snapshot);

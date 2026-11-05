@@ -1,35 +1,37 @@
-# API Khách hàng (UC-CUS-01 → 06)
+# API Khách hàng
 
-Nguồn: `frontend/src/features/customers/api/customersApi.ts`, `customerRecordsApi.ts`, `customerStatusApi.ts` và các mock server tương ứng trong `frontend/src/mocks/`. Quy ước chung (tiền tố, JWT, Idempotency-Key, mã lỗi) xem [list_api.md](../../../list_api.md).
+Cập nhật trên `cus-flow` ngày 05/11/2026, sau khi ghép `main` tại `93b5447`. Tiền tố: `/api/v1`. Các thao tác ghi dùng JWT, CSRF chung của backend; tạo/sửa/kích hoạt lại cần `Idempotency-Key`. Kết quả thực chạy và test case ở [báo cáo kiểm thử](../../testing/test-cases/customers-main-ef.md).
 
-> Trạng thái thực hiện được ghi trong [implementation-status.md](implementation-status.md). Bảng dưới giữ tên endpoint từ đề xuất; không coi mọi endpoint trong bảng đã hoàn thiện.
+Theo yêu cầu của người dùng, **backend SYS-CUS-03 đã được gỡ**: không còn endpoint rà soát/tạm ngưng, không cấp mới ủy quyền `suspend`. `canSuspend` luôn bằng `false`. Lịch sử Suspend và trạng thái Suspended có sẵn vẫn được đọc để phục vụ SYS-CUS-04; không xóa dữ liệu lịch sử.
 
-> Quy tắc ủy quyền trong tài liệu này phản ánh quyết định mới nhất; mô tả chỉ cấp quyền theo vai trò trong tài liệu trạng thái được viết trước thay đổi này.
+Frontend được giữ nguyên toàn bộ theo `main`: các adapter khách hàng vẫn là mock và `BusinessRoute` chưa cho mở màn khách hàng với danh tính API. Tên hàm frontend dưới đây không có nghĩa là đã tích hợp API thật.
 
-| Method | Endpoint | UC | Hàm FE | Ghi chú |
-|---|---|---|---|---|
-| GET | `/customers?keyword&status&sort&page&size` | CUS-05 | `customersApi.search` | Chỉ đếm và trả bản ghi trong phạm vi quyền |
-| GET | `/customers/{code}` | CUS-06 | `customersApi.getCustomer` | |
-| GET | `/customers/form-options` | CUS-01/02 | `customersApi.getFormOptions` | Nhóm khách hàng, nhóm dịch vụ |
-| POST | `/customers` | CUS-01 | `customersApi.create` | Idempotency-Key; `{draft}`; lỗi `DUPLICATE_TAX_CODE` |
-| PATCH | `/customers/{code}` | CUS-02 | `customersApi.update` | Idempotency-Key; `{baseVersion, draft, reason}`; gửi kèm mã KH/MST/trạng thái/người phụ trách thì báo `IMMUTABLE_FIELD` |
-| GET | `/customers/{code}/status-permissions` | CUS-03/04 | `useCustomerStatusPermissions` | Trả `canSuspend`, `canReactivate` theo người, từng thao tác và khách hàng đang phụ trách |
-| GET | `/customers/delegations/candidates` | CUS-03/04 | `customerDelegationsApi.candidates` | Nhân viên Kinh doanh đang hoạt động cùng phòng; chỉ Trưởng phòng Kinh doanh được quản lý |
-| GET | `/customers/delegations` | CUS-03/04 | `customerDelegationsApi.list` | Lịch sử giao và thu hồi, gồm quyền còn hiệu lực, hết hạn, không đủ điều kiện |
-| POST | `/customers/delegations` | CUS-03/04 | `customerDelegationsApi.grant` | `{granteeId, action: "suspend" \| "reactivate", expiresAt?, reason?}`; quyền chỉ áp dụng cho khách do nhân viên đó đang phụ trách |
-| POST | `/customers/delegations/{id}/revoke` | CUS-03/04 | `customerDelegationsApi.revoke` | Thu hồi một quyền; lịch sử vẫn được giữ |
-| GET | `/customers/{code}/records/{group}` | CUS-06 | `customerRecordsApi.getGroup` | `group` = `contracts \| priceLists \| payments`; mỗi nhóm tải và báo lỗi riêng |
-| POST | `/customers/{code}/payments/{paymentCode}/discrepancy-reports` | CUS-06 | `customerRecordsApi.reportDiscrepancy` | `{content}` |
-| GET | `/customers/suspension-reason-groups` | CUS-03 | `customerStatusApi.getSuspensionReasonGroups` | |
-| GET | `/customers/{code}/suspension-review` | CUS-03 b2 | `customerStatusApi.getSuspensionReview` | Hồ sơ và công việc bị ảnh hưởng |
-| POST | `/customers/{code}/suspend` | CUS-03 | `customerStatusApi.suspend` | Idempotency-Key; `{baseVersion, reasonGroup, reason, evidence, plan, coordinationNote}`; cần quyền và phạm vi hợp lệ; hiện trả `REVIEW_INCOMPLETE` |
-| GET | `/customers/{code}/reactivation-context` | CUS-04 | `customerStatusApi.getReactivationContext` | Thông tin tạm ngưng hiện hành và điều kiện kích hoạt lại |
-| POST | `/customers/{code}/reactivate` | CUS-04 | `customerStatusApi.reactivate` | Idempotency-Key; `{baseVersion, reason, evidence, exception?}`; cần quyền và phạm vi hợp lệ; hiện trả `REVIEW_INCOMPLETE` |
+| Method | Endpoint | SYS | Hành vi backend |
+|---|---|---|---|
+| GET | `/customers?keyword&status&sort&page&size` | CUS-05 | Chỉ đếm/trả khách thuộc phòng Kinh doanh của actor. Mặc định Active, trang 1, 8 dòng; hỗ trợ 8/20/50 dòng. |
+| GET | `/customers/{code}` | CUS-06 | Thông tin, lịch sử tạo/sửa, quyết định trạng thái; ngoài phạm vi trả 404. |
+| GET | `/customers/form-options` | CUS-01/02 | Danh mục tạm của Sprint 1; chưa nối phân hệ danh mục dùng chung. |
+| POST | `/customers` | CUS-01 | `{draft}`; chủ hồ sơ, mã và trạng thái do server gán. MST duy nhất toàn hệ thống, kể cả Suspended. |
+| PATCH | `/customers/{code}` | CUS-02 | `{baseVersion,draft,reason}`; nhân viên sửa khách mình phụ trách, trưởng phòng sửa khách trong phòng. Trường hệ thống/MST không được sửa. |
+| GET | `/customers/{code}/status-permissions` | CUS-04 | `{canSuspend:false,canReactivate}`; kiểm tra từng người và khách đang phụ trách. |
+| GET | `/customers/delegations/candidates` | CUS-04 | Nhân viên Kinh doanh Active cùng phòng; chỉ trưởng phòng quản lý. |
+| GET | `/customers/delegations` | CUS-04 | Lịch sử cấp/thu hồi/hết hạn/không đủ điều kiện. |
+| POST | `/customers/delegations` | CUS-04 | `{granteeId,action:"reactivate",expiresAt?,reason?}`. Action `suspend` trả 400. |
+| POST | `/customers/delegations/{id}/revoke` | CUS-04 | Thu hồi quyền, giữ lịch sử; retry không ghi thêm audit thu hồi. |
+| GET | `/customers/{code}/reactivation-context` | CUS-04 | Quyết định tạm ngưng trước và điều kiện xác minh; nguồn chưa đầy đủ thì `canReactivate:false`. |
+| POST | `/customers/{code}/reactivate` | CUS-04 | `{baseVersion,reason,evidence,exception?}`; kiểm tra nguồn server, quyền, phiên bản, lưu trạng thái/quyết định/audit/outbox/receipt trong cùng transaction. |
+| GET | `/customers/{code}/records/{group}` | CUS-06 | `contracts/priceLists/payments` còn trả lỗi nguồn chưa tích hợp; kiểm tra phạm vi trước, quyền phân hệ cho contracts/payments. |
 
-## Quy tắc ủy quyền
+Các endpoint `/suspension-review`, `/suspend`, `/suspension-reason-groups` và báo cáo sai lệch thanh toán không được triển khai trong bản backend này.
 
-Trưởng phòng Kinh doanh có quyền `customers.change-status` và `customers.view` có thể tự thực hiện hai thao tác trong phạm vi phòng, hoặc giao từng thao tác riêng cho nhân viên Kinh doanh đang hoạt động cùng phòng. Ủy quyền có thể không đặt thời hạn hoặc có ngày giờ hết hạn; có thể thu hồi bất kỳ lúc nào. Khi xét quyền, backend kiểm tra chức danh, phòng, trạng thái tài khoản, hiệu lực ủy quyền và người phụ trách hiện tại. Quyền theo vai trò `customers.change-status` của nhân viên không tự thay thế ủy quyền cá nhân. Quyền được giao không bỏ qua điều kiện rà soát nghiệp vụ. Quyền chỉ được xét lại sau khi người nhận trở lại vai trò/phòng phù hợp nếu chưa hết hạn hoặc bị thu hồi; người quản lý có thể chủ động thu hồi để chấm dứt quyền vĩnh viễn.
+## Quyền và xác minh
 
-## Phụ thuộc module Sprint 2/3
+Nhân viên xem khách trong phòng Kinh doanh nhưng chỉ sửa khách mình phụ trách. Trưởng phòng có `customers.change-status` và `customers.view` được kích hoạt lại trong phạm vi phòng, hoặc cấp riêng quyền kích hoạt lại cho nhân viên Active cùng phòng, trên khách đang được nhân viên đó phụ trách. Quyền theo vai trò của nhân viên không thay cho ủy quyền cá nhân. Kiểm tra lại hiệu lực ngay trước khi ghi; hết hạn/thu hồi không bị bỏ qua bởi retry.
 
-Nhóm `contracts`, `priceLists` và `payments` còn phụ thuộc quyền theo từng phân hệ và hợp đồng dữ liệu thật. Khi nguồn chưa sẵn sàng không trả danh sách rỗng như thể đã xác minh; API trả lỗi phù hợp và giao diện báo chưa tải được. Báo cáo sai lệch thanh toán chưa được kết nối.
+Nguồn thật hiện chưa có xác nhận có thẩm quyền: kích hoạt lại trả `REVIEW_INCOMPLETE`, giữ nguyên dữ liệu. Tệp chỉ có tên/kích thước không được coi là bằng chứng đã lưu; gửi tệp như vậy trả `EVIDENCE_UNAVAILABLE`. Không tự tin lời khai ngoại lệ từ trình duyệt. Các ca thành công trong test dùng nguồn kiểm soát riêng, không thay nguồn thật trong ứng dụng.
+
+MST trùng đang trả `DUPLICATE_TAX_CODE`; API chưa trả liên kết tới hồ sơ trùng trong phạm vi như nhánh ngoại lệ A5.3 của SYS-CUS-01. Outbox mới lưu yêu cầu, chưa có worker chuyển tới hộp Notifications.
+
+## Lưu trữ
+
+Nguồn schema duy nhất là EF Core `QtkdDbContext`, migration `20261105104547_CustomerFlow`; áp qua `QTKD.DbTool` theo [DB/README](../../../DB/README.md). Không dùng Prisma Migrate, không để API tự migrate. Runtime nghiệp vụ hiện vẫn dùng Npgsql trong service cũ; chuyển migration sang EF không đồng nghĩa toàn bộ runtime đã chuyển sang EF LINQ/Repository.

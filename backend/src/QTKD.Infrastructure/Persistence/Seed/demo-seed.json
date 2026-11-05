@@ -1,0 +1,1544 @@
+{
+  "comment": "Synthetic demo fixture (port of DB/prisma/seed-data.ts, 2026-11-04). Column names are database names. password_hash is replaced at seed time.",
+  "passwordHashPlaceholder": "__SEED_PASSWORD_HASH__",
+  "ids": {
+    "sales": "00000000-0000-4000-8000-0000000003e9",
+    "operations": "00000000-0000-4000-8000-0000000003ea",
+    "accounting": "00000000-0000-4000-8000-0000000003eb",
+    "legal": "00000000-0000-4000-8000-0000000003ec",
+    "board": "00000000-0000-4000-8000-0000000003ed",
+    "adminDepartment": "00000000-0000-4000-8000-0000000003ee",
+    "salesStaff": "00000000-0000-4000-8000-0000000007d1",
+    "salesManager": "00000000-0000-4000-8000-0000000007d2",
+    "operationsStaff": "00000000-0000-4000-8000-0000000007d3",
+    "operationsManager": "00000000-0000-4000-8000-0000000007d4",
+    "accountant": "00000000-0000-4000-8000-0000000007d5",
+    "accountingReviewer": "00000000-0000-4000-8000-0000000007d6",
+    "legalStaff": "00000000-0000-4000-8000-0000000007d7",
+    "boardMember": "00000000-0000-4000-8000-0000000007d8",
+    "admin": "00000000-0000-4000-8000-0000000007d9",
+    "legalManager": "00000000-0000-4000-8000-0000000007da",
+    "boardChair": "00000000-0000-4000-8000-0000000007db",
+    "customer": "00000000-0000-4000-8000-000000001f41",
+    "suspendedCustomer": "00000000-0000-4000-8000-000000001f42",
+    "port": "00000000-0000-4000-8000-000000002711",
+    "yard": "00000000-0000-4000-8000-000000002712",
+    "block": "00000000-0000-4000-8000-000000002713",
+    "warehouse": "00000000-0000-4000-8000-000000002714",
+    "suspendedBlock": "00000000-0000-4000-8000-000000002715",
+    "lifting": "00000000-0000-4000-8000-000000002af9",
+    "storage": "00000000-0000-4000-8000-000000002afa",
+    "contract": "00000000-0000-4000-8000-0000000036b1",
+    "submittedContract": "00000000-0000-4000-8000-0000000036b2",
+    "draftContract": "00000000-0000-4000-8000-0000000036b3",
+    "appendix": "00000000-0000-4000-8000-0000000036b4",
+    "assignSalesContract": "00000000-0000-4000-8000-0000000036b5",
+    "assignLegalContract": "00000000-0000-4000-8000-0000000036b6",
+    "assignBoardContract": "00000000-0000-4000-8000-0000000036b7",
+    "item": "00000000-0000-4000-8000-000000003a99",
+    "price": "00000000-0000-4000-8000-000000003e81",
+    "liftingPrice": "00000000-0000-4000-8000-000000004269",
+    "storagePrice": "00000000-0000-4000-8000-00000000426a",
+    "volume": "00000000-0000-4000-8000-000000004651",
+    "liftingVolume": "00000000-0000-4000-8000-000000004a39",
+    "storageVolume": "00000000-0000-4000-8000-000000004a3a",
+    "statement": "00000000-0000-4000-8000-000000004e21",
+    "contractRound": "00000000-0000-4000-8000-000000005dc1",
+    "currentRound": "00000000-0000-4000-8000-000000005dc2",
+    "paymentRound": "00000000-0000-4000-8000-000000005dc3",
+    "assignSalesRound": "00000000-0000-4000-8000-000000005dc4",
+    "assignLegalRound": "00000000-0000-4000-8000-000000005dc5",
+    "assignBoardRound": "00000000-0000-4000-8000-000000005dc6",
+    "contractFile": "00000000-0000-4000-8000-000000001b59",
+    "paymentFile": "00000000-0000-4000-8000-000000001b5a"
+  },
+  "tables": {
+    "role_definition": [
+      {
+        "code": "SalesStaff",
+        "name": "Nhân viên Kinh doanh",
+        "department_code": "KD"
+      },
+      {
+        "code": "SalesManager",
+        "name": "Trưởng phòng Kinh doanh",
+        "department_code": "KD"
+      },
+      {
+        "code": "OperationsStaff",
+        "name": "Nhân viên Khai thác",
+        "department_code": "KT"
+      },
+      {
+        "code": "OperationsManager",
+        "name": "Trưởng phòng Khai thác",
+        "department_code": "KT"
+      },
+      {
+        "code": "Accountant",
+        "name": "Nhân viên Kế toán",
+        "department_code": "KTOAN"
+      },
+      {
+        "code": "LegalStaff",
+        "name": "Nhân viên Pháp chế",
+        "department_code": "PC"
+      },
+      {
+        "code": "LegalManager",
+        "name": "Trưởng phòng Pháp chế",
+        "department_code": "PC"
+      },
+      {
+        "code": "BoardMember",
+        "name": "Ban Giám đốc",
+        "department_code": "BGD"
+      },
+      {
+        "code": "BoardChair",
+        "name": "Tổng Giám đốc",
+        "department_code": "BGD"
+      },
+      {
+        "code": "SystemAdmin",
+        "name": "Quản trị hệ thống",
+        "department_code": "QTHT"
+      }
+    ],
+    "permission": [
+      {
+        "code": "approvals.approve",
+        "name": "approvals.approve"
+      },
+      {
+        "code": "approvals.assign",
+        "name": "approvals.assign"
+      },
+      {
+        "code": "approvals.review-legal",
+        "name": "approvals.review-legal"
+      },
+      {
+        "code": "approvals.track",
+        "name": "approvals.track"
+      },
+      {
+        "code": "areas.create",
+        "name": "areas.create"
+      },
+      {
+        "code": "areas.manage",
+        "name": "areas.manage"
+      },
+      {
+        "code": "areas.update",
+        "name": "areas.update"
+      },
+      {
+        "code": "areas.view",
+        "name": "areas.view"
+      },
+      {
+        "code": "audit.view",
+        "name": "audit.view"
+      },
+      {
+        "code": "catalogs.manage",
+        "name": "catalogs.manage"
+      },
+      {
+        "code": "contracts.create",
+        "name": "contracts.create"
+      },
+      {
+        "code": "contracts.view",
+        "name": "contracts.view"
+      },
+      {
+        "code": "customers.change-status",
+        "name": "customers.change-status"
+      },
+      {
+        "code": "customers.create",
+        "name": "customers.create"
+      },
+      {
+        "code": "customers.update",
+        "name": "customers.update"
+      },
+      {
+        "code": "customers.view",
+        "name": "customers.view"
+      },
+      {
+        "code": "departments.manage",
+        "name": "departments.manage"
+      },
+      {
+        "code": "payments.view",
+        "name": "payments.view"
+      },
+      {
+        "code": "roles.manage",
+        "name": "roles.manage"
+      },
+      {
+        "code": "users.manage",
+        "name": "users.manage"
+      },
+      {
+        "code": "workflows.manage",
+        "name": "workflows.manage"
+      }
+    ],
+    "role_permission": [
+      {
+        "role": "SalesStaff",
+        "permission_code": "customers.view"
+      },
+      {
+        "role": "SalesStaff",
+        "permission_code": "customers.create"
+      },
+      {
+        "role": "SalesStaff",
+        "permission_code": "customers.update"
+      },
+      {
+        "role": "SalesStaff",
+        "permission_code": "contracts.view"
+      },
+      {
+        "role": "SalesStaff",
+        "permission_code": "contracts.create"
+      },
+      {
+        "role": "SalesStaff",
+        "permission_code": "approvals.track"
+      },
+      {
+        "role": "SalesStaff",
+        "permission_code": "areas.view"
+      },
+      {
+        "role": "SalesManager",
+        "permission_code": "customers.view"
+      },
+      {
+        "role": "SalesManager",
+        "permission_code": "customers.update"
+      },
+      {
+        "role": "SalesManager",
+        "permission_code": "customers.change-status"
+      },
+      {
+        "role": "SalesManager",
+        "permission_code": "contracts.view"
+      },
+      {
+        "role": "SalesManager",
+        "permission_code": "approvals.track"
+      },
+      {
+        "role": "SalesManager",
+        "permission_code": "approvals.approve"
+      },
+      {
+        "role": "SalesManager",
+        "permission_code": "approvals.assign"
+      },
+      {
+        "role": "SalesManager",
+        "permission_code": "areas.view"
+      },
+      {
+        "role": "OperationsStaff",
+        "permission_code": "areas.view"
+      },
+      {
+        "role": "OperationsStaff",
+        "permission_code": "areas.create"
+      },
+      {
+        "role": "OperationsStaff",
+        "permission_code": "areas.update"
+      },
+      {
+        "role": "OperationsManager",
+        "permission_code": "areas.view"
+      },
+      {
+        "role": "OperationsManager",
+        "permission_code": "areas.create"
+      },
+      {
+        "role": "OperationsManager",
+        "permission_code": "areas.update"
+      },
+      {
+        "role": "OperationsManager",
+        "permission_code": "areas.manage"
+      },
+      {
+        "role": "LegalStaff",
+        "permission_code": "contracts.view"
+      },
+      {
+        "role": "LegalStaff",
+        "permission_code": "approvals.track"
+      },
+      {
+        "role": "LegalStaff",
+        "permission_code": "approvals.review-legal"
+      },
+      {
+        "role": "LegalManager",
+        "permission_code": "contracts.view"
+      },
+      {
+        "role": "LegalManager",
+        "permission_code": "approvals.track"
+      },
+      {
+        "role": "LegalManager",
+        "permission_code": "approvals.review-legal"
+      },
+      {
+        "role": "LegalManager",
+        "permission_code": "approvals.assign"
+      },
+      {
+        "role": "BoardMember",
+        "permission_code": "contracts.view"
+      },
+      {
+        "role": "BoardMember",
+        "permission_code": "approvals.track"
+      },
+      {
+        "role": "BoardMember",
+        "permission_code": "approvals.approve"
+      },
+      {
+        "role": "BoardChair",
+        "permission_code": "contracts.view"
+      },
+      {
+        "role": "BoardChair",
+        "permission_code": "approvals.track"
+      },
+      {
+        "role": "BoardChair",
+        "permission_code": "approvals.approve"
+      },
+      {
+        "role": "BoardChair",
+        "permission_code": "approvals.assign"
+      },
+      {
+        "role": "SystemAdmin",
+        "permission_code": "users.manage"
+      },
+      {
+        "role": "SystemAdmin",
+        "permission_code": "departments.manage"
+      },
+      {
+        "role": "SystemAdmin",
+        "permission_code": "roles.manage"
+      },
+      {
+        "role": "SystemAdmin",
+        "permission_code": "workflows.manage"
+      },
+      {
+        "role": "SystemAdmin",
+        "permission_code": "audit.view"
+      },
+      {
+        "role": "SystemAdmin",
+        "permission_code": "catalogs.manage"
+      }
+    ],
+    "department": [
+      {
+        "department_id": "00000000-0000-4000-8000-0000000003e9",
+        "code": "KD",
+        "department_name": "Kinh doanh",
+        "manager_id": "00000000-0000-4000-8000-0000000007d2"
+      },
+      {
+        "department_id": "00000000-0000-4000-8000-0000000003ea",
+        "code": "KT",
+        "department_name": "Khai thác",
+        "manager_id": "00000000-0000-4000-8000-0000000007d4"
+      },
+      {
+        "department_id": "00000000-0000-4000-8000-0000000003eb",
+        "code": "KTOAN",
+        "department_name": "Kế toán",
+        "manager_id": "00000000-0000-4000-8000-0000000007d6"
+      },
+      {
+        "department_id": "00000000-0000-4000-8000-0000000003ec",
+        "code": "PC",
+        "department_name": "Pháp chế",
+        "manager_id": "00000000-0000-4000-8000-0000000007da"
+      },
+      {
+        "department_id": "00000000-0000-4000-8000-0000000003ed",
+        "code": "BGD",
+        "department_name": "Ban Giám đốc",
+        "manager_id": "00000000-0000-4000-8000-0000000007db"
+      },
+      {
+        "department_id": "00000000-0000-4000-8000-0000000003ee",
+        "code": "QTHT",
+        "department_name": "Quản trị hệ thống",
+        "manager_id": "00000000-0000-4000-8000-0000000007d9"
+      }
+    ],
+    "user_account": [
+      {
+        "user_id": "00000000-0000-4000-8000-0000000007d1",
+        "username": "demo.sales",
+        "full_name": "Nguyễn An Demo",
+        "department_id": "00000000-0000-4000-8000-0000000003e9",
+        "role": "SalesStaff",
+        "company_email": "demo.sales@example.invalid",
+        "password_hash": "__SEED_PASSWORD_HASH__",
+        "status": "Active",
+        "failed_login_count": 0,
+        "must_change_password": true,
+        "can_sign": false
+      },
+      {
+        "user_id": "00000000-0000-4000-8000-0000000007d2",
+        "username": "demo.sales.manager",
+        "full_name": "Trần Bình Demo",
+        "department_id": "00000000-0000-4000-8000-0000000003e9",
+        "role": "SalesManager",
+        "company_email": "demo.sales.manager@example.invalid",
+        "password_hash": "__SEED_PASSWORD_HASH__",
+        "status": "Active",
+        "failed_login_count": 0,
+        "must_change_password": true,
+        "can_sign": false
+      },
+      {
+        "user_id": "00000000-0000-4000-8000-0000000007d3",
+        "username": "demo.operations",
+        "full_name": "Lê Cường Demo",
+        "department_id": "00000000-0000-4000-8000-0000000003ea",
+        "role": "OperationsStaff",
+        "company_email": "demo.operations@example.invalid",
+        "password_hash": "__SEED_PASSWORD_HASH__",
+        "status": "Active",
+        "failed_login_count": 0,
+        "must_change_password": true,
+        "can_sign": false
+      },
+      {
+        "user_id": "00000000-0000-4000-8000-0000000007d4",
+        "username": "demo.operations.manager",
+        "full_name": "Phạm Dung Demo",
+        "department_id": "00000000-0000-4000-8000-0000000003ea",
+        "role": "OperationsManager",
+        "company_email": "demo.operations.manager@example.invalid",
+        "password_hash": "__SEED_PASSWORD_HASH__",
+        "status": "Active",
+        "failed_login_count": 0,
+        "must_change_password": true,
+        "can_sign": false
+      },
+      {
+        "user_id": "00000000-0000-4000-8000-0000000007d5",
+        "username": "demo.accountant",
+        "full_name": "Võ Hạnh Demo",
+        "department_id": "00000000-0000-4000-8000-0000000003eb",
+        "role": "Accountant",
+        "company_email": "demo.accountant@example.invalid",
+        "password_hash": "__SEED_PASSWORD_HASH__",
+        "status": "Active",
+        "failed_login_count": 0,
+        "must_change_password": true,
+        "can_sign": false
+      },
+      {
+        "user_id": "00000000-0000-4000-8000-0000000007d6",
+        "username": "demo.accountant.reviewer",
+        "full_name": "Đỗ Khang Demo",
+        "department_id": "00000000-0000-4000-8000-0000000003eb",
+        "role": "Accountant",
+        "company_email": "demo.accountant.reviewer@example.invalid",
+        "password_hash": "__SEED_PASSWORD_HASH__",
+        "status": "Active",
+        "failed_login_count": 0,
+        "must_change_password": true,
+        "can_sign": false
+      },
+      {
+        "user_id": "00000000-0000-4000-8000-0000000007d7",
+        "username": "demo.legal",
+        "full_name": "Bùi Lan Demo",
+        "department_id": "00000000-0000-4000-8000-0000000003ec",
+        "role": "LegalStaff",
+        "company_email": "demo.legal@example.invalid",
+        "password_hash": "__SEED_PASSWORD_HASH__",
+        "status": "Active",
+        "failed_login_count": 0,
+        "must_change_password": true,
+        "can_sign": false
+      },
+      {
+        "user_id": "00000000-0000-4000-8000-0000000007d8",
+        "username": "demo.board",
+        "full_name": "Hoàng Minh Demo",
+        "department_id": "00000000-0000-4000-8000-0000000003ed",
+        "role": "BoardMember",
+        "company_email": "demo.board@example.invalid",
+        "password_hash": "__SEED_PASSWORD_HASH__",
+        "status": "Active",
+        "failed_login_count": 0,
+        "must_change_password": true,
+        "can_sign": true
+      },
+      {
+        "user_id": "00000000-0000-4000-8000-0000000007da",
+        "username": "demo.legal.manager",
+        "full_name": "Đinh Quang Demo",
+        "department_id": "00000000-0000-4000-8000-0000000003ec",
+        "role": "LegalManager",
+        "company_email": "demo.legal.manager@example.invalid",
+        "password_hash": "__SEED_PASSWORD_HASH__",
+        "status": "Active",
+        "failed_login_count": 0,
+        "must_change_password": true,
+        "can_sign": false
+      },
+      {
+        "user_id": "00000000-0000-4000-8000-0000000007db",
+        "username": "demo.board.chair",
+        "full_name": "Lý Tâm Demo",
+        "department_id": "00000000-0000-4000-8000-0000000003ed",
+        "role": "BoardChair",
+        "company_email": "demo.board.chair@example.invalid",
+        "password_hash": "__SEED_PASSWORD_HASH__",
+        "status": "Active",
+        "failed_login_count": 0,
+        "must_change_password": true,
+        "can_sign": true
+      },
+      {
+        "user_id": "00000000-0000-4000-8000-0000000007d9",
+        "username": "demo.admin",
+        "full_name": "Đặng Nam Demo",
+        "department_id": "00000000-0000-4000-8000-0000000003ee",
+        "role": "SystemAdmin",
+        "company_email": "demo.admin@example.invalid",
+        "password_hash": "__SEED_PASSWORD_HASH__",
+        "status": "Active",
+        "failed_login_count": 0,
+        "must_change_password": true,
+        "can_sign": false
+      }
+    ],
+    "login_session": [
+      {
+        "session_id": "00000000-0000-4000-8000-000000000bb9",
+        "user_id": "00000000-0000-4000-8000-0000000007d1",
+        "refresh_token_hash": "cfc89b1a61ae6d67ad1719654d4e3059d9790fd3125f3de42a04063a743fbfef",
+        "logout_token_hash": "ff1ba798c10194fcab588e5417669e0d6b7814b6da9560aa854b57cdb01cded5",
+        "created_at": "2026-10-01T02:00:00.000Z",
+        "last_activity_at": "2026-10-01T02:00:00.000Z",
+        "expires_at": "2026-10-01T02:30:00.000Z",
+        "is_revoked": true,
+        "end_reason": "Expired",
+        "device": "Demo fixture; not a live session"
+      }
+    ],
+    "password_otp": [
+      {
+        "otp_id": "00000000-0000-4000-8000-000000000fa1",
+        "user_id": "00000000-0000-4000-8000-0000000007d1",
+        "otp_hash": "65673d26f16e23eb8f2816def511a38f6aa80743ed3c1e8be8e16c21b728b5d4",
+        "sent_at": "2026-10-01T02:00:00.000Z",
+        "expires_at": "2026-10-01T02:05:00.000Z",
+        "failed_count": 0,
+        "is_used": true
+      }
+    ],
+    "notification": [
+      {
+        "notification_id": "00000000-0000-4000-8000-000000001389",
+        "recipient_id": "00000000-0000-4000-8000-0000000007d2",
+        "record_type": "Contract",
+        "record_id": "00000000-0000-4000-8000-0000000036b2",
+        "content": "Hợp đồng Demo chờ rà soát; dữ liệu thử nghiệm.",
+        "is_read": false,
+        "send_status": "Pending",
+        "created_at": "2026-11-01T02:00:00.000Z"
+      }
+    ],
+    "audit_log": [
+      {
+        "log_id": "00000000-0000-4000-8000-000000001771",
+        "entity_type": "demo_seed",
+        "entity_id": "00000000-0000-4000-8000-0000000036b1",
+        "action": "ImportDemoFixture",
+        "actor_id": "00000000-0000-4000-8000-0000000007d9",
+        "acted_at": "2026-11-01T02:00:00.000Z",
+        "note": "Dữ liệu giả lập, bao gồm lịch sử đã hoàn tất; không phải kết quả chạy quy trình nghiệp vụ."
+      }
+    ],
+    "attachment": [
+      {
+        "attachment_id": "00000000-0000-4000-8000-000000001b59",
+        "record_type": "Contract",
+        "contract_id": "00000000-0000-4000-8000-0000000036b1",
+        "file_name": "DEMO-contract-placeholder.pdf",
+        "file_path": "demo-placeholder/contracts/contract.pdf",
+        "uploaded_by": "00000000-0000-4000-8000-0000000007d1",
+        "uploaded_at": "2026-10-03T02:00:00.000Z"
+      },
+      {
+        "attachment_id": "00000000-0000-4000-8000-000000001b5a",
+        "record_type": "PaymentStatement",
+        "statement_id": "00000000-0000-4000-8000-000000004e21",
+        "file_name": "DEMO-payment-placeholder.pdf",
+        "file_path": "demo-placeholder/payments/statement.pdf",
+        "uploaded_by": "00000000-0000-4000-8000-0000000007d5",
+        "uploaded_at": "2026-11-01T08:00:00.000Z"
+      },
+      {
+        "attachment_id": "00000000-0000-4000-8000-000000001b5b",
+        "record_type": "Contract",
+        "contract_id": "00000000-0000-4000-8000-0000000036b2",
+        "file_name": "DEMO-draft-placeholder.pdf",
+        "file_path": "demo-placeholder/contracts/draft.pdf",
+        "uploaded_by": "00000000-0000-4000-8000-0000000007d1",
+        "uploaded_at": "2026-11-01T02:00:00.000Z"
+      }
+    ],
+    "customer": [
+      {
+        "customer_id": "00000000-0000-4000-8000-000000001f41",
+        "customer_name": "Công ty Logistics Minh An Demo",
+        "tax_code": "0000000001",
+        "address": "Địa chỉ giả lập, Thành phố Hồ Chí Minh",
+        "legal_representative": "Nguyễn Đại Diện Demo",
+        "contact_name": "Trần Liên Hệ Demo",
+        "contact_title": "Điều phối",
+        "phone": "0900000001",
+        "email": "contact@example.invalid",
+        "customer_group": "Doanh nghiệp logistics",
+        "interested_services": "Nâng hạ; lưu bãi",
+        "status": "Active",
+        "account_manager_id": "00000000-0000-4000-8000-0000000007d1",
+        "version": 1
+      },
+      {
+        "customer_id": "00000000-0000-4000-8000-000000001f42",
+        "customer_name": "Công ty Kho Vận Tạm Ngưng Demo",
+        "tax_code": "0000000002",
+        "address": "Địa chỉ giả lập, Đồng Nai",
+        "legal_representative": "Lê Đại Diện Demo",
+        "phone": "0900000002",
+        "status": "Suspended",
+        "account_manager_id": "00000000-0000-4000-8000-0000000007d1",
+        "version": 2
+      }
+    ],
+    "customer_status_decision": [
+      {
+        "decision_id": "00000000-0000-4000-8000-000000002329",
+        "customer_id": "00000000-0000-4000-8000-000000001f42",
+        "decision_type": "Suspend",
+        "reason": "Tạm ngưng để kiểm tra kịch bản demo.",
+        "basis": "Dữ liệu giả lập",
+        "follow_up_plan": "Tiếp tục đối soát nghĩa vụ cũ nếu có.",
+        "confirmed_by": "00000000-0000-4000-8000-0000000007d2",
+        "decided_at": "2026-11-01T02:00:00.000Z"
+      }
+    ],
+    "area": [
+      {
+        "area_id": "00000000-0000-4000-8000-000000002711",
+        "area_code": "DEMO-PORT",
+        "area_name": "Cảng Demo",
+        "area_type": "Cảng",
+        "level": 1,
+        "hierarchy_path": "/DEMO-PORT",
+        "area_m2": "100000",
+        "capacity": "10000",
+        "status": "Active"
+      },
+      {
+        "area_id": "00000000-0000-4000-8000-000000002712",
+        "area_code": "DEMO-CY",
+        "area_name": "Bãi CY Demo",
+        "area_type": "Bãi CY",
+        "parent_area_id": "00000000-0000-4000-8000-000000002711",
+        "level": 2,
+        "hierarchy_path": "/DEMO-PORT/DEMO-CY",
+        "area_m2": "40000",
+        "capacity": "4000",
+        "status": "Active"
+      },
+      {
+        "area_id": "00000000-0000-4000-8000-000000002714",
+        "area_code": "DEMO-CFS",
+        "area_name": "Kho CFS Demo",
+        "area_type": "Kho CFS",
+        "parent_area_id": "00000000-0000-4000-8000-000000002711",
+        "level": 2,
+        "hierarchy_path": "/DEMO-PORT/DEMO-CFS",
+        "area_m2": "10000",
+        "capacity": "1000",
+        "status": "Active"
+      },
+      {
+        "area_id": "00000000-0000-4000-8000-000000002713",
+        "area_code": "DEMO-B01",
+        "area_name": "Block 01 Demo",
+        "area_type": "Block",
+        "parent_area_id": "00000000-0000-4000-8000-000000002712",
+        "level": 3,
+        "hierarchy_path": "/DEMO-PORT/DEMO-CY/DEMO-B01",
+        "area_m2": "5000",
+        "capacity": "500",
+        "status": "Active"
+      },
+      {
+        "area_id": "00000000-0000-4000-8000-000000002715",
+        "area_code": "DEMO-B02",
+        "area_name": "Block 02 Tạm Ngưng Demo",
+        "area_type": "Block",
+        "parent_area_id": "00000000-0000-4000-8000-000000002712",
+        "level": 3,
+        "hierarchy_path": "/DEMO-PORT/DEMO-CY/DEMO-B02",
+        "area_m2": "5000",
+        "capacity": "500",
+        "status": "Suspended"
+      }
+    ],
+    "service": [
+      {
+        "service_id": "00000000-0000-4000-8000-000000002af9",
+        "service_name": "Nâng hạ container Demo",
+        "unit": "TEU",
+        "is_mandatory": true
+      },
+      {
+        "service_id": "00000000-0000-4000-8000-000000002afa",
+        "service_name": "Lưu bãi Demo",
+        "unit": "TEU-ngày",
+        "is_mandatory": false
+      }
+    ],
+    "area_service": [
+      {
+        "area_id": "00000000-0000-4000-8000-000000002713",
+        "service_id": "00000000-0000-4000-8000-000000002af9"
+      },
+      {
+        "area_id": "00000000-0000-4000-8000-000000002713",
+        "service_id": "00000000-0000-4000-8000-000000002afa"
+      },
+      {
+        "area_id": "00000000-0000-4000-8000-000000002714",
+        "service_id": "00000000-0000-4000-8000-000000002afa"
+      }
+    ],
+    "area_assignment": [
+      {
+        "assignment_id": "00000000-0000-4000-8000-0000000032c9",
+        "area_id": "00000000-0000-4000-8000-000000002713",
+        "user_id": "00000000-0000-4000-8000-0000000007d3",
+        "from_date": "2026-10-01T02:00:00.000Z"
+      }
+    ],
+    "contract": [
+      {
+        "owning_department_id": "00000000-0000-4000-8000-0000000003e9",
+        "customer_snapshot": {
+          "name": "Công ty Logistics Minh An Demo",
+          "taxCode": "0000000001",
+          "address": "Địa chỉ giả lập, Thành phố Hồ Chí Minh",
+          "representative": "Nguyễn Đại Diện Demo",
+          "contactName": "Trần Liên Hệ Demo",
+          "email": "contact@example.invalid",
+          "phone": "0900000001"
+        },
+        "customer_id": "00000000-0000-4000-8000-000000001f41",
+        "contract_type": "Dịch vụ logistics",
+        "start_date": "2026-10-01",
+        "end_date": "2027-09-30",
+        "contract_value": "100000000.00",
+        "payment_terms": "Thanh toán trong 30 ngày (dữ liệu demo).",
+        "content": "Nội dung giả lập phục vụ kiểm tra dữ liệu; không phải hợp đồng thực tế.",
+        "owner_id": "00000000-0000-4000-8000-0000000007d1",
+        "version": 1,
+        "created_at": "2026-10-01T02:00:00.000Z",
+        "updated_at": "2026-10-01T02:00:00.000Z",
+        "contract_id": "00000000-0000-4000-8000-0000000036b1",
+        "document_type": "Contract",
+        "title": "Hợp đồng đang khai thác Demo",
+        "status": "Active"
+      },
+      {
+        "owning_department_id": "00000000-0000-4000-8000-0000000003e9",
+        "customer_snapshot": {
+          "name": "Công ty Logistics Minh An Demo",
+          "taxCode": "0000000001",
+          "address": "Địa chỉ giả lập, Thành phố Hồ Chí Minh",
+          "representative": "Nguyễn Đại Diện Demo",
+          "contactName": "Trần Liên Hệ Demo",
+          "email": "contact@example.invalid",
+          "phone": "0900000001"
+        },
+        "customer_id": "00000000-0000-4000-8000-000000001f41",
+        "contract_type": "Dịch vụ logistics",
+        "start_date": "2026-10-01",
+        "end_date": "2027-09-30",
+        "contract_value": "100000000.00",
+        "payment_terms": "Thanh toán trong 30 ngày (dữ liệu demo).",
+        "content": "Nội dung giả lập phục vụ kiểm tra dữ liệu; không phải hợp đồng thực tế.",
+        "owner_id": "00000000-0000-4000-8000-0000000007d1",
+        "version": 1,
+        "created_at": "2026-10-01T02:00:00.000Z",
+        "updated_at": "2026-10-01T02:00:00.000Z",
+        "contract_id": "00000000-0000-4000-8000-0000000036b2",
+        "document_type": "Contract",
+        "title": "Hợp đồng chờ rà soát Demo",
+        "status": "Submitted"
+      },
+      {
+        "owning_department_id": "00000000-0000-4000-8000-0000000003e9",
+        "customer_snapshot": {
+          "name": "Công ty Logistics Minh An Demo",
+          "taxCode": "0000000001",
+          "address": "Địa chỉ giả lập, Thành phố Hồ Chí Minh",
+          "representative": "Nguyễn Đại Diện Demo",
+          "contactName": "Trần Liên Hệ Demo",
+          "email": "contact@example.invalid",
+          "phone": "0900000001"
+        },
+        "customer_id": "00000000-0000-4000-8000-000000001f41",
+        "contract_type": "Dịch vụ logistics",
+        "start_date": "2026-10-01",
+        "end_date": "2027-09-30",
+        "contract_value": "100000000.00",
+        "payment_terms": "Thanh toán trong 30 ngày (dữ liệu demo).",
+        "content": "Nội dung giả lập phục vụ kiểm tra dữ liệu; không phải hợp đồng thực tế.",
+        "owner_id": "00000000-0000-4000-8000-0000000007d1",
+        "version": 1,
+        "created_at": "2026-10-01T02:00:00.000Z",
+        "updated_at": "2026-10-01T02:00:00.000Z",
+        "contract_id": "00000000-0000-4000-8000-0000000036b3",
+        "document_type": "Contract",
+        "title": "Hợp đồng dự thảo Demo",
+        "status": "Draft"
+      },
+      {
+        "owning_department_id": "00000000-0000-4000-8000-0000000003e9",
+        "customer_snapshot": {
+          "name": "Công ty Logistics Minh An Demo",
+          "taxCode": "0000000001",
+          "address": "Địa chỉ giả lập, Thành phố Hồ Chí Minh",
+          "representative": "Nguyễn Đại Diện Demo",
+          "contactName": "Trần Liên Hệ Demo",
+          "email": "contact@example.invalid",
+          "phone": "0900000001"
+        },
+        "customer_id": "00000000-0000-4000-8000-000000001f41",
+        "contract_type": "Dịch vụ logistics",
+        "start_date": "2026-10-01",
+        "end_date": "2027-09-30",
+        "contract_value": "100000000.00",
+        "payment_terms": "Thanh toán trong 30 ngày (dữ liệu demo).",
+        "content": "Nội dung giả lập phục vụ kiểm tra dữ liệu; không phải hợp đồng thực tế.",
+        "owner_id": "00000000-0000-4000-8000-0000000007d1",
+        "version": 1,
+        "created_at": "2026-10-01T02:00:00.000Z",
+        "updated_at": "2026-10-01T02:00:00.000Z",
+        "contract_id": "00000000-0000-4000-8000-0000000036b4",
+        "document_type": "Appendix",
+        "parent_contract_id": "00000000-0000-4000-8000-0000000036b1",
+        "title": "Phụ lục dự thảo Demo",
+        "status": "Draft"
+      },
+      {
+        "owning_department_id": "00000000-0000-4000-8000-0000000003e9",
+        "customer_snapshot": {
+          "name": "Công ty Logistics Minh An Demo",
+          "taxCode": "0000000001",
+          "address": "Địa chỉ giả lập, Thành phố Hồ Chí Minh",
+          "representative": "Nguyễn Đại Diện Demo",
+          "contactName": "Trần Liên Hệ Demo",
+          "email": "contact@example.invalid",
+          "phone": "0900000001"
+        },
+        "customer_id": "00000000-0000-4000-8000-000000001f41",
+        "contract_type": "Dịch vụ logistics",
+        "start_date": "2026-10-01",
+        "end_date": "2027-09-30",
+        "contract_value": "100000000.00",
+        "payment_terms": "Thanh toán trong 30 ngày (dữ liệu demo).",
+        "content": "Nội dung giả lập phục vụ kiểm tra dữ liệu; không phải hợp đồng thực tế.",
+        "owner_id": "00000000-0000-4000-8000-0000000007d1",
+        "version": 1,
+        "created_at": "2026-10-01T02:00:00.000Z",
+        "updated_at": "2026-10-01T02:00:00.000Z",
+        "contract_id": "00000000-0000-4000-8000-0000000036b5",
+        "document_type": "Contract",
+        "title": "Chờ TP Kinh doanh phân công Demo",
+        "status": "Submitted"
+      },
+      {
+        "owning_department_id": "00000000-0000-4000-8000-0000000003e9",
+        "customer_snapshot": {
+          "name": "Công ty Logistics Minh An Demo",
+          "taxCode": "0000000001",
+          "address": "Địa chỉ giả lập, Thành phố Hồ Chí Minh",
+          "representative": "Nguyễn Đại Diện Demo",
+          "contactName": "Trần Liên Hệ Demo",
+          "email": "contact@example.invalid",
+          "phone": "0900000001"
+        },
+        "customer_id": "00000000-0000-4000-8000-000000001f41",
+        "contract_type": "Dịch vụ logistics",
+        "start_date": "2026-10-01",
+        "end_date": "2027-09-30",
+        "contract_value": "100000000.00",
+        "payment_terms": "Thanh toán trong 30 ngày (dữ liệu demo).",
+        "content": "Nội dung giả lập phục vụ kiểm tra dữ liệu; không phải hợp đồng thực tế.",
+        "owner_id": "00000000-0000-4000-8000-0000000007d1",
+        "version": 1,
+        "created_at": "2026-10-01T02:00:00.000Z",
+        "updated_at": "2026-10-01T02:00:00.000Z",
+        "contract_id": "00000000-0000-4000-8000-0000000036b6",
+        "document_type": "Contract",
+        "title": "Chờ TP Pháp chế phân công Demo",
+        "status": "UnderReview"
+      },
+      {
+        "owning_department_id": "00000000-0000-4000-8000-0000000003e9",
+        "customer_snapshot": {
+          "name": "Công ty Logistics Minh An Demo",
+          "taxCode": "0000000001",
+          "address": "Địa chỉ giả lập, Thành phố Hồ Chí Minh",
+          "representative": "Nguyễn Đại Diện Demo",
+          "contactName": "Trần Liên Hệ Demo",
+          "email": "contact@example.invalid",
+          "phone": "0900000001"
+        },
+        "customer_id": "00000000-0000-4000-8000-000000001f41",
+        "contract_type": "Dịch vụ logistics",
+        "start_date": "2026-10-01",
+        "end_date": "2027-09-30",
+        "contract_value": "100000000.00",
+        "payment_terms": "Thanh toán trong 30 ngày (dữ liệu demo).",
+        "content": "Nội dung giả lập phục vụ kiểm tra dữ liệu; không phải hợp đồng thực tế.",
+        "owner_id": "00000000-0000-4000-8000-0000000007d1",
+        "version": 1,
+        "created_at": "2026-10-01T02:00:00.000Z",
+        "updated_at": "2026-10-01T02:00:00.000Z",
+        "contract_id": "00000000-0000-4000-8000-0000000036b7",
+        "document_type": "Contract",
+        "title": "Chờ Tổng Giám đốc phân công Demo",
+        "status": "UnderReview"
+      }
+    ],
+    "contract_item": [
+      {
+        "item_id": "00000000-0000-4000-8000-000000003a99",
+        "contract_id": "00000000-0000-4000-8000-0000000036b1",
+        "service_id": "00000000-0000-4000-8000-000000002af9",
+        "area_id": "00000000-0000-4000-8000-000000002713",
+        "area_name_snapshot": "Block 01 Demo"
+      },
+      {
+        "item_id": "00000000-0000-4000-8000-000000003a9a",
+        "contract_id": "00000000-0000-4000-8000-0000000036b1",
+        "service_id": "00000000-0000-4000-8000-000000002afa",
+        "area_id": "00000000-0000-4000-8000-000000002713",
+        "area_name_snapshot": "Block 01 Demo"
+      },
+      {
+        "item_id": "00000000-0000-4000-8000-000000003a9b",
+        "contract_id": "00000000-0000-4000-8000-0000000036b2",
+        "service_id": "00000000-0000-4000-8000-000000002af9",
+        "area_id": "00000000-0000-4000-8000-000000002713",
+        "area_name_snapshot": "Block 01 Demo"
+      }
+    ],
+    "price_list": [
+      {
+        "price_list_id": "00000000-0000-4000-8000-000000003e81",
+        "contract_id": "00000000-0000-4000-8000-0000000036b1",
+        "version": 1,
+        "effective_from": "2026-10-01",
+        "effective_to": "2027-09-30",
+        "status": "Effective",
+        "created_by": "00000000-0000-4000-8000-0000000007d1"
+      }
+    ],
+    "price_list_line": [
+      {
+        "line_id": "00000000-0000-4000-8000-000000004269",
+        "price_list_id": "00000000-0000-4000-8000-000000003e81",
+        "service_id": "00000000-0000-4000-8000-000000002af9",
+        "area_id": "00000000-0000-4000-8000-000000002713",
+        "unit_price": "100000.00",
+        "unit": "TEU"
+      },
+      {
+        "line_id": "00000000-0000-4000-8000-00000000426a",
+        "price_list_id": "00000000-0000-4000-8000-000000003e81",
+        "service_id": "00000000-0000-4000-8000-000000002afa",
+        "area_id": "00000000-0000-4000-8000-000000002713",
+        "unit_price": "20000.00",
+        "unit": "TEU-ngày"
+      }
+    ],
+    "volume_period": [
+      {
+        "volume_period_id": "00000000-0000-4000-8000-000000004651",
+        "contract_id": "00000000-0000-4000-8000-0000000036b1",
+        "billing_period": "2026-10",
+        "status": "Locked",
+        "locked_by": "00000000-0000-4000-8000-0000000007d4",
+        "locked_at": "2026-10-31T10:00:00.000Z"
+      }
+    ],
+    "volume_line": [
+      {
+        "volume_line_id": "00000000-0000-4000-8000-000000004a39",
+        "volume_period_id": "00000000-0000-4000-8000-000000004651",
+        "service_id": "00000000-0000-4000-8000-000000002af9",
+        "area_id": "00000000-0000-4000-8000-000000002713",
+        "quantity": "10.0000"
+      },
+      {
+        "volume_line_id": "00000000-0000-4000-8000-000000004a3a",
+        "volume_period_id": "00000000-0000-4000-8000-000000004651",
+        "service_id": "00000000-0000-4000-8000-000000002afa",
+        "area_id": "00000000-0000-4000-8000-000000002713",
+        "quantity": "30.0000"
+      }
+    ],
+    "payment_statement": [
+      {
+        "statement_id": "00000000-0000-4000-8000-000000004e21",
+        "contract_id": "00000000-0000-4000-8000-0000000036b1",
+        "billing_period": "2026-10",
+        "price_list_id": "00000000-0000-4000-8000-000000003e81",
+        "volume_period_id": "00000000-0000-4000-8000-000000004651",
+        "customer_name_snapshot": "Công ty Logistics Minh An Demo",
+        "tax_code_snapshot": "0000000001",
+        "address_snapshot": "Địa chỉ giả lập, Thành phố Hồ Chí Minh",
+        "representative_snapshot": "Nguyễn Đại Diện Demo",
+        "subtotal": "1600000.00",
+        "tax_amount": "160000.00",
+        "total_amount": "1760000.00",
+        "status": "Issued",
+        "created_by": "00000000-0000-4000-8000-0000000007d5",
+        "created_at": "2026-11-01T02:00:00.000Z",
+        "issued_at": "2026-11-02T02:00:00.000Z",
+        "is_locked": true
+      }
+    ],
+    "payment_statement_line": [
+      {
+        "line_id": "00000000-0000-4000-8000-000000005209",
+        "statement_id": "00000000-0000-4000-8000-000000004e21",
+        "price_list_line_id": "00000000-0000-4000-8000-000000004269",
+        "volume_line_id": "00000000-0000-4000-8000-000000004a39",
+        "quantity": "10.0000",
+        "unit_price": "100000.00",
+        "amount": "1000000.00",
+        "is_mandatory": true
+      },
+      {
+        "line_id": "00000000-0000-4000-8000-00000000520a",
+        "statement_id": "00000000-0000-4000-8000-000000004e21",
+        "price_list_line_id": "00000000-0000-4000-8000-00000000426a",
+        "volume_line_id": "00000000-0000-4000-8000-000000004a3a",
+        "quantity": "30.0000",
+        "unit_price": "20000.00",
+        "amount": "600000.00",
+        "is_mandatory": false
+      }
+    ],
+    "reconciliation": [
+      {
+        "reconciliation_id": "00000000-0000-4000-8000-0000000055f1",
+        "statement_id": "00000000-0000-4000-8000-000000004e21",
+        "volume_confirmed_by": "00000000-0000-4000-8000-0000000007d3",
+        "volume_confirmed_at": "2026-11-01T02:10:00.000Z",
+        "price_confirmed_at": "2026-11-01T02:15:00.000Z",
+        "sent_to_customer_at": "2026-11-01T02:20:00.000Z",
+        "customer_result": "Agreed",
+        "customer_feedback": "Đồng ý số liệu demo.",
+        "reconciled_by": "00000000-0000-4000-8000-0000000007d5",
+        "completed_at": "2026-11-01T02:30:00.000Z"
+      }
+    ],
+    "change_request": [
+      {
+        "request_id": "00000000-0000-4000-8000-0000000059d9",
+        "request_type": "Revision",
+        "record_type": "PaymentStatement",
+        "statement_id": "00000000-0000-4000-8000-000000004e21",
+        "reason": "Đề nghị điều chỉnh dữ liệu demo; chưa có hiệu lực thay thế.",
+        "status": "Pending",
+        "requested_by": "00000000-0000-4000-8000-0000000007d5",
+        "requested_at": "2026-11-02T03:00:00.000Z"
+      }
+    ],
+    "approval_round": [
+      {
+        "round_id": "00000000-0000-4000-8000-000000005dc1",
+        "record_type": "Contract",
+        "contract_id": "00000000-0000-4000-8000-0000000036b1",
+        "record_version": 1,
+        "round_no": 1,
+        "submitted_by": "00000000-0000-4000-8000-0000000007d1",
+        "submitted_at": "2026-10-01T02:00:00.000Z",
+        "result": "Completed",
+        "ended_at": "2026-10-02T02:00:00.000Z",
+        "record_snapshot": {
+          "contractId": "00000000-0000-4000-8000-0000000036b1",
+          "title": "Hợp đồng đang khai thác Demo",
+          "customer": {
+            "customerName": "Công ty Logistics Minh An Demo",
+            "taxCode": "0000000001"
+          },
+          "contractValue": "100000000.00",
+          "version": 1,
+          "items": [
+            {
+              "itemId": "00000000-0000-4000-8000-000000003a99",
+              "contractId": "00000000-0000-4000-8000-0000000036b1",
+              "serviceId": "00000000-0000-4000-8000-000000002af9",
+              "areaId": "00000000-0000-4000-8000-000000002713",
+              "areaNameSnapshot": "Block 01 Demo"
+            },
+            {
+              "itemId": "00000000-0000-4000-8000-000000003a9a",
+              "contractId": "00000000-0000-4000-8000-0000000036b1",
+              "serviceId": "00000000-0000-4000-8000-000000002afa",
+              "areaId": "00000000-0000-4000-8000-000000002713",
+              "areaNameSnapshot": "Block 01 Demo"
+            }
+          ],
+          "workflow": {
+            "version": 1,
+            "stages": [
+              "SalesManager",
+              "LegalStaff",
+              "BoardMember"
+            ]
+          }
+        }
+      },
+      {
+        "round_id": "00000000-0000-4000-8000-000000005dc2",
+        "record_type": "Contract",
+        "contract_id": "00000000-0000-4000-8000-0000000036b2",
+        "record_version": 1,
+        "round_no": 1,
+        "submitted_by": "00000000-0000-4000-8000-0000000007d1",
+        "submitted_at": "2026-11-01T02:00:00.000Z",
+        "result": "Running",
+        "record_snapshot": {
+          "contractId": "00000000-0000-4000-8000-0000000036b2",
+          "title": "Hợp đồng chờ rà soát Demo",
+          "customer": {
+            "customerName": "Công ty Logistics Minh An Demo",
+            "taxCode": "0000000001"
+          },
+          "contractValue": "100000000.00",
+          "version": 1,
+          "items": [
+            {
+              "itemId": "00000000-0000-4000-8000-000000003a9b",
+              "contractId": "00000000-0000-4000-8000-0000000036b2",
+              "serviceId": "00000000-0000-4000-8000-000000002af9",
+              "areaId": "00000000-0000-4000-8000-000000002713",
+              "areaNameSnapshot": "Block 01 Demo"
+            }
+          ],
+          "workflow": {
+            "version": 1,
+            "stages": [
+              "SalesManager",
+              "LegalStaff",
+              "BoardMember"
+            ]
+          }
+        }
+      },
+      {
+        "round_id": "00000000-0000-4000-8000-000000005dc3",
+        "record_type": "PaymentStatement",
+        "statement_id": "00000000-0000-4000-8000-000000004e21",
+        "record_version": 1,
+        "round_no": 1,
+        "submitted_by": "00000000-0000-4000-8000-0000000007d5",
+        "submitted_at": "2026-11-01T03:00:00.000Z",
+        "result": "Completed",
+        "ended_at": "2026-11-01T07:00:00.000Z",
+        "record_snapshot": {
+          "statementId": "00000000-0000-4000-8000-000000004e21",
+          "contractId": "00000000-0000-4000-8000-0000000036b1",
+          "billingPeriod": "2026-10",
+          "priceListId": "00000000-0000-4000-8000-000000003e81",
+          "volumePeriodId": "00000000-0000-4000-8000-000000004651",
+          "customerNameSnapshot": "Công ty Logistics Minh An Demo",
+          "taxCodeSnapshot": "0000000001",
+          "addressSnapshot": "Địa chỉ giả lập, Thành phố Hồ Chí Minh",
+          "representativeSnapshot": "Nguyễn Đại Diện Demo",
+          "subtotal": "1600000.00",
+          "taxAmount": "160000.00",
+          "totalAmount": "1760000.00",
+          "status": "Reconciled",
+          "createdBy": "00000000-0000-4000-8000-0000000007d5",
+          "createdAt": "2026-11-01T02:00:00.000Z",
+          "issuedAt": null,
+          "isLocked": false,
+          "lines": [
+            {
+              "lineId": "00000000-0000-4000-8000-000000005209",
+              "statementId": "00000000-0000-4000-8000-000000004e21",
+              "priceListLineId": "00000000-0000-4000-8000-000000004269",
+              "volumeLineId": "00000000-0000-4000-8000-000000004a39",
+              "quantity": "10.0000",
+              "unitPrice": "100000.00",
+              "amount": "1000000.00",
+              "isMandatory": true
+            },
+            {
+              "lineId": "00000000-0000-4000-8000-00000000520a",
+              "statementId": "00000000-0000-4000-8000-000000004e21",
+              "priceListLineId": "00000000-0000-4000-8000-00000000426a",
+              "volumeLineId": "00000000-0000-4000-8000-000000004a3a",
+              "quantity": "30.0000",
+              "unitPrice": "20000.00",
+              "amount": "600000.00",
+              "isMandatory": false
+            }
+          ],
+          "workflow": {
+            "version": 1,
+            "stages": [
+              "Accountant",
+              "BoardMember"
+            ]
+          }
+        }
+      },
+      {
+        "round_id": "00000000-0000-4000-8000-000000005dc4",
+        "record_type": "Contract",
+        "contract_id": "00000000-0000-4000-8000-0000000036b5",
+        "record_version": 1,
+        "round_no": 1,
+        "submitted_by": "00000000-0000-4000-8000-0000000007d1",
+        "submitted_at": "2026-11-01T02:00:00.000Z",
+        "result": "Running",
+        "record_snapshot": {
+          "contractId": "00000000-0000-4000-8000-0000000036b5",
+          "title": "Chờ TP Kinh doanh phân công Demo",
+          "customer": {
+            "customerName": "Công ty Logistics Minh An Demo",
+            "taxCode": "0000000001"
+          },
+          "contractValue": "100000000.00",
+          "version": 1,
+          "items": [],
+          "workflow": {
+            "version": 1,
+            "stages": [
+              "SalesManager",
+              "LegalStaff",
+              "BoardMember"
+            ]
+          }
+        }
+      },
+      {
+        "round_id": "00000000-0000-4000-8000-000000005dc5",
+        "record_type": "Contract",
+        "contract_id": "00000000-0000-4000-8000-0000000036b6",
+        "record_version": 1,
+        "round_no": 1,
+        "submitted_by": "00000000-0000-4000-8000-0000000007d1",
+        "submitted_at": "2026-11-01T02:00:00.000Z",
+        "result": "Running",
+        "record_snapshot": {
+          "contractId": "00000000-0000-4000-8000-0000000036b6",
+          "title": "Chờ TP Pháp chế phân công Demo",
+          "customer": {
+            "customerName": "Công ty Logistics Minh An Demo",
+            "taxCode": "0000000001"
+          },
+          "contractValue": "100000000.00",
+          "version": 1,
+          "items": [],
+          "workflow": {
+            "version": 1,
+            "stages": [
+              "SalesManager",
+              "LegalStaff",
+              "BoardMember"
+            ]
+          }
+        }
+      },
+      {
+        "round_id": "00000000-0000-4000-8000-000000005dc6",
+        "record_type": "Contract",
+        "contract_id": "00000000-0000-4000-8000-0000000036b7",
+        "record_version": 1,
+        "round_no": 1,
+        "submitted_by": "00000000-0000-4000-8000-0000000007d1",
+        "submitted_at": "2026-11-01T02:00:00.000Z",
+        "result": "Running",
+        "record_snapshot": {
+          "contractId": "00000000-0000-4000-8000-0000000036b7",
+          "title": "Chờ Tổng Giám đốc phân công Demo",
+          "customer": {
+            "customerName": "Công ty Logistics Minh An Demo",
+            "taxCode": "0000000001"
+          },
+          "contractValue": "100000000.00",
+          "version": 1,
+          "items": [],
+          "workflow": {
+            "version": 1,
+            "stages": [
+              "SalesManager",
+              "LegalStaff",
+              "BoardMember"
+            ]
+          }
+        }
+      }
+    ],
+    "approval_step": [
+      {
+        "step_id": "00000000-0000-4000-8000-0000000061a9",
+        "round_id": "00000000-0000-4000-8000-000000005dc1",
+        "step_name": "Rà soát kinh doanh",
+        "step_order": 1,
+        "assignee_id": "00000000-0000-4000-8000-0000000007d2",
+        "step_status": "Completed",
+        "assigned_at": "2026-10-01T02:00:00.000Z",
+        "accepted_at": "2026-10-01T02:00:00.000Z",
+        "decision": "Approve",
+        "comment": "Đồng ý (lịch sử giả lập).",
+        "decided_by": "00000000-0000-4000-8000-0000000007d2",
+        "decided_at": "2026-10-01T02:00:00.000Z"
+      },
+      {
+        "step_id": "00000000-0000-4000-8000-0000000061aa",
+        "round_id": "00000000-0000-4000-8000-000000005dc1",
+        "step_name": "Rà soát pháp lý",
+        "step_order": 2,
+        "assignee_id": "00000000-0000-4000-8000-0000000007d7",
+        "step_status": "Completed",
+        "assigned_at": "2026-10-01T03:00:00.000Z",
+        "accepted_at": "2026-10-01T03:00:00.000Z",
+        "decision": "Approve",
+        "comment": "Đồng ý (lịch sử giả lập).",
+        "decided_by": "00000000-0000-4000-8000-0000000007d7",
+        "decided_at": "2026-10-01T03:00:00.000Z",
+        "legal_conclusion": "Đạt yêu cầu pháp lý (demo)."
+      },
+      {
+        "step_id": "00000000-0000-4000-8000-0000000061ab",
+        "round_id": "00000000-0000-4000-8000-000000005dc1",
+        "step_name": "Phê duyệt",
+        "step_order": 3,
+        "assignee_id": "00000000-0000-4000-8000-0000000007d8",
+        "step_status": "Completed",
+        "assigned_at": "2026-10-01T04:00:00.000Z",
+        "accepted_at": "2026-10-01T04:00:00.000Z",
+        "decision": "Approve",
+        "comment": "Đồng ý (lịch sử giả lập).",
+        "decided_by": "00000000-0000-4000-8000-0000000007d8",
+        "decided_at": "2026-10-01T04:00:00.000Z"
+      },
+      {
+        "step_id": "00000000-0000-4000-8000-0000000061ac",
+        "round_id": "00000000-0000-4000-8000-000000005dc2",
+        "step_name": "Rà soát kinh doanh",
+        "step_order": 1,
+        "assignee_id": "00000000-0000-4000-8000-0000000007d2",
+        "step_status": "Pending",
+        "assigned_at": "2026-11-01T02:00:00.000Z"
+      },
+      {
+        "step_id": "00000000-0000-4000-8000-0000000061ad",
+        "round_id": "00000000-0000-4000-8000-000000005dc2",
+        "step_name": "Rà soát pháp lý",
+        "step_order": 2,
+        "assignee_id": "00000000-0000-4000-8000-0000000007d7",
+        "step_status": "NotStarted"
+      },
+      {
+        "step_id": "00000000-0000-4000-8000-0000000061ae",
+        "round_id": "00000000-0000-4000-8000-000000005dc2",
+        "step_name": "Phê duyệt",
+        "step_order": 3,
+        "assignee_id": "00000000-0000-4000-8000-0000000007d8",
+        "step_status": "NotStarted"
+      },
+      {
+        "step_id": "00000000-0000-4000-8000-0000000061af",
+        "round_id": "00000000-0000-4000-8000-000000005dc3",
+        "step_name": "Duyệt kế toán",
+        "step_order": 1,
+        "assignee_id": "00000000-0000-4000-8000-0000000007d6",
+        "assigned_at": "2026-11-01T03:00:00.000Z",
+        "accepted_at": "2026-11-01T03:00:00.000Z",
+        "step_status": "Completed",
+        "decision": "Approve",
+        "comment": "Đồng ý số liệu demo.",
+        "decided_by": "00000000-0000-4000-8000-0000000007d6",
+        "decided_at": "2026-11-01T03:00:00.000Z"
+      },
+      {
+        "step_id": "00000000-0000-4000-8000-0000000061b0",
+        "round_id": "00000000-0000-4000-8000-000000005dc3",
+        "step_name": "Phê duyệt",
+        "step_order": 2,
+        "assignee_id": "00000000-0000-4000-8000-0000000007d8",
+        "assigned_at": "2026-11-01T03:00:00.000Z",
+        "accepted_at": "2026-11-01T03:00:00.000Z",
+        "step_status": "Completed",
+        "decision": "Approve",
+        "comment": "Đồng ý số liệu demo.",
+        "decided_by": "00000000-0000-4000-8000-0000000007d8",
+        "decided_at": "2026-11-01T04:00:00.000Z"
+      },
+      {
+        "step_id": "00000000-0000-4000-8000-0000000061b1",
+        "round_id": "00000000-0000-4000-8000-000000005dc4",
+        "step_name": "Rà soát kinh doanh",
+        "step_order": 1,
+        "step_status": "NotStarted"
+      },
+      {
+        "step_id": "00000000-0000-4000-8000-0000000061b2",
+        "round_id": "00000000-0000-4000-8000-000000005dc4",
+        "step_name": "Rà soát pháp lý",
+        "step_order": 2,
+        "step_status": "NotStarted"
+      },
+      {
+        "step_id": "00000000-0000-4000-8000-0000000061b3",
+        "round_id": "00000000-0000-4000-8000-000000005dc4",
+        "step_name": "Phê duyệt",
+        "step_order": 3,
+        "step_status": "NotStarted"
+      },
+      {
+        "step_id": "00000000-0000-4000-8000-0000000061b4",
+        "round_id": "00000000-0000-4000-8000-000000005dc5",
+        "step_name": "Rà soát kinh doanh",
+        "step_order": 1,
+        "assignee_id": "00000000-0000-4000-8000-0000000007d2",
+        "assigned_at": "2026-11-01T02:00:00.000Z",
+        "accepted_at": "2026-11-01T02:00:00.000Z",
+        "step_status": "Completed",
+        "decision": "Approve",
+        "comment": "Đồng ý chuyển Pháp chế (dữ liệu thử phân công).",
+        "decided_by": "00000000-0000-4000-8000-0000000007d2",
+        "decided_at": "2026-11-01T04:00:00.000Z"
+      },
+      {
+        "step_id": "00000000-0000-4000-8000-0000000061b5",
+        "round_id": "00000000-0000-4000-8000-000000005dc5",
+        "step_name": "Rà soát pháp lý",
+        "step_order": 2,
+        "step_status": "NotStarted"
+      },
+      {
+        "step_id": "00000000-0000-4000-8000-0000000061b6",
+        "round_id": "00000000-0000-4000-8000-000000005dc5",
+        "step_name": "Phê duyệt",
+        "step_order": 3,
+        "step_status": "NotStarted"
+      },
+      {
+        "step_id": "00000000-0000-4000-8000-0000000061b7",
+        "round_id": "00000000-0000-4000-8000-000000005dc6",
+        "step_name": "Rà soát kinh doanh",
+        "step_order": 1,
+        "assignee_id": "00000000-0000-4000-8000-0000000007d2",
+        "assigned_at": "2026-11-01T02:00:00.000Z",
+        "accepted_at": "2026-11-01T02:00:00.000Z",
+        "step_status": "Completed",
+        "decision": "Approve",
+        "comment": "Đồng ý chuyển Pháp chế (dữ liệu thử phân công).",
+        "decided_by": "00000000-0000-4000-8000-0000000007d2",
+        "decided_at": "2026-11-01T04:00:00.000Z"
+      },
+      {
+        "step_id": "00000000-0000-4000-8000-0000000061b8",
+        "round_id": "00000000-0000-4000-8000-000000005dc6",
+        "step_name": "Rà soát pháp lý",
+        "step_order": 2,
+        "assignee_id": "00000000-0000-4000-8000-0000000007d7",
+        "assigned_at": "2026-11-01T04:00:00.000Z",
+        "accepted_at": "2026-11-01T04:00:00.000Z",
+        "step_status": "Reviewing"
+      },
+      {
+        "step_id": "00000000-0000-4000-8000-0000000061b9",
+        "round_id": "00000000-0000-4000-8000-000000005dc6",
+        "step_name": "Phê duyệt",
+        "step_order": 3,
+        "step_status": "NotStarted"
+      }
+    ],
+    "signing_session": [
+      {
+        "signing_session_id": "00000000-0000-4000-8000-000000006591",
+        "record_type": "Contract",
+        "contract_id": "00000000-0000-4000-8000-0000000036b1",
+        "provider_session_id": "DEMO-CONTRACT-SIGN-1",
+        "status": "Succeeded",
+        "company_signer_id": "00000000-0000-4000-8000-0000000007d8",
+        "company_signed_at": "2026-10-03T02:00:00.000Z",
+        "customer_signer_name": "Nguyễn Đại Diện Demo",
+        "customer_signer_email": "signer@example.invalid",
+        "customer_signed_at": "2026-10-03T02:00:00.000Z",
+        "signed_file_id": "00000000-0000-4000-8000-000000001b59",
+        "sent_by": "00000000-0000-4000-8000-0000000007d1",
+        "sent_at": "2026-10-02T02:00:00.000Z",
+        "result_at": "2026-10-03T02:00:00.000Z"
+      },
+      {
+        "signing_session_id": "00000000-0000-4000-8000-000000006592",
+        "record_type": "PaymentStatement",
+        "statement_id": "00000000-0000-4000-8000-000000004e21",
+        "provider_session_id": "DEMO-PAYMENT-SIGN-1",
+        "status": "Succeeded",
+        "company_signer_id": "00000000-0000-4000-8000-0000000007d8",
+        "company_signed_at": "2026-11-01T08:00:00.000Z",
+        "customer_signer_name": "Nguyễn Đại Diện Demo",
+        "customer_signer_email": "signer@example.invalid",
+        "customer_signed_at": "2026-11-01T08:00:00.000Z",
+        "signed_file_id": "00000000-0000-4000-8000-000000001b5a",
+        "sent_by": "00000000-0000-4000-8000-0000000007d5",
+        "sent_at": "2026-11-01T07:00:00.000Z",
+        "result_at": "2026-11-01T08:00:00.000Z"
+      }
+    ]
+  }
+}

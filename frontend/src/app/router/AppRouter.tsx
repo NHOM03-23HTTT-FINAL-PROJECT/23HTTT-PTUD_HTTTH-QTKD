@@ -1,6 +1,5 @@
 import { BACKEND_ENABLED as CONTRACTS_API_ENABLED } from '@/features/contracts/config/backend';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
-import { IS_MOCK_AUTH } from '@/features/auth/api/authApi';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { ACCOUNT_NAV, WORKSPACE_NAV } from '@/constants/navigation';
 import { ROUTES } from '@/constants/routes';
 import { ChangePasswordPage } from '@/features/auth/pages/ChangePasswordPage';
@@ -13,7 +12,6 @@ import { ForgotPasswordPage } from '@/features/auth/pages/ForgotPasswordPage';
 import { LoginPage } from '@/features/auth/pages/LoginPage';
 import { CustomerCreatePage } from '@/features/customers/pages/CustomerCreatePage';
 import { CustomerDetailPage } from '@/features/customers/pages/CustomerDetailPage';
-import { CustomerDelegationsPage } from '@/features/customers/pages/CustomerDelegationsPage';
 import { CustomerEditPage } from '@/features/customers/pages/CustomerEditPage';
 import { CustomerListPage } from '@/features/customers/pages/CustomerListPage';
 import { CustomerReactivatePage } from '@/features/customers/pages/CustomerReactivatePage';
@@ -28,6 +26,8 @@ import { ContractListPage } from '@/features/contracts/pages/ContractListPage';
 import { ContractProgressPage } from '@/features/contracts/pages/ContractProgressPage';
 import { ApprovalAssignmentPage } from '@/features/contracts/pages/ApprovalAssignmentPage';
 import { DashboardPage } from '@/features/dashboard/pages/DashboardPage';
+import { NotificationOpenPage } from '@/features/notifications/pages/NotificationOpenPage';
+import { NotificationsPage } from '@/features/notifications/pages/NotificationsPage';
 import { MainLayout } from '@/layouts/MainLayout';
 import { PublicOnly, RequireAuth } from './guards';
 import { BusinessRoute } from './BusinessRoute';
@@ -77,7 +77,7 @@ export function AppRoutes() {
       <Routes>
         <Route element={<PublicOnly />}>
           <Route path={ROUTES.login} element={<LoginPage />} />
-          <Route path={ROUTES.forgotPassword} element={IS_MOCK_AUTH ? <ForgotPasswordPage /> : <Navigate to={ROUTES.login} replace />} />
+          <Route path={ROUTES.forgotPassword} element={<ForgotPasswordPage />} />
         </Route>
 
         <Route element={<RequireAuth />}>
@@ -85,10 +85,14 @@ export function AppRoutes() {
           <Route element={<MainLayout />}>
             <Route path={ROUTES.dashboard} element={<DashboardPage />} />
             <Route path={ROUTES.changePassword} element={<ChangePasswordPage />} />
+            {/* UC-CHUNG-05: mọi người dùng nội bộ đã đăng nhập; BE chỉ trả thông báo của chính họ. */}
+            <Route path={ROUTES.notifications} element={<NotificationsPage />} />
+            {/* A4: link trong email mở đúng một thông báo. */}
+            <Route path="/thong-bao/:id" element={<NotificationOpenPage />} />
             <Route
               path={ROUTES.customers}
               element={
-                <BusinessRoute permission="customers.view" label="Danh sách khách hàng" apiReady>
+                <BusinessRoute permission="customers.view" label="Danh sách khách hàng">
                   <CustomerListPage />
                 </BusinessRoute>
               }
@@ -96,19 +100,15 @@ export function AppRoutes() {
             <Route
               path={ROUTES.customerCreate}
               element={
-                <BusinessRoute permission="customers.create" label="Tạo khách hàng" apiReady>
+                <BusinessRoute permission="customers.create" label="Tạo khách hàng">
                   <CustomerCreatePage />
                 </BusinessRoute>
               }
             />
             <Route
-              path={ROUTES.customerDelegations}
-              element={<BusinessRoute permission="customers.change-status" label="Ủy quyền trạng thái khách hàng" apiReady><CustomerDelegationsPage /></BusinessRoute>}
-            />
-            <Route
               path="/khach-hang/:code"
               element={
-                <BusinessRoute permission="customers.view" label="Hồ sơ khách hàng" apiReady>
+                <BusinessRoute permission="customers.view" label="Hồ sơ khách hàng">
                   <CustomerDetailPage />
                 </BusinessRoute>
               }
@@ -116,7 +116,7 @@ export function AppRoutes() {
             <Route
               path="/khach-hang/:code/chinh-sua"
               element={
-                <BusinessRoute permission="customers.update" label="Chỉnh sửa khách hàng" apiReady>
+                <BusinessRoute permission="customers.update" label="Chỉnh sửa khách hàng">
                   <CustomerEditPage />
                 </BusinessRoute>
               }
@@ -124,7 +124,7 @@ export function AppRoutes() {
             <Route
               path="/khach-hang/:code/tam-ngung"
               element={
-                <BusinessRoute permission="customers.view" label="Tạm ngưng khách hàng" apiReady>
+                <BusinessRoute permission="customers.change-status" label="Tạm ngưng khách hàng">
                   <CustomerSuspendPage />
                 </BusinessRoute>
               }
@@ -132,7 +132,7 @@ export function AppRoutes() {
             <Route
               path="/khach-hang/:code/kich-hoat-lai"
               element={
-                <BusinessRoute permission="customers.view" label="Kích hoạt lại khách hàng" apiReady>
+                <BusinessRoute permission="customers.change-status" label="Kích hoạt lại khách hàng">
                   <CustomerReactivatePage />
                 </BusinessRoute>
               }

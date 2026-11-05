@@ -1,19 +1,19 @@
 # QTKD Identity backend — TASK-022/023
 
-.NET 10, Api/Application/Domain/Infrastructure. Identity Core custom store trên schema qtkd hiện có, EF Core/Npgsql chỉ truy cập dữ liệu; Prisma quản lý migration.
+.NET 10, Api/Application/Domain/Infrastructure. Identity Core custom store trên schema qtkd hiện có, EF Core quản lý migration (`QtkdDbContext`, áp bằng `src/QTKD.DbTool`); phần lớn module vẫn đọc/ghi bằng SQL qua Npgsql.
 Đọc docs/specs/identity/TASK-022-023-PLAN.md và ADR 0001–0003 trước khi sửa hợp đồng auth.
 
 ## Hiện trạng
 
-Có source login/JWT/session/refresh/logout/change-password, quản lý users/departments/role grants, policy và integration tests.
-Theo bàn giao, project API và dependency đã build; người dùng đã đăng nhập thật. Chưa có suite integration BE/PostgreSQL PASS đầy đủ; bcrypt interop gần nhất bị abort vì testhost không kết nối sau 90 giây. Không coi các task nghiệp vụ khác đã hoàn tất.
+Có source login/JWT/session/refresh/logout/change-password, đặt lại mật khẩu qua OTP, quản lý users/departments/role grants, policy và integration tests.
+Đã build solution và kiểm tra Identity, OpenAPI, OTP qua TestServer với SQLite và hộp thư giả lập. Cần kiểm tra thêm trên PostgreSQL test và relay SMTP của nhóm.
 Tài liệu API: ../docs/specs/identity/list_api-auth.md. Bằng chứng kiểm tra: ../docs/testing/test-cases/identity.md.
 
 ## Chuẩn bị và chạy
 
 1. Cài .NET SDK 10.0.403 (global.json cho phép bản vá mới trong feature band), Node/npm phù hợp DB/frontend.
 2. Nhận backend/.env và DB/.env qua kênh bảo mật của nhóm. Từ backend/, chạy `dotnet restore QTKD.slnx`, rồi `dotnet build src/QTKD.Api/QTKD.Api.csproj --no-restore`; global.json áp dụng theo thư mục chạy lệnh.
-3. Với DB chung đã chuẩn bị, chỉ kiểm tra connection/migrate:status từ DB/. Chỉ phụ trách DB mới cần deploy/seed theo DB/README.md; không dùng EF migration, EnsureCreated hoặc reset DB ứng dụng.
+3. Với DB chung đã chuẩn bị, chỉ kiểm tra connection/migrate:status từ DB/. Chỉ phụ trách DB mới cần adopt/deploy/seed theo DB/README.md; không dùng `dotnet ef database update`, EnsureCreated hoặc reset DB ứng dụng.
 4. Khi dùng override: ConnectionStrings:Identity là Npgsql key=value connection string, `SSL Mode=VerifyFull`, PostgreSQL direct/session port 5432; Jwt:SigningKey ngẫu nhiên ít nhất 32 byte. Không dùng service key hoặc API URL thay connection string.
 5. dotnet run --project backend/src/QTKD.Api --launch-profile https. API mặc định https://localhost:7156.
 
@@ -34,6 +34,29 @@ Liveness /health/live chỉ chứng minh tiến trình chạy, không chứng mi
 
 FE dùng Vite proxy /api tới backend; bật VITE_AUTH_MODE=api. Cookie Secure đòi trình duyệt hỗ trợ ngữ cảnh localhost an toàn hoặc frontend HTTPS. Không tắt Secure để chạy production.
 
+## Swagger và email OTP
+
+Khi chạy API ở `Development`, mở [Swagger UI](https://localhost:7156/swagger/index.html) hoặc [OpenAPI JSON](https://localhost:7156/openapi/v1.json). Gọi `POST /api/v1/auth/login` với `X-QTKD-CSRF` bằng `1`, lấy `accessToken` và dán token vào **Authorize** để thử `GET /api/v1/auth/session`. Trình duyệt giữ refresh cookie cho các thao tác cần cookie. Origin của Swagger phải thuộc `Cors:Origins`.
+
+Để bật gửi OTP, thêm cấu hình dưới đây vào `backend/src/QTKD.Api/appsettings.Local.json` đã được Git ignore, hoặc đặt các biến môi trường tương ứng như `PasswordRecovery__Smtp__Enabled` và `PasswordRecovery__Smtp__Password`. Chọn relay SMTP có STARTTLS và người gửi được phép. Dùng tài khoản ứng dụng có email công ty nhận được thư để QA.
+
+```json
+{
+  "PasswordRecovery": {
+    "Smtp": {
+      "Enabled": true,
+      "Host": "smtp.example.com",
+      "Port": 587,
+      "From": "recovery@example.com",
+      "Username": "",
+      "Password": ""
+    }
+  }
+}
+```
+
+Điền `Username` và `Password` qua kênh cấu hình riêng nếu relay yêu cầu xác thực. Khởi động lại backend sau khi cập nhật cấu hình. Với `VITE_AUTH_MODE=api`, mở **Quên mật khẩu?**, nhập tài khoản có email nhận được thư và hoàn tất luồng bằng mã trong hộp thư. API trả `202` khi đã nhận yêu cầu vào hàng đợi trong bộ nhớ. Lỗi giao thư được ghi bằng mã sự kiện `PASSWORD_RECOVERY_DELIVERY_FAILED`. Có thể yêu cầu mã mới sau thời gian chờ. Bảng `qtkd.password_otp` hiện có đủ cột cho luồng này.
+
 ## Kiểm thử
 
 Từ backend/: `dotnet test QTKD.slnx`. Mặc định SQLite in-memory với Identity/JWT middleware thật; không thay bằng auth handler luôn thành công. Test parser launcher độc lập từ gốc repo: `./backend/tests/LocalEnvironment.Tests.ps1`.
@@ -46,7 +69,7 @@ Chạy npm ci trong DB trước kiểm tra bcrypt hai chiều. Bộ test Postgre
 - Runtime grants ở DB; FE permission constants phục vụ prototype/hiển thị.
 - ResourceAccess handler không thay việc module sở hữu kiểm tra scope, trạng thái và assignee trong transaction.
 - Logging vận hành có correlation/actor; audit interceptor append-only thuộc TASK-024, chưa triển khai ở đây.
-- Chưa có các controller nghiệp vụ khác, UI quản trị hoàn chỉnh, OTP/email, deployment hoặc CI.
+- UI quản trị Identity vẫn chưa đầy đủ.
 
 
 Contracts CRUD and cancellation integration: [setup](GETTING-STARTED.md).

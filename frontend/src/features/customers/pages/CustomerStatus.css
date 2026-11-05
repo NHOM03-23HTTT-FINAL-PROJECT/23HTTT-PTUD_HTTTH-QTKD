@@ -230,8 +230,7 @@
   color: var(--accent-strong);
 }
 
-.customer-card.impact-card {
-  flex: none;
+.impact-card {
   gap: 0;
   padding: 0;
   overflow: hidden;

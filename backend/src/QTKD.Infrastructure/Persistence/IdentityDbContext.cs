@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Npgsql.NameTranslation;
 using QTKD.Domain.Identity;
+using PasswordOtp = QTKD.Infrastructure.Persistence.Schema.PasswordOtp;
 
 namespace QTKD.Infrastructure.Persistence;
 
@@ -9,6 +10,7 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
     public DbSet<UserAccount> Users => Set<UserAccount>();
     public DbSet<Department> Departments => Set<Department>();
     public DbSet<LoginSession> Sessions => Set<LoginSession>();
+    public DbSet<PasswordOtp> PasswordOtps => Set<PasswordOtp>();
     public DbSet<RoleDefinition> Roles => Set<RoleDefinition>();
     public DbSet<Permission> Permissions => Set<Permission>();
     public DbSet<RolePermission> Grants => Set<RolePermission>();
@@ -19,6 +21,7 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
         b.Entity<UserAccount>().ToTable("user_account").HasKey(x => x.UserId);
         b.Entity<Department>().ToTable("department").HasKey(x => x.DepartmentId);
         b.Entity<LoginSession>().ToTable("login_session").HasKey(x => x.SessionId);
+        b.Entity<PasswordOtp>().ToTable("password_otp").HasKey(x => x.OtpId);
         b.Entity<RoleDefinition>().ToTable("role_definition").HasKey(x => x.Code);
         b.Entity<RoleDefinition>().Property(x => x.Code).ValueGeneratedNever();
         b.Entity<Permission>().ToTable("permission").HasKey(x => x.Code);
@@ -26,6 +29,7 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
         b.Entity<UserAccount>().HasOne<Department>().WithMany().HasForeignKey(x => x.DepartmentId).OnDelete(DeleteBehavior.Restrict);
         b.Entity<UserAccount>().HasOne<RoleDefinition>().WithMany().HasForeignKey(x => x.Role).OnDelete(DeleteBehavior.Restrict);
         b.Entity<LoginSession>().HasOne<UserAccount>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
+        b.Entity<PasswordOtp>().HasOne<UserAccount>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
         b.Entity<RolePermission>().HasOne<RoleDefinition>().WithMany().HasForeignKey(x => x.Role).OnDelete(DeleteBehavior.Restrict);
         b.Entity<RolePermission>().HasOne<Permission>().WithMany().HasForeignKey(x => x.PermissionCode).OnDelete(DeleteBehavior.Restrict);
         b.Entity<Department>().HasIndex(x => x.Code).IsUnique();
@@ -60,4 +64,19 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
         if (Database.IsNpgsql())
             await Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(22023)", ct);
     }
+
+    public async Task RevokeSessions(Guid userId, string reason, CancellationToken ct, Guid? except = null)
+    {
+        var sessions = await Sessions.Where(x => x.UserId == userId && !x.IsRevoked && (except == null || x.SessionId != except)).ToListAsync(ct);
+        foreach (var session in sessions)
+        {
+            session.IsRevoked = true;
+            session.EndReason = SessionEndReason.Revoked;
+            session.RevocationReason = reason;
+        }
+    }
+
+    public Task InvalidatePasswordRecovery(Guid userId, CancellationToken ct) => PasswordOtps
+        .Where(x => x.UserId == userId && x.OtpHash != "")
+        .ExecuteUpdateAsync(set => set.SetProperty(x => x.IsUsed, true).SetProperty(x => x.OtpHash, ""), ct);
 }

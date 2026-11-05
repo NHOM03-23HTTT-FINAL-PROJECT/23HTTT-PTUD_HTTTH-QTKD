@@ -11,8 +11,11 @@ using Npgsql.NameTranslation;
 using Npgsql;
 using Microsoft.AspNetCore.Http.Features;
 using QTKD.Api.Authentication;
+using QTKD.Application.Features.Customers;
+using QTKD.Infrastructure.Customers;
 using QTKD.Application.Common.Interfaces;
 using QTKD.Application.Features.Contracts;
+using QTKD.Application.Features.Notifications;
 using QTKD.Domain.Contracts;
 using QTKD.Api.Authorization;
 using QTKD.Api.Endpoints;
@@ -20,12 +23,9 @@ using QTKD.Application.Features.ContractApprovals;
 using QTKD.Application.Features.Workflows;
 using QTKD.Infrastructure.ContractApprovals;
 using QTKD.Application.Features.Identity;
-using QTKD.Application.Features.Customers;
 using QTKD.Domain.Identity;
-using QTKD.Infrastructure.Customers;
 using QTKD.Infrastructure.Identity;
 using QTKD.Infrastructure.Persistence;
-using QTKD.Api.Customers;
 using TokenOptions = QTKD.Infrastructure.Identity.TokenOptions;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -35,8 +35,9 @@ builder.Logging.AddJsonConsole(options => options.IncludeScopes = true);
 builder.Services.AddOptions<TokenOptions>().BindConfiguration("Jwt").ValidateDataAnnotations().ValidateOnStart();
 builder.Services.AddOptions<DatabaseOptions>().BindConfiguration("ConnectionStrings").ValidateDataAnnotations().ValidateOnStart();
 builder.Services.AddSingleton(TimeProvider.System);
-// Reuse the enum translator: a new singleton instance per DbContext causes EF
-// to create a new internal service provider on every request.
+// One translator for the whole app. The options lambda runs per request scope; a new translator each time
+// makes EF build a new internal service provider per request and throw ManyServiceProvidersCreatedWarning
+// after 20, which turned every later request into 500 SYSTEM_ERROR.
 var enumNames = new NpgsqlNullNameTranslator();
 builder.Services.AddDbContext<IdentityDbContext>((sp, options) => options.UseNpgsql(
     sp.GetRequiredService<IConfiguration>().GetConnectionString("Identity") ?? throw new InvalidOperationException("ConnectionStrings:Identity is required."),
@@ -51,8 +52,13 @@ builder.Services.AddIdentityCore<UserAccount>(options =>
 builder.Services.AddScoped<IPasswordHasher<UserAccount>, BcryptPasswordHasher>();
 builder.Services.AddScoped<TokenIssuer>();
 builder.Services.AddScoped<IIdentityService, IdentityService>();
-builder.Services.AddScoped<ICustomerStatusSource, PostgresCustomerStatusSource>();
-builder.Services.AddScoped<CustomerService>();
+builder.Services.AddScoped<PasswordRecoveryService>();
+builder.Services.AddOptions<PasswordRecoveryMailOptions>().BindConfiguration("PasswordRecovery:Smtp")
+    .Validate(options => options.IsValid(), "Password recovery SMTP configuration is incomplete.").ValidateOnStart();
+builder.Services.AddSingleton<IPasswordRecoveryMailSender, SmtpPasswordRecoveryMailSender>();
+builder.Services.AddSingleton<PasswordRecoveryQueue>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<PasswordRecoveryQueue>());
+builder.Services.AddAuthOpenApi();
 builder.Services.AddScoped<ContractApprovalService>();
 builder.Services.AddSingleton<WorkflowEngine>();
 builder.Services.AddScoped<PostgresApprovalStore>();
@@ -115,8 +121,12 @@ builder.Services.AddAuthorization(options =>
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = 429;
+    options.OnRejected = (context, ct) => new ValueTask(context.HttpContext.Response.WriteAsJsonAsync(
+        new { code = "RATE_LIMITED", traceId = context.HttpContext.TraceIdentifier }, ct));
     options.AddPolicy("auth", context => RateLimitPartition.GetFixedWindowLimiter(context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         _ => new FixedWindowRateLimiterOptions { PermitLimit = 30, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+    options.AddPolicy("password-recovery", context => RateLimitPartition.GetFixedWindowLimiter(context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = 20, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
 });
 var allowedOrigins = builder.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? [];
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy.WithOrigins(allowedOrigins)
@@ -132,6 +142,12 @@ builder.Services.AddScoped<IContractStore>(sp => new PostgresContractStore(
     sp.GetRequiredService<PgDatabase>(),
     Path.GetFullPath(builder.Configuration["Storage:Root"] ?? Path.Combine(builder.Environment.ContentRootPath, ".data", "uploads"))));
 builder.Services.AddScoped<ContractService>();
+builder.Services.AddQtkdPersistence(
+    sp => sp.GetRequiredService<IConfiguration>().GetConnectionString("Identity") ?? throw new InvalidOperationException("ConnectionStrings:Identity is required."),
+    enumNames);
+builder.Services.AddScoped<NotificationService>();
+builder.Services.AddScoped<ICustomerStatusSource, PostgresCustomerStatusSource>();
+builder.Services.AddScoped<CustomerService>();
 
 var app = builder.Build();
 app.Use(async (context, next) =>
@@ -140,6 +156,11 @@ app.Use(async (context, next) =>
     context.Response.Headers["Cache-Control"] = "no-store";
     context.Response.Headers["X-Correlation-ID"] = context.TraceIdentifier;
     try { await next(context); }
+    catch (CustomerFailure error)
+    {
+        context.Response.StatusCode = error.Status;
+        await context.Response.WriteAsJsonAsync(new { code = error.Code, detail = error.Detail, traceId = context.TraceIdentifier });
+    }
     catch (BusinessException error)
     {
         context.Response.StatusCode = error.Status;
@@ -168,11 +189,6 @@ app.Use(async (context, next) =>
         context.Response.StatusCode = error.Status;
         await context.Response.WriteAsJsonAsync(new { code = error.Code, remainingAttempts = error.RemainingAttempts, lockedUntil = error.LockedUntil, traceId = context.TraceIdentifier });
     }
-    catch (CustomerFailure error)
-    {
-        context.Response.StatusCode = error.Status;
-        await context.Response.WriteAsJsonAsync(new { code = error.Code, detail = error.Detail, traceId = context.TraceIdentifier });
-    }
     catch (Exception error)
     {
         // Never log raw provider exceptions: they may contain connection details or SQL values.
@@ -182,6 +198,11 @@ app.Use(async (context, next) =>
     }
 });
 app.UseCors();
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi().AllowAnonymous();
+    app.UseSwaggerUI(options => options.SwaggerEndpoint("/openapi/v1.json", "QTKD Authentication v1"));
+}
 app.UseAuthentication();
 var temporaryPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
 { "/api/v1/auth/login", "/api/v1/auth/session", "/api/v1/auth/activity", "/api/v1/auth/refresh", "/api/v1/auth/logout", "/api/v1/auth/password/change" };
@@ -200,8 +221,6 @@ app.Use(async (context, next) =>
 app.UseRateLimiter();
 app.UseAuthorization();
 app.MapContractApprovals(allowedOrigins);
-app.MapGet("/api/v1/notifications", async (HttpContext context, PostgresApprovalStore store, CancellationToken ct)
-    => Results.Ok(await store.Notifications(Guid.Parse(context.User.FindFirstValue("sub")!), ct))).RequireAuthorization();
 
 const string cookieName = "__Host-qtkd-refresh";
 bool Csrf(HttpContext context) => context.Request.Headers["X-QTKD-CSRF"] == "1"
@@ -209,45 +228,81 @@ bool Csrf(HttpContext context) => context.Request.Headers["X-QTKD-CSRF"] == "1"
 void RequireCsrf(HttpContext context) { if (!Csrf(context)) throw new IdentityFailure(403, "CSRF_REJECTED"); }
 void SetRefresh(HttpContext context, AuthResult result) => context.Response.Cookies.Append(cookieName, result.RefreshToken,
     new CookieOptions { HttpOnly = true, Secure = true, SameSite = SameSiteMode.Strict, Path = "/", Expires = result.Remember ? new DateTimeOffset(DateTime.SpecifyKind(result.ExpiresAt, DateTimeKind.Utc)) : null });
-object PublicResult(AuthResult result) => new { result.AccessToken, result.AccessTokenExpiresAt, result.User, result.SignedInAt,
-    result.IdleExpiresAt, result.ExpiresAt, result.PreviousLogin, passwordChangedAt = result.User.PasswordChangedAt };
 (Guid User, Guid Session) Subject(HttpContext context) => (Guid.Parse(context.User.FindFirstValue("sub")!), Guid.Parse(context.User.FindFirstValue("sid")!));
 
 app.MapGet("/health/live", () => Results.Ok(new { status = "up" })).AllowAnonymous();
-var auth = app.MapGroup("/api/v1/auth");
+var auth = app.MapGroup("/api/v1/auth").WithTags("Authentication");
 auth.MapPost("/login", async (LoginRequest request, IIdentityService identity, HttpContext context, CancellationToken ct) =>
 {
     RequireCsrf(context);
     var result = await identity.Login(request, context.Connection.RemoteIpAddress?.ToString(), context.Request.Headers.UserAgent.ToString(), ct);
     // One current refresh cookie per browser. Another device uses a separate cookie jar.
     await identity.Logout(context.Request.Cookies[cookieName], ct);
-    SetRefresh(context, result); return Results.Ok(PublicResult(result));
-}).AllowAnonymous().RequireRateLimiting("auth");
+    SetRefresh(context, result); return TypedResults.Ok(AuthResponse.From(result));
+}).AllowAnonymous().RequireRateLimiting("auth")
+    .WithDescription("Returns an access JWT and sets the refresh cookie. Errors: VALIDATION, INVALID_CREDENTIALS, DISABLED, LOCKED, CSRF_REJECTED, RATE_LIMITED.")
+    .AuthErrors(400, 401, 403, 423, 429);
 auth.MapPost("/refresh", async (IIdentityService identity, HttpContext context, CancellationToken ct) =>
 {
     RequireCsrf(context); var result = await identity.Refresh(context.Request.Cookies[cookieName] ?? "", ct);
-    SetRefresh(context, result); return Results.Ok(PublicResult(result));
-}).AllowAnonymous().RequireRateLimiting("auth");
+    SetRefresh(context, result); return TypedResults.Ok(AuthResponse.From(result));
+}).AllowAnonymous().RequireRateLimiting("auth")
+    .WithDescription("Rotates the HttpOnly refresh cookie. Requires the current cookie. A rejected session returns 401.")
+    .AuthErrors(401, 403, 429);
 auth.MapPost("/logout", async (IIdentityService identity, HttpContext context, CancellationToken ct) =>
 {
     RequireCsrf(context); await identity.Logout(context.Request.Cookies[cookieName], ct);
     context.Response.Cookies.Delete(cookieName, new CookieOptions { Secure = true, HttpOnly = true, SameSite = SameSiteMode.Strict, Path = "/" });
-    return Results.NoContent();
-}).AllowAnonymous().RequireRateLimiting("auth");
+    return TypedResults.NoContent();
+}).AllowAnonymous().RequireRateLimiting("auth")
+    .WithDescription("Revokes the session identified by the refresh cookie and clears the cookie.").AuthErrors(403, 429);
 auth.MapGet("/session", async (IIdentityService identity, HttpContext context, CancellationToken ct) =>
 {
-    var subject = Subject(context); return Results.Ok(await identity.Session(subject.User, subject.Session, false, ct));
-}).RequireAuthorization();
+    var subject = Subject(context); return TypedResults.Ok(await identity.Session(subject.User, subject.Session, false, ct));
+}).RequireAuthorization().WithDescription("Reads the current user and session without extending idle time.").AuthErrors(401);
 auth.MapPost("/activity", async (IIdentityService identity, HttpContext context, CancellationToken ct) =>
 {
-    var subject = Subject(context); return Results.Ok(await identity.Session(subject.User, subject.Session, true, ct));
-}).RequireAuthorization();
+    var subject = Subject(context); return TypedResults.Ok(await identity.Session(subject.User, subject.Session, true, ct));
+}).RequireAuthorization().WithDescription("Records user activity and returns the updated session.").AuthErrors(401);
 auth.MapPost("/password/change", async (PasswordRequest request, IIdentityService identity, HttpContext context, CancellationToken ct) =>
 {
     RequireCsrf(context); var subject = Subject(context);
     var result = await identity.ChangePassword(subject.User, subject.Session, request, context.Request.Cookies[cookieName], ct);
-    SetRefresh(context, result); return Results.Ok(PublicResult(result));
-}).RequireAuthorization().RequireRateLimiting("auth");
+    SetRefresh(context, result); return TypedResults.Ok(AuthResponse.From(result));
+}).RequireAuthorization().RequireRateLimiting("auth")
+    .WithDescription("Requires the current password, Bearer JWT and refresh cookie. Errors include WRONG_CURRENT, LOCKED, WEAK_PASSWORD and SAME_AS_CURRENT.")
+    .AuthErrors(400, 401, 403, 429);
+
+var recovery = auth.MapGroup("/password/recovery").AllowAnonymous().RequireRateLimiting("password-recovery");
+recovery.MapPost("/send", (SendOtpRequest request, PasswordRecoveryQueue queue, HttpContext context) =>
+{
+    RequireCsrf(context);
+    return TypedResults.Accepted((string?)null, queue.Request(request));
+}).WithDescription("Accepts a request to email an OTP. The response is independent of whether the account exists. EMAIL_FAILED indicates unavailable delivery queue or configuration.")
+    .AuthErrors(400, 403, 429, 503);
+recovery.MapPost("/verify", async (VerifyOtpRequest request, PasswordRecoveryService service, HttpContext context, CancellationToken ct) =>
+{
+    RequireCsrf(context);
+    var started = TimeProvider.System.GetTimestamp();
+    try
+    {
+        return TypedResults.Ok(await service.Verify(request, ct));
+    }
+    catch (IdentityFailure error) when (error.Code == "INVALID_CODE")
+    {
+        // Failed lookups and failed attempts should have a comparable response time.
+        var remaining = TimeSpan.FromMilliseconds(300) - TimeProvider.System.GetElapsedTime(started);
+        if (remaining > TimeSpan.Zero) await Task.Delay(remaining, ct);
+        throw;
+    }
+}).WithDescription("Exchanges a single-use OTP for a reset token. INVALID_CODE covers incorrect, expired, used or blocked codes.")
+    .AuthErrors(400, 403, 429);
+recovery.MapPost("/reset", async (ResetPasswordRequest request, PasswordRecoveryService service, HttpContext context, CancellationToken ct) =>
+{
+    RequireCsrf(context);
+    return TypedResults.Ok(await service.Reset(request, ct));
+}).WithDescription("Consumes a reset token and revokes all account sessions. Errors include TOKEN_EXPIRED, WEAK_PASSWORD and SAME_AS_CURRENT.")
+    .AuthErrors(400, 403, 429);
 app.MapGet("/api/v1/users", async (IIdentityService identity, CancellationToken ct) => Results.Ok(await identity.Users(ct))).RequireAuthorization("users.manage");
 app.MapGet("/api/v1/users/{id:guid}", async (Guid id, IIdentityService identity, CancellationToken ct) => Results.Ok(await identity.User(id, ct))).RequireAuthorization("users.manage");
 app.MapPost("/api/v1/users", async (CreateUserRequest request, IIdentityService identity, CancellationToken ct) =>
@@ -267,7 +322,6 @@ app.MapPut("/api/v1/roles/{code}/permissions", async (string code, GrantsRequest
     await identity.SaveGrants(code, request.Permissions, ct); return Results.NoContent();
 }).RequireAuthorization("roles.manage");
 app.MapGet("/api/v1/permissions", async (IIdentityService identity, CancellationToken ct) => Results.Ok(await identity.Permissions(ct))).RequireAuthorization("roles.manage");
-app.MapCustomerEndpoints();
 app.MapControllers();
 app.MapGet("/api/health", () => Results.Ok(new { status = "ok", database = "not-checked" })).AllowAnonymous();
 app.Run();

@@ -65,6 +65,7 @@ export type ApprovalDecision = 'approve' | 'revision' | 'reject';
 export type ApprovalRoundResult = 'in-progress' | 'completed' | 'revision' | 'rejected' | 'withdrawn';
 
 export type ApprovalStep = {
+  id?: string;
   key: ApprovalStepKey;
   label: string;
   assigneeId?: string;
@@ -120,6 +121,7 @@ export type LegalCoordination = {
 };
 
 export type ApprovalRound = {
+  id?: string;
   no: number;
   submittedById: string;
   submittedByName: string;
@@ -133,6 +135,8 @@ export type ApprovalRound = {
 };
 
 export type Contract = Omit<ContractDraft, 'value'> & {
+  /** Server UUID used by approval APIs; code remains the human-readable route. */
+  id?: string;
   customerSnapshot?: import('@/features/customers/types/customer').Customer;
   cancellationRequests?: ContractCancellationRequest[];
   history?: { at: string; action: string; byName: string; note?: string }[];

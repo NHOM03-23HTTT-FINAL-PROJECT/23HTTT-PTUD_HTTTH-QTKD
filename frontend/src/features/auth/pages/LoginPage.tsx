@@ -16,7 +16,6 @@ import { LoginError, type LoginErrorCode, type LoginSuccess } from '../types/aut
 import { RememberCheckbox } from '../components/RememberCheckbox';
 import type { PasswordResetState } from './ForgotPasswordPage';
 import './LoginPage.css';
-import { IS_MOCK_AUTH } from '../api/authApi';
 
 type FieldErrors = { identifier?: string; password?: string };
 
@@ -181,9 +180,9 @@ export function LoginPage() {
 
         <div className="login-options">
           <RememberCheckbox checked={remember} onChange={setRemember} disabled={fieldsDisabled} />
-          {IS_MOCK_AUTH ? <Link to={ROUTES.forgotPassword} state={{ identifier: identifier.trim() }} className="login-options__forgot">
+          <Link to={ROUTES.forgotPassword} state={{ identifier: identifier.trim() }} className="login-options__forgot">
             Quên mật khẩu?
-          </Link> : <span className="login-options__forgot">Quên mật khẩu? Liên hệ Quản trị hệ thống.</span>}
+          </Link>
         </div>
 
         {isLocked && lockedUntil && (

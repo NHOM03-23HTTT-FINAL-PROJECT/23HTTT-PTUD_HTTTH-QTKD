@@ -1,0 +1,62 @@
+@startuml UC-CHUNG-03-dang-xuat
+<style>
+    sequenceDiagram {
+        actor {
+            BackgroundColor #E7F0F7
+            BorderColor #32536C
+        }
+        participant {
+            BackgroundColor #E7F0F7
+            BorderColor #32536C
+        }
+        arrow {
+            LineColor #32536C
+        }
+    }
+</style>
+
+title UC-CHUNG-03 · Đăng xuất
+hide footbox
+autonumber "<b>[000]"
+
+actor "Người dùng" as User
+boundary "Giao diện web" as Web
+control "Dịch vụ xác thực" as Auth
+database "Cơ sở dữ liệu" as Db
+
+alt Người dùng chủ động đăng xuất
+    User -> Web: Chọn Đăng xuất
+    opt Có dữ liệu chưa lưu
+        Web --> User: Cảnh báo dữ liệu chưa lưu và hỏi xác nhận
+        User -> Web: Chọn Ở lại hoặc xác nhận Đăng xuất
+    end
+else Bộ đếm phiên hết hạn
+    Web -> Web: Xác định phiên đã hết thời hạn
+else Người dùng chuyển trang hoặc quay lại tab
+    Web -> Auth: Kiểm tra phiên đang dùng
+    Auth -> Db: Đọc trạng thái phiên
+    Db --> Auth: Trạng thái và thời hạn
+    Auth --> Web: Phiên hợp lệ hoặc lý do kết thúc
+end
+
+alt Chọn Ở lại hoặc kết quả kiểm tra cho thấy phiên hợp lệ
+    Web --> User: Tiếp tục màn hình đang làm việc
+else Máy chủ đã thu hồi phiên
+    Web -> Web: Xóa phiên trên trình duyệt
+    Web --> User: Về trang đăng nhập và hiển thị lý do
+else Có yêu cầu đăng xuất hoặc bộ đếm phiên hết hạn
+    Web -> Web: Ghi nhận ý định đăng xuất và xóa mã truy cập
+    Web -> Auth: Yêu cầu đăng xuất kèm cookie của phiên
+    alt Máy chủ xử lý được yêu cầu
+        Auth -> Db: Tìm phiên theo cookie
+        opt Phiên còn chưa bị thu hồi
+            Auth -> Db: Thu hồi phiên của trình duyệt này
+        end
+        Auth --> Web: Xác nhận đăng xuất và xóa cookie
+        Web --> User: Về trang đăng nhập và hiển thị thông báo
+    else Mất kết nối hoặc máy chủ từ chối yêu cầu
+        Web --> User: Về trang đăng nhập với thông báo chỉ đăng xuất trên thiết bị này
+    end
+end
+
+@enduml

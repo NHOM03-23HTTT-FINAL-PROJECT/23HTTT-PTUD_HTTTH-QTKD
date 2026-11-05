@@ -16,6 +16,20 @@ async function client(t, fetcher) {
   t.after(() => { globalThis.fetch = originalFetch; globalThis.window = originalWindow; });
   return import('../src/lib/http/client.ts?test=' + randomUUID());
 }
+test('anonymous recovery calls omit credentials and work after local logout', async t => {
+  const api = await client(t, async (path, init) => {
+    assert.equal(path, '/api/v1/auth/password/recovery/send');
+    assert.equal(init.credentials, 'omit');
+    assert.equal(new Headers(init.headers).get('Authorization'), null);
+    assert.equal(new Headers(init.headers).get('X-QTKD-CSRF'), '1');
+    assert.deepEqual(JSON.parse(init.body), { identifier: 'synthetic-test' });
+    return response({ expiresAt: 42 }, 202);
+  });
+  api.clearApiAuth();
+  assert.deepEqual(await api.postAnonymous('/auth/password/recovery/send', { identifier: 'synthetic-test' }), { expiresAt: 42 });
+  assert.equal(api.apiAuthState(), null);
+});
+
 test('403 preserves the authenticated session and does not refresh or emit logout', async t => {
   let calls = 0, ended = 0;
   const api = await client(t, async () => { calls++; return response({ code: 'FORBIDDEN' }, 403); });

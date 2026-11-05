@@ -55,8 +55,10 @@ async function harness(mode) {
   const { BusinessRoute } = await load('app/router/BusinessRoute.tsx');
   const { setUser } = await load('app/providers/AuthProvider.tsx');
   return {
+    ...await load('features/contracts/utils/approvalReview.ts'),
     ...await load('features/contracts/api/approvalApi.ts'),
-    ...await load('features/auth/api/authApi.ts'), ...await load('lib/http/client.ts'),
+    ...await load('features/auth/api/authApi.ts'), ...await load('features/auth/api/passwordRecoveryApi.ts'),
+    ...await load('lib/http/client.ts'), ...await load('constants/routes.ts'),
     ...await load('mocks/contractsServer.ts'), ...await load('mocks/seed/users.ts'),
     renderRoute(path, user) {
       setUser(user);
@@ -88,9 +90,9 @@ const authResult = {
   user: { ...user, permissions: [] },
 };
 const routes = [
-  ['/khach-hang', 'customers.view'], ['/khach-hang/tao-moi', 'customers.create'], ['/khach-hang/uy-quyen', 'customers.change-status'],
+  ['/khach-hang', 'customers.view'], ['/khach-hang/tao-moi', 'customers.create'],
   ['/khach-hang/KH-001', 'customers.view'], ['/khach-hang/KH-001/chinh-sua', 'customers.update'],
-  ['/khach-hang/KH-001/tam-ngung', 'customers.view'], ['/khach-hang/KH-001/kich-hoat-lai', 'customers.view'],
+  ['/khach-hang/KH-001/tam-ngung', 'customers.change-status'], ['/khach-hang/KH-001/kich-hoat-lai', 'customers.change-status'],
   ['/khu-vuc', 'areas.view'], ['/khu-vuc/tra-cuu', 'areas.view'], ['/khu-vuc/so-do', 'areas.view'],
   ['/khu-vuc/tao-moi', 'areas.create'], ['/khu-vuc/KV-001', 'areas.view'], ['/khu-vuc/KV-001/chinh-sua', 'areas.update'],
   ['/hop-dong', 'contracts.view'], ['/hop-dong/tao-moi', 'contracts.create'],
@@ -110,14 +112,11 @@ function ignoreStaticRedirectWarning(t) {
   });
 }
 
-test('API identity can open customer screens; other unfinished business screens remain unavailable', () => {
+test('API identity opens approval inboxes and reviewer assignment while other mock business routes remain isolated', () => {
   api.acceptAuth(authResult);
   for (const [path, permission] of routes) {
     const html = api.renderRoute(path, { ...user, permissions: new Set([permission]) });
-    if (path.startsWith('/khach-hang')) {
-      assert.ok(!html.includes('Chức năng chưa sẵn sàng'), path);
-      assert.ok(html.includes('Đang tải') || html.includes('Danh sách khách hàng'), path);
-    } else if (['/phe-duyet/cho-duyet', '/phe-duyet/cho-ra-soat', '/phe-duyet/da-ra-soat', '/phe-duyet/cho-phe-duyet'].includes(path)) {
+    if (['/phe-duyet/cho-duyet', '/phe-duyet/cho-ra-soat', '/phe-duyet/da-ra-soat', '/phe-duyet/cho-phe-duyet'].includes(path)) {
       assert.ok(!html.includes('Chức năng chưa sẵn sàng'), path);
       assert.ok(html.includes('Chỉ gồm hồ sơ mà bạn là người được giao chính thức'), path);
     } else if (path === '/phe-duyet/phan-cong') {
@@ -188,6 +187,34 @@ test('API session verification uses BE for a real UUID and still ends expired or
   assert.ok(calls.includes('/api/v1/auth/session'));
 });
 
+test('API mode opens password recovery and calls the real send, verify and reset adapter', async t => {
+  assert.match(api.renderRoute(api.ROUTES.forgotPassword, null), /Quên mật khẩu/);
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  const identifier = 'synthetic-user';
+  const resetToken = 'synthetic-reset-token';
+  const dispatch = { expiresAt: 1234, resendAvailableAt: 567 };
+  const verified = { resetToken, accountLabel: 'test@example.invalid' };
+  const requests = [
+    ['send', { identifier }, 202, dispatch],
+    ['verify', { identifier, code: '123456' }, 400, { code: 'INVALID_CODE' }],
+    ['verify', { identifier, code: '123456' }, 200, verified],
+    ['reset', { resetToken, newPassword: 'Synthetic@123' }, 200, { identifier }],
+  ];
+  globalThis.fetch = async (path, init) => {
+    const [action, body, status, response] = requests.shift();
+    assert.equal(path, `/api/v1/auth/password/recovery/${action}`);
+    assert.deepEqual(JSON.parse(init.body), body);
+    return new Response(JSON.stringify(response), { status });
+  };
+
+  assert.deepEqual(await api.passwordRecoveryApi.sendOtp(identifier), dispatch);
+  await assert.rejects(api.passwordRecoveryApi.verifyOtp(identifier, '123456'), { name: 'RecoveryError', code: 'INVALID_CODE' });
+  assert.deepEqual(await api.passwordRecoveryApi.verifyOtp(identifier, '123456'), verified);
+  assert.deepEqual(await api.passwordRecoveryApi.resetPassword({ resetToken, newPassword: 'Synthetic@123' }), { identifier });
+  assert.equal(requests.length, 0);
+});
+
 test('approval adapter sends snapshot and idempotency key with bearer and never sends a client actor', async t => {
   const originalFetch = globalThis.fetch;
   t.after(() => { globalThis.fetch = originalFetch; });
@@ -210,4 +237,52 @@ test('approval adapter sends snapshot and idempotency key with bearer and never 
   assert.equal(calls[1].path, `/api/v1/approvals/contracts/${user.id}/handoff`);
   assert.equal(calls[2].path, `/api/v1/approvals/contracts/${user.id}/pending-task/retry?step=legal`);
   for (const call of calls) assert.ok(!('userId' in call.body));
+});
+
+function reviewFixture(role = 'TP_KD') {
+  const actor = { id: role, roles: [role], permissions: new Set(['approvals.approve', 'approvals.review-legal']) };
+  const keys = ['sales', 'legal', 'board'];
+  const assignees = ['TP_KD', 'NV_PC', 'GD'];
+  const steps = keys.map((key, i) => ({ id: key, key, order: i + 1, assigneeId: assignees[i], assigneeName: assignees[i],
+    state: i === 0 ? 'pending-accept' : 'waiting', decision: null, reviewedVersion: null, requiresHandoff: key === 'legal' }));
+  const contract = { id: 'contract-uuid', code: 'HD-000010', status: 'submitted', version: 3,
+    rounds: [{ id: 'round-1', no: 1, result: 'in-progress', contractVersion: 3, steps: structuredClone(steps) }] };
+  const doc = { id: contract.id, code: contract.code, roundId: 'round-1', roundNo: 1, version: 3, submittedVersion: 3, roundResult: 'in-progress', status: 'submitted', steps };
+  return { actor, contract, doc };
+}
+
+test('detail review exposes sales acceptance only for the assigned reviewer on the displayed version', () => {
+  const { actor, contract, doc } = reviewFixture();
+  assert.equal(api.approvalView(contract, actor, doc).kind, 'accept');
+  assert.equal(api.approvalView({ ...contract, version: 2 }, actor, doc).kind, 'stale');
+  assert.equal(api.approvalView(contract, actor, { ...doc, roundId: 'new-round' }).kind, 'stale');
+  assert.equal(api.approvalView(contract, { ...actor, permissions: new Set() }, doc).kind, 'info');
+  assert.equal(api.approvalView(contract, { ...actor, id: 'different-manager' }, doc).kind, 'info');
+});
+
+test('legal and board controls wait for predecessors, assignment and the explicit handoff', () => {
+  const f = reviewFixture('NV_PC');
+  assert.equal(api.approvalView(f.contract, f.actor, f.doc).kind, 'info');
+  f.doc.status = 'under-review'; f.doc.steps[0] = { ...f.doc.steps[0], state: 'done', decision: 'approve', reviewedVersion: 3 };
+  f.doc.steps[1].state = 'reviewing';
+  assert.equal(api.approvalView(f.contract, f.actor, f.doc).kind, 'decide');
+  f.doc.steps[1] = { ...f.doc.steps[1], state: 'done', decision: 'approve', reviewedVersion: 3 };
+  assert.equal(api.approvalView(f.contract, f.actor, f.doc).kind, 'handoff');
+  const board = { ...f.actor, id: 'GD', roles: ['GD'] };
+  assert.equal(api.approvalView(f.contract, board, f.doc).kind, 'info');
+  f.doc.steps[2].state = 'reviewing';
+  assert.equal(api.approvalView(f.contract, board, f.doc).kind, 'decide');
+  f.doc.steps[0].reviewedVersion = 2;
+  assert.equal(api.approvalView(f.contract, board, f.doc).kind, 'info');
+});
+
+test('unassigned, concluded and new manager roles produce explicit read-only states', () => {
+  const f = reviewFixture('NV_PC');
+  f.contract.rounds[0].steps[1].assigneeId = null;
+  assert.match(api.approvalView(f.contract, f.actor, f.doc).message, /chờ phân công/);
+  f.contract.rounds[0].result = 'revision';
+  assert.match(api.approvalView(f.contract, f.actor, f.doc).message, /đã kết thúc/);
+  assert.equal(api.approvalStepFor({ roles: ['TP_PC'] }), 'legal');
+  assert.equal(api.approvalStepFor({ roles: ['TGD'] }), 'board');
+  assert.equal(api.approvalStepFor({ roles: ['NV_KD'] }), undefined);
 });

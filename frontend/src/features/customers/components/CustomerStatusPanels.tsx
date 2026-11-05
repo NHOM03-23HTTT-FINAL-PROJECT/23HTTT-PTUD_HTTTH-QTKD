@@ -37,9 +37,9 @@ type MenuItem = {
 
 /**
  * Nút "Chỉnh sửa thông tin ▾" (frame 03.0 / 04.0): phần chính mở UC-CUS-02, mũi tên mở menu có thao tác tạm ngưng /
- * kích hoạt lại theo quyền trên hồ sơ; mục không áp dụng cho trạng thái hiện tại bị mờ.
+ * kích hoạt lại dành cho Trưởng phòng KD; mục không áp dụng cho trạng thái hiện tại bị mờ.
  */
-export function CustomerActionsMenu({ customer, canEdit, canSuspend, canReactivate }: { customer: Customer; canEdit: boolean; canSuspend: boolean; canReactivate: boolean }) {
+export function CustomerActionsMenu({ customer, canChangeStatus }: { customer: Customer; canChangeStatus: boolean }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const suspended = customer.status === 'suspended';
@@ -61,29 +61,29 @@ export function CustomerActionsMenu({ customer, canEdit, canSuspend, canReactiva
   }, [open]);
 
   const statusItems: MenuItem[] = [
-    ...(canSuspend ? [{
+    {
       to: ROUTES.customerSuspend(customer.code),
-      icon: 'pause' as const,
+      icon: 'pause',
       label: 'Tạm ngưng khách hàng',
       hint: suspended ? 'Khách hàng đã Tạm ngưng' : 'Ngăn phát sinh giao dịch mới · UC-CUS-03',
-      tone: 'danger' as const,
+      tone: 'danger',
       disabled: suspended,
-    }] : []),
-    ...(canReactivate ? [{
+    },
+    {
       to: ROUTES.customerReactivate(customer.code),
-      icon: 'play' as const,
+      icon: 'play',
       label: 'Kích hoạt lại khách hàng',
       hint: suspended ? 'Cho phép giao dịch trở lại · UC-CUS-04' : 'Chỉ khi khách hàng đang Tạm ngưng',
-      tone: 'success' as const,
+      tone: 'success',
       disabled: !suspended,
-    }] : []),
+    },
   ];
 
   return (
     <div ref={rootRef} className="split-button">
-      {canEdit && <Link to={ROUTES.customerEdit(customer.code)} className="btn btn--primary split-button__main">
+      <Link to={ROUTES.customerEdit(customer.code)} className="btn btn--primary split-button__main">
         Chỉnh sửa thông tin
-      </Link>}
+      </Link>
       <button
         type="button"
         className="btn btn--primary split-button__toggle"
@@ -96,11 +96,11 @@ export function CustomerActionsMenu({ customer, canEdit, canSuspend, canReactiva
       </button>
       {open && (
         <div className="action-menu" role="menu">
-          {canEdit && <MenuLink item={{ to: ROUTES.customerEdit(customer.code), icon: 'edit', label: 'Cập nhật thông tin', hint: 'Sửa thông tin hồ sơ · UC-CUS-02' }} />}
-          {/* Chỉ hiện thao tác trạng thái khi phiên hiện tại có quyền tương ứng. */}
-          {statusItems.length > 0 && (
+          <MenuLink item={{ to: ROUTES.customerEdit(customer.code), icon: 'edit', label: 'Cập nhật thông tin', hint: 'Sửa thông tin hồ sơ · UC-CUS-02' }} />
+          {/* Nhân viên KD không có quyền đổi trạng thái nên chỉ thấy "Cập nhật thông tin" (ghi chú 03.0). */}
+          {canChangeStatus && (
             <>
-              <p className="action-menu__group">TRẠNG THÁI HỢP TÁC</p>
+              <p className="action-menu__group">TRẠNG THÁI HỢP TÁC · CHỈ TRƯỞNG PHÒNG KD</p>
               {statusItems.map((item) => (
                 <MenuLink key={item.label} item={item} />
               ))}
@@ -141,17 +141,11 @@ function MenuLink({ item }: { item: MenuItem }) {
 
 /** "Lịch sử trạng thái": lần tạo hồ sơ và các lần chuyển trạng thái, mới nhất trước (frame 03.6 / 04.1). */
 export function StatusHistoryCard({ customer }: { customer: Customer }) {
-  const entries = customer.history.filter((entry) => entry.action === 'Tạo hồ sơ khách hàng' || entry.statusChange).reverse();
-  const decisions = [...(customer.statusDecisions ?? [])].reverse();
+  const entries = customer.history.filter((entry, index) => index === 0 || entry.statusChange).reverse();
   return (
     <section className="side-card">
       <h2 className="side-card__title">Lịch sử trạng thái</h2>
-      {entries.length === 0 && decisions.length === 0 && <p>Chưa có thông tin lịch sử trạng thái.</p>}
       <ol className="history-timeline">
-        {decisions.map((decision) => <li key={`${decision.type}-${decision.at}`} className="history-timeline__item">
-          <span className="history-timeline__title">{decision.type === 'Suspend' ? 'Tạm ngưng' : 'Kích hoạt lại'}</span>
-          <span className="history-timeline__meta">{decision.decidedBy} · {formatDateTime(decision.at)}</span>
-        </li>)}
         {entries.map((entry) => {
           const to = entry.statusChange?.to;
           const tone = to === 'suspended' ? 'warning' : to === 'active' ? 'success' : 'neutral';

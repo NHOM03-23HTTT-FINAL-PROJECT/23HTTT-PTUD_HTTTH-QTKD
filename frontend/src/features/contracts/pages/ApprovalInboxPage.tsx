@@ -11,7 +11,8 @@ import { ROUTES } from '@/constants/routes';
 import { formatDateTime, formatMoney } from '@/utils/format';
 import { contractsApi } from '../api/contractsApi';
 import { approvalApi, approvalReviewPath } from '../api/approvalApi';
-import { approvalError } from './ContractReviewPage';
+import { APPROVALS_CHANGED } from '../api/approvalEvents';
+import { approvalError } from '../utils/approvalReview';
 import { ContractActionError, type ApprovalInboxItem, type ApprovalStepKey } from '../types/contract';
 import { CONTRACT_STATUS_BADGE, DECISION_LABELS } from '../utils/contractStatus';
 import './Contracts.css';
@@ -22,7 +23,7 @@ const COPY: Record<ApprovalStepKey, { title: string; subtitle: string; action: s
   board: { title: 'Hồ sơ chờ phê duyệt', subtitle: 'Hồ sơ đã được Pháp chế kết luận đạt yêu cầu và giao cho bạn phê duyệt.', action: 'Xem & phê duyệt', empty: 'Không có hồ sơ nào đang chờ phê duyệt.' },
 };
 
-type InboxRow = Pick<ApprovalInboxItem, 'code' | 'title' | 'customerName' | 'ownerName' | 'value' | 'status' | 'submittedAt' | 'assignedAt' | 'decidedAt' | 'decision' | 'previousStep'>;
+type InboxRow = Pick<ApprovalInboxItem, 'code' | 'title' | 'customerName' | 'ownerName' | 'value' | 'status' | 'submittedAt' | 'assignedAt' | 'decidedAt' | 'decision' | 'previousStep'> & { reviewId?: string; detailCode?: string };
 type Load = { kind: 'loading' } | { kind: 'ok'; items: InboxRow[] } | { kind: 'error'; message: string };
 
 /** 07.1 / 08.1 / 09.1 · Hồ sơ được giao tại bước của người dùng; `done` cho danh sách "Đã rà soát". */
@@ -35,6 +36,22 @@ export function ApprovalInboxPage({ step, done = false }: { step: ApprovalStepKe
   const title = done ? 'Hồ sơ đã rà soát' : copy.title;
 
   useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState !== 'hidden') setRetry(value => value + 1);
+    };
+    window.addEventListener(APPROVALS_CHANGED, refresh);
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    const timer = window.setInterval(refresh, 30000);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener(APPROVALS_CHANGED, refresh);
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!user) return;
     let active = true;
     setLoad({ kind: 'loading' });
@@ -42,7 +59,7 @@ export function ApprovalInboxPage({ step, done = false }: { step: ApprovalStepKe
       ? contractsApi.inbox({ userId: user.id, signedInAt: user.signedInAt, step, done })
       : approvalApi.inbox(step, done).then(docs => docs.map(d => {
         const reviewed = d.steps.find(s => s.key === step && s.assigneeId === user.id);
-        return { code: d.id, title: d.title, customerName: d.customerName, ownerName: d.ownerName,
+        return { code: d.code || d.id, detailCode: d.code, reviewId: d.id, title: d.title, customerName: d.customerName, ownerName: d.ownerName,
           value: d.value, status: d.status, submittedAt: d.submittedAt,
           decidedAt: reviewed?.decidedAt ?? undefined, decision: reviewed?.decision ?? undefined };
       }));
@@ -57,16 +74,16 @@ export function ApprovalInboxPage({ step, done = false }: { step: ApprovalStepKe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, done, retry, user?.id]);
 
-  const reviewPath = (id: string) => IS_MOCK_AUTH ? ROUTES.contractDetail(id) : approvalReviewPath(id, step);
+  const reviewPath = (row: InboxRow) => IS_MOCK_AUTH || row.detailCode ? ROUTES.contractDetail(row.code) : approvalReviewPath(row.reviewId ?? row.code, step);
   const columns: Column<InboxRow>[] = [
-    { key: 'code', header: 'Mã hợp đồng', width: 130, render: (row) => <Link to={reviewPath(row.code)} className="contract-list__code">{row.code}</Link> },
+    { key: 'code', header: 'Mã hợp đồng', width: 130, render: (row) => <Link to={reviewPath(row)} className="contract-list__code">{row.code}</Link> },
     { key: 'title', header: 'Hợp đồng · khách hàng', render: (row) => <span className="contract-list__stack"><span>{row.title}</span><small>{row.customerName} · {row.ownerName}</small></span> },
     { key: 'value', header: 'Giá trị', width: 150, align: 'end', render: (row) => formatMoney(row.value) },
     done
       ? { key: 'decision', header: 'Kết quả', width: 170, render: (row) => <span className="contract-list__stack"><StatusBadge label={row.decision ? DECISION_LABELS[row.decision] : '—'} tone={row.decision === 'approve' ? 'success' : row.decision === 'reject' ? 'danger' : 'warning'} /><small>{row.decidedAt ? formatDateTime(row.decidedAt) : ''}</small></span> }
       : { key: 'assigned', header: 'Giao lúc', width: 170, render: (row) => <span className="contract-list__stack"><span>{row.assignedAt ? formatDateTime(row.assignedAt) : '—'}</span>{row.previousStep && <small>{row.previousStep}</small>}</span> },
     { key: 'status', header: 'Trạng thái', width: 140, render: (row) => <StatusBadge label={CONTRACT_STATUS_BADGE[row.status].label} tone={CONTRACT_STATUS_BADGE[row.status].tone} /> },
-    { key: 'actions', header: '', width: 140, align: 'end', render: (row) => <Link to={reviewPath(row.code)} className={done ? 'btn btn--ghost' : 'btn btn--primary'}>{done ? 'Xem' : copy.action}</Link> },
+    { key: 'actions', header: '', width: 140, align: 'end', render: (row) => <Link to={reviewPath(row)} className={done ? 'btn btn--ghost' : 'btn btn--primary'}>{done ? 'Xem' : copy.action}</Link> },
   ];
 
   return (

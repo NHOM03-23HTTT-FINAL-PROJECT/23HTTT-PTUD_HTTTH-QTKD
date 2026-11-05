@@ -45,7 +45,7 @@ public sealed partial class CustomerService
         var actor = await GetActor(actorId, ct);
         await using var c = Connection(); await c.OpenAsync(ct);
         var row = await Find(c, null, actor, ParseCode(code), false, ct);
-        return new CustomerStatusPermissions(await CanStatusAction(c, null, actor, row, "Suspend", ct),
+        return new CustomerStatusPermissions(false,
             await CanStatusAction(c, null, actor, row, "Reactivate", ct));
     }
 
@@ -121,7 +121,7 @@ public sealed partial class CustomerService
     public async Task<StatusDelegationView> GrantDelegation(Guid actorId, Guid sessionId,
         GrantStatusDelegationRequest request, CancellationToken ct)
     {
-        var action = request.Action switch { "suspend" => "Suspend", "reactivate" => "Reactivate", _ => null };
+        var action = request.Action == "reactivate" ? "Reactivate" : null;
         var reason = (request.Reason ?? "").Trim();
         if (request.GranteeId == Guid.Empty || action is null || reason.Length > 1000)
             throw new CustomerFailure(400, "VALIDATION");

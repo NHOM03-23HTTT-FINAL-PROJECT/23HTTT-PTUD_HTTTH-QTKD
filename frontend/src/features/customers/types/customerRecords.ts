@@ -69,7 +69,7 @@ export type ReportDiscrepancyRequest = {
   content: string;
 };
 
-export type CustomerRecordsErrorCode = 'LOAD_FAILED' | 'SOURCE_UNAVAILABLE' | 'FORBIDDEN' | 'NOT_FOUND' | 'SESSION_ENDED' | 'VALIDATION';
+export type CustomerRecordsErrorCode = 'LOAD_FAILED' | 'FORBIDDEN' | 'NOT_FOUND' | 'SESSION_ENDED' | 'VALIDATION';
 
 export class CustomerRecordsError extends Error {
   readonly code: CustomerRecordsErrorCode;

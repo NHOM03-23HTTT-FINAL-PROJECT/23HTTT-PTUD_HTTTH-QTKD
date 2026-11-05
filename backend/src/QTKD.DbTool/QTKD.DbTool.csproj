@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Database operations for the qtkd schema: connection check, EF Core migrations, Prisma hand-over and demo seed. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../QTKD.Infrastructure/QTKD.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

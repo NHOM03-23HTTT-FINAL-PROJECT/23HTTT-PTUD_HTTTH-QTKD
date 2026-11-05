@@ -8,7 +8,7 @@
 | --- | --- |
 | Frontend | React 18.3.1, TypeScript 5.6.3, Vite 5.4.11 — [frontend/](frontend/README.md) |
 | Backend | .NET 10, ASP.NET Core Identity Core, JWT, EF Core/Npgsql; bốn tầng Api/Application/Domain/Infrastructure — [backend/](backend/README.md) |
-| Database | PostgreSQL trên Supabase; Prisma 7.10.1 là nguồn migration duy nhất — [DB/](DB/README.md) |
+| Database | PostgreSQL trên Supabase; EF Core (`QtkdDbContext`) là nguồn migration duy nhất từ 04/11/2026, áp bằng `QTKD.DbTool` — [DB/](DB/README.md) |
 | Tài liệu | [Kiến trúc](docs/architecture/STRUCTURE.md), [ADR](docs/decisions/README.md), [API Identity](docs/specs/identity/list_api-auth.md) |
 
 BE thực tế ở `backend/`. Supabase chỉ cung cấp PostgreSQL trong luồng Identity này; không dùng Supabase Auth. FE gọi BE qua `/api`, không kết nối PostgreSQL trực tiếp.

@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/button/Button';
 import { Alert } from '@/components/feedback/Alert';
 import { TextAreaField } from '@/components/form/TextAreaField';
+import { SelectField } from '@/components/form/SelectField';
+import { Dialog } from '@/components/feedback/Dialog';
 import { approvalApi, type ReviewCoordination, type ReviewDocument } from '../api/approvalApi';
 import { ApiError } from '@/lib/http/client';
 import { IS_MOCK_AUTH } from '@/features/auth/api/authApi';
@@ -13,6 +15,7 @@ export function LegalCoordinationPanel({ document, editable }: { document: Revie
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [reload, setReload] = useState(0);
+  const [requestOpen, setRequestOpen] = useState(false);
   const inFlight = useRef(false);
   useEffect(() => {
     if (IS_MOCK_AUTH) return;
@@ -28,18 +31,24 @@ export function LegalCoordinationPanel({ document, editable }: { document: Revie
     inFlight.current = true; setBusy(true);
     try {
       const item = await approvalApi.coordinate(document.id, { roundId: document.roundId, stepId: step.id, step: 'legal', viewedVersion: document.version }, department, content.trim(), crypto.randomUUID());
-      setItems(v => [...v, item]); setContent(''); setError('');
+      setItems(v => [...v, item]); setContent(''); setError(''); setRequestOpen(false);
     } catch { setError('Chưa gửi được yêu cầu phối hợp. Kiểm tra hồ sơ và thử lại.'); }
     finally { inFlight.current = false; setBusy(false); }
   }
-  return <section className="side-card"><h2>Phối hợp phòng ban chuyên môn</h2>
+  return <section className="review-coordination"><div className="review-coordination__head"><strong>Phối hợp phòng ban chuyên môn</strong>
+    <div className="review-panel__actions"><Button variant="secondary" disabled={busy} onClick={() => setReload(n => n + 1)}>Tải lại phản hồi</Button>
+      {editable && <Button variant="secondary" disabled={busy} onClick={() => setRequestOpen(true)}>Yêu cầu phối hợp</Button>}</div></div>
     {error && <Alert tone="danger" title="Chưa hoàn tất">{error}</Alert>}
-    <Button variant="secondary" onClick={() => setReload(n => n + 1)}>Tải lại phản hồi</Button>
-    {items.map(i => <div key={i.id}><h3>{i.department} · {i.reply ? 'Đã phản hồi' : 'Chờ phản hồi'}</h3><p>{i.content}</p><p>{i.requestedBy}</p>{i.reply && <p>Phản hồi: {i.reply} · {i.repliedBy}</p>}</div>)}
-    {editable && <><label>Phòng ban <select value={department} disabled={busy} onChange={e => setDepartment(e.target.value)}>
-      <option value="KT">Khai thác</option><option value="KTOAN">Kế toán</option><option value="KD">Kinh doanh</option><option value="BGD">Ban Giám đốc</option></select></label>
-      <TextAreaField label="Nội dung cần xác minh / tài liệu liên quan" required value={content} disabled={busy} onChange={e => setContent(e.target.value)} />
-      <Button disabled={busy || !content.trim()} onClick={() => void send()}>Gửi yêu cầu phối hợp</Button></>}
+    {!items.length && <p className="review-panel__text">Chưa có yêu cầu phối hợp trong lượt này.</p>}
+    {items.map(i => <div className="review-coordination__item" key={i.id}><strong>{i.department} · {i.reply ? 'Đã phản hồi' : 'Chờ phản hồi'}</strong><p>{i.content}</p><p>{i.requestedBy}</p>{i.reply && <p>Phản hồi: {i.reply} · {i.repliedBy}</p>}</div>)}
+    {editable && requestOpen && <Dialog title="Yêu cầu phối hợp phòng ban" icon="users" tone="info" width={560} initialFocus="first" onClose={() => { if (!busy) setRequestOpen(false); }}
+      actions={<><Button variant="secondary" disabled={busy} onClick={() => setRequestOpen(false)}>Hủy</Button><Button disabled={busy || !content.trim()} onClick={() => void send()}>{busy ? 'Đang gửi…' : 'Gửi yêu cầu phối hợp'}</Button></>}>
+      <div className="dialog__body contract-dialog-form"><p>{document.code ?? document.id} · Lượt {document.roundNo}</p>
+        <SelectField label="Phòng ban chuyên môn" placeholder="Chọn phòng ban" required value={department} disabled={busy} onChange={setDepartment} options={[
+          { value: 'KT', label: 'Khai thác' }, { value: 'KTOAN', label: 'Kế toán' }, { value: 'KD', label: 'Kinh doanh' }, { value: 'BGD', label: 'Ban Giám đốc' },
+        ]} />
+        <TextAreaField label="Nội dung cần xác minh / tài liệu liên quan" required maxLength={4000} value={content} disabled={busy} onChange={e => setContent(e.target.value)} />
+      </div></Dialog>}
   </section>;
 }
 

@@ -6,7 +6,6 @@ export const ROUTES = {
   forcedPasswordChange: '/doi-mat-khau-lan-dau',
   customers: '/khach-hang',
   customerCreate: '/khach-hang/tao-moi',
-  customerDelegations: '/khach-hang/uy-quyen',
   customerDetail: (code: string) => `/khach-hang/${code}`,
   customerEdit: (code: string) => `/khach-hang/${code}/chinh-sua`,
   customerSuspend: (code: string) => `/khach-hang/${code}/tam-ngung`,
@@ -30,6 +29,8 @@ export const ROUTES = {
   approvalTracking: '/phe-duyet/tien-do',
   approvalAssignments: '/phe-duyet/phan-cong',
   paymentDetail: (code: string) => `/bang-thanh-toan/${code}`,
+  notifications: '/thong-bao',
+  notificationOpen: (id: string) => `/thong-bao/${encodeURIComponent(id)}`,
 } as const;
 
 /** Tham số giữ đường dẫn người dùng định mở trước khi bị chuyển sang trang đăng nhập (A3). */

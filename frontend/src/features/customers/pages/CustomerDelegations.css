@@ -1,8 +1,0 @@
-.delegation-page { display: grid; gap: 16px; }
-.delegation-form { align-items: stretch; }
-.delegation-list { display: grid; gap: 12px; padding: 0; margin: 0; list-style: none; }
-.delegation-item { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding: 16px; border: 1px solid var(--border-default); border-radius: 8px; }
-.delegation-item__main { min-width: 0; overflow-wrap: anywhere; }
-.delegation-item__title { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.delegation-item p { margin: 5px 0 0; color: var(--text-secondary); }
-@media (max-width: 600px) { .delegation-item { flex-direction: column; } .delegation-item > .btn { align-self: flex-start; } }

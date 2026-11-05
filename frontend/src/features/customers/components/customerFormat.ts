@@ -34,3 +34,8 @@ export function formatChangeAfter(change: CustomerChange, catalogs: CustomerCata
 export function formatChangeBefore(change: CustomerChange, catalogs: CustomerCatalogs): string {
   return formatFieldValue(change.field, change.before, catalogs) || EMPTY_VALUE;
 }
+
+/** Rút gọn giá trị dài trong lịch sử, ví dụ "125 Nguyễn Văn Cừ…". */
+export function truncate(text: string, max = 22): string {
+  return text.length > max ? `${text.slice(0, max).trimEnd()}…` : text;
+}

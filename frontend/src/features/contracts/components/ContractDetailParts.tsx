@@ -163,9 +163,7 @@ export function ProgressSummaryCard({ contract }: { contract: Contract }) {
         <>
           <StatusBadge label="Chưa gửi trình duyệt" tone="neutral" />
           <p className="side-card__subtitle">
-            {BACKEND_ENABLED
-              ? 'Chức năng trình duyệt chưa được mở. Bạn có thể tiếp tục hoàn thiện hồ sơ.'
-              : 'Quy trình Trưởng phòng Kinh doanh → Pháp chế → Ban Giám đốc chỉ hiển thị sau khi hồ sơ được gửi trình duyệt.'}
+            Quy trình Trưởng phòng Kinh doanh → Pháp chế → Ban Giám đốc hiển thị sau khi hồ sơ được gửi trình duyệt hợp lệ.
           </p>
         </>
       ) : (

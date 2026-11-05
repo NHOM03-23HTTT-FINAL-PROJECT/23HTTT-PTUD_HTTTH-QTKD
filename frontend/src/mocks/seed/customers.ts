@@ -48,8 +48,7 @@ export const SIMULATED_CONCURRENT_EDIT = {
 
 type SeedHistoryEntry = Omit<Customer['history'][number], 'version'>;
 
-type SeedCustomerInput = Omit<Customer, 'version' | 'history' | 'createdBy' | 'createdAt'> & {
-  createdAt: string;
+type SeedCustomerInput = Omit<Customer, 'version' | 'history' | 'createdBy'> & {
   /** Các thao tác sau khi tạo; mỗi thao tác tăng một phiên bản. */
   laterHistory?: SeedHistoryEntry[];
 };

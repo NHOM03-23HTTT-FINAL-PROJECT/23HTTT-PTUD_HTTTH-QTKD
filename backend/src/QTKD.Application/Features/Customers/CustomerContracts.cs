@@ -24,12 +24,7 @@ public sealed record UpdateCustomerResult(CustomerView Customer, string[] Change
 public sealed record StatusEvidence(string? Name, long Size);
 public sealed record StatusPlanItem(string? Id, string? Option);
 public sealed record StatusException(string? DecisionNo, string? Content);
-public sealed record SuspendCustomerRequest(int BaseVersion, string? ReasonGroup, string? Reason,
-    StatusEvidence[]? Evidence, StatusPlanItem[]? Plan, string? CoordinationNote);
 public sealed record ReactivateCustomerRequest(int BaseVersion, string? Reason, StatusEvidence[]? Evidence, StatusException? Exception);
-public sealed record StatusImpactItem(string Id, string Kind, string KindNote, string Code, string Title, string Detail,
-    string StatusLabel, string StatusTone, string Department, string[] Options, string PlanNote);
-public sealed record SuspensionReview(StatusImpactItem[] Items, string[] FailedKinds, string? FailedAt = null, string[]? MissingSources = null);
 public sealed record ReactivationCheck(string Id, string Label, string Status, string Detail);
 public sealed record SuspensionContext(string ReasonGroup, string Reason, StatusEvidence[] Evidence, string DecidedBy,
     string DecidedByTitle, DateTime At, StatusPlanItem[] Plan, string CoordinationNote, object[] Notices);
