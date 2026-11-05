@@ -8,7 +8,7 @@
 | --- | --- |
 | Frontend | React 18.3.1, TypeScript 5.6.3, Vite 5.4.11 — [frontend/](frontend/README.md) |
 | Backend | .NET 10, ASP.NET Core Identity Core, JWT, EF Core/Npgsql; bốn tầng Api/Application/Domain/Infrastructure — [backend/](backend/README.md) |
-| Database | PostgreSQL trên Supabase; Prisma 7.10.1 là nguồn migration duy nhất — [DB/](DB/README.md) |
+| Database | PostgreSQL trên Supabase; EF Core (`QtkdDbContext`) là nguồn migration duy nhất từ 04/11/2026, áp bằng `QTKD.DbTool` — [DB/](DB/README.md) |
 | Tài liệu | [Kiến trúc](docs/architecture/STRUCTURE.md), [ADR](docs/decisions/README.md), [API Identity](docs/specs/identity/list_api-auth.md) |
 
 BE thực tế ở `backend/`. Supabase chỉ cung cấp PostgreSQL trong luồng Identity này; không dùng Supabase Auth. FE gọi BE qua `/api`, không kết nối PostgreSQL trực tiếp.
@@ -113,7 +113,9 @@ API mode dùng mật khẩu demo được nhóm chia sẻ riêng, không dùng m
 | `demo.operations.manager` | OperationsManager |
 | `demo.accountant`, `demo.accountant.reviewer` | Accountant |
 | `demo.legal` | LegalStaff |
+| `demo.legal.manager` | LegalManager (Trưởng phòng Pháp chế, trưởng PC, có tab Phân công người duyệt) |
 | `demo.board` | BoardMember |
+| `demo.board.chair` | BoardChair (Tổng Giám đốc, trưởng BGĐ, có tab Phân công người duyệt) |
 | `demo.admin` | SystemAdmin |
 
 Role Accountant hiện có grants rỗng nhưng vẫn đăng nhập được. Tên `.reviewer` không tạo role/quyền riêng. Trên QTKD_DATH, chín tài khoản hiện có đã được reset và bỏ bắt đổi mật khẩu theo phê duyệt riêng ngày 02/11/2026; tài khoản seed trên DB mới vẫn có `mustChangePassword=true`. Đổi `SEED_PASSWORD` trong file không tự đổi mật khẩu đã lưu trong DB.
@@ -144,3 +146,6 @@ Lệnh kiểm tra offline, integration và các giới hạn bằng chứng nằ
 - [Phạm vi Sprint 1](context/SPRINT-1.md), [quy tắc nghiệp vụ](context/BUSINESS-RULES.md), [tài liệu nguồn](docs/sources/).
 
 Agent đọc [AGENTS.md](AGENTS.md) và [skill qtkd-sprint1](.agents/skills/qtkd-sprint1/SKILL.md) trước khi thay đổi. Thư mục giữ chỗ hoặc source có sẵn không chứng minh task đã hoàn tất; xác định đúng TASK/US và kiểm chứng phần được giao.
+
+
+Contracts CRUD and cancellation integration: [setup](backend/GETTING-STARTED.md).

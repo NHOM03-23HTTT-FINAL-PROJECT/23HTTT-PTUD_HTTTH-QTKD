@@ -56,7 +56,7 @@ export const authApi = {
   },
   async checkSession(userId: string, signedInAt: string): Promise<SessionCheck> {
     if (IS_MOCK_AUTH) return mockCheckSession(userId, signedInAt);
-    try { const view = await apiRequest<RemoteSession>('/auth/session', {}, false); updateApiSession(view); return { status: 'active', user: view.user }; }
+    try { const view = await apiRequest<RemoteSession>('/auth/session'); updateApiSession(view); return { status: 'active', user: view.user }; }
     catch (error) { if (error instanceof ApiError && error.status === 401) return ended(error.code); throw error; }
   },
   async activity(): Promise<void> {

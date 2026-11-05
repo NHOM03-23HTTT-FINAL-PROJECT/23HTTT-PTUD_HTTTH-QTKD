@@ -13,7 +13,7 @@ Tiền tố /api/v1. Hợp đồng theo ADR 0001–0003, được chốt Phase 0
 - Cookie __Host-qtkd-refresh: HttpOnly, Secure, SameSite=Strict, Path=/, không Domain. Secret không trả trong JSON.
 - Login/refresh/logout/change-password yêu cầu Origin trong Cors:Origins và X-QTKD-CSRF: 1. Body JSON. Server giới hạn auth 30 request/phút/IP, không hàng đợi; vượt trả 429.
 - Chỉ thêm permission đã có trong catalog. Role catalog tám mã cố định. QTHT không có wildcard bỏ qua scope/assignee.
-- API không tự migrate/seed. Chưa có recovery OTP/email thật trong phạm vi này.
+- API không tự migrate/seed. OpenAPI JSON và Swagger UI có trong môi trường `Development`, xem [hướng dẫn Swagger và SMTP](../../../backend/README.md#swagger-và-email-otp).
 
 ## Xác thực và phiên
 
@@ -36,6 +36,20 @@ Sai credential trả 401 INVALID_CREDENTIALS chung, không hiển thị số l�
 Đang khóa và đã xác minh đúng mật khẩu: 423 LOCKED kèm lockedUntil; disabled: 403 DISABLED.
 Đổi mật khẩu sai hiện tại: 400 WRONG_CURRENT, tới lần 5: 400 LOCKED và thu hồi phiên.
 Phiên kết thúc có code expired/password-changed/locked/disabled/permissions-changed. Token hỏng trả SESSION_ENDED.
+
+## Quên mật khẩu
+
+Các request gửi JSON và cần `X-QTKD-CSRF: 1` cùng Origin trong danh sách cho phép. FE gửi qua luồng HTTP công khai.
+
+| Method | Endpoint dưới `/api/v1/auth/password/recovery` | Dữ liệu | Kết quả |
+| --- | --- | --- | --- |
+| POST | `/send` | `identifier` | `202` với `expiresAt`, `resendAvailableAt` theo epoch milliseconds. Phản hồi có cùng cấu trúc dù tài khoản có tồn tại hay không. |
+| POST | `/verify` | `identifier`, `code` | `200` với `resetToken`, `accountLabel`. Mã sai, hết hạn, đã dùng hoặc bị chặn đều trả `400 INVALID_CODE`. |
+| POST | `/reset` | `resetToken`, `newPassword` | `200` với `identifier` để quay lại login. Lỗi `400 TOKEN_EXPIRED`, `WEAK_PASSWORD` hoặc `SAME_AS_CURRENT`. |
+
+- OTP sáu chữ số có hiệu lực 5 phút. Mỗi tài khoản đợi ít nhất 60 giây giữa hai lần gửi và nhận tối đa 4 mã trong 15 phút. Sau 5 lần xác minh sai, luồng gửi mã của tài khoản tạm dừng 15 phút.
+- Xác minh thành công tiêu thụ OTP và cấp reset token dùng một lần, hạn 10 phút. Khi thực sự phát OTP mới, mã và reset token trước đó mất hiệu lực. Reset thành công lưu mật khẩu mới và thu hồi mọi phiên trong cùng transaction.
+- `429 RATE_LIMITED` áp theo IP. `/send` trả `503 EMAIL_FAILED` khi chưa bật SMTP hoặc hàng đợi không nhận thêm yêu cầu. `202` xác nhận đã nhận yêu cầu để xử lý, việc giao thư diễn ra sau đó.
 
 ## Người dùng, phòng ban, vai trò và quyền
 
@@ -72,7 +86,7 @@ Lookup department/role cho màn quản trị hiện dành cho QTHT có bộ quy�
 | BoardMember | GD | BGD |
 | SystemAdmin | QTHT | QTHT |
 
-Ma trận grants khởi tạo nằm tại DB/prisma/identity-catalog.ts và migration 202611020003_identity.
+Ma trận grants khởi tạo nằm trong migration 202611020003_identity (backend/src/QTKD.Infrastructure/Persistence/Migrations/Sql) và bảng role_permission của fixture demo-seed.json.
 Sau khi admin thay grants, DB là nguồn quyền; chạy seed không tự phục hồi quyền đã gỡ.
 
 ## Tích hợp các module tiếp theo
@@ -81,4 +95,4 @@ Policy ResourceAccess nhận resource metadata từ BE đã tải: permission, I
 Không bind trực tiếp ResourceAccess từ body client và không mặc định InScope=true khi thiếu AC.
 Handler chỉ cung cấp cơ chế; chưa chứng minh endpoint duyệt thật đã tích hợp handler.
 
-OTP recovery, get-password-changed-at riêng và CRUD UI quản trị chưa thuộc API đã triển khai. passwordChangedAt được gộp trong user/session.
+`passwordChangedAt` được gộp trong user/session. CRUD UI quản trị còn ngoài phần này.

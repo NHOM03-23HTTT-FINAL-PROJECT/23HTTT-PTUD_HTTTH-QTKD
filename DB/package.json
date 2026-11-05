@@ -3,35 +3,27 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=22.18.0 <23 || >=24.11.0" },
+  "engines": {
+    "node": ">=22.18.0 <23 || >=24.11.0"
+  },
   "scripts": {
-    "format": "prisma format",
-    "validate": "prisma validate",
-    "generate": "prisma generate",
-    "typecheck": "tsc --noEmit",
-    "test": "tsx --test tests/*.test.ts",
-    "test:identity:offline": "node --experimental-transform-types --test tests/identity-offline.test.mjs",
-    "seed:check": "tsx prisma/seed.ts --dry-run",
-    "migration:check": "tsx scripts/check-migration.ts",
-    "connection:check": "tsx scripts/check-connection.ts",
-    "check": "npm run validate && npm run generate && npm run typecheck && npm test && npm run seed:check && npm run migration:check",
-    "migrate:deploy": "tsx scripts/supabase.ts migrate",
-    "migrate:status": "tsx scripts/supabase.ts status",
-    "preseed": "npm run generate",
-    "seed": "tsx scripts/supabase.ts seed"
+    "connection:check": "dotnet run --project ../backend/src/QTKD.DbTool -- connection-check",
+    "migrate:status": "dotnet run --project ../backend/src/QTKD.DbTool -- status",
+    "migrate:adopt": "dotnet run --project ../backend/src/QTKD.DbTool -- adopt",
+    "migrate:deploy": "dotnet run --project ../backend/src/QTKD.DbTool -- migrate",
+    "seed:check": "dotnet run --project ../backend/src/QTKD.DbTool -- seed --dry-run",
+    "seed": "dotnet run --project ../backend/src/QTKD.DbTool -- seed",
+    "test": "node --experimental-transform-types --test tests/identity-offline.test.mjs",
+    "test:ef-parity": "node tests/ef-schema-parity.mjs",
+    "test:dbtool": "dotnet build ../backend/src/QTKD.DbTool && node tests/dbtool-pglite.mjs",
+    "test:contracts": "node tests/contracts-api.mjs",
+    "check": "npm test && npm run test:ef-parity && npm run test:dbtool"
   },
   "dependencies": {
-    "@prisma/adapter-pg": "7.10.1",
-    "@prisma/client": "7.10.1",
-    "bcryptjs": "3.0.3",
-    "dotenv": "17.2.3",
-    "pg": "8.16.3"
+    "bcryptjs": "3.0.3"
   },
   "devDependencies": {
-    "@types/node": "22.19.0",
-    "@types/pg": "8.15.6",
-    "prisma": "7.10.1",
-    "tsx": "4.20.6",
-    "typescript": "5.9.3"
+    "@electric-sql/pglite": "0.5.14",
+    "@electric-sql/pglite-socket": "0.2.17"
   }
 }

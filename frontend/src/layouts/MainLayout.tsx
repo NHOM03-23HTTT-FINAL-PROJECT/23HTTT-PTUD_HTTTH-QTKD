@@ -4,7 +4,10 @@ import { SessionProvider } from '@/app/providers/SessionProvider';
 import { Icon } from '@/components/icon/Icon';
 import { WORKSPACE_NAV, WORKSPACE_SEARCH_PLACEHOLDER, type NavItem } from '@/constants/navigation';
 import { ROUTES } from '@/constants/routes';
-import { getUnreadCount } from '@/mocks/seed/dashboards';
+import { NotificationBell } from '@/features/notifications/components/NotificationBell';
+import { NotificationsProvider } from '@/features/notifications/hooks/useNotifications';
+import { IS_MOCK_AUTH } from '@/features/auth/api/authApi';
+import { useApprovalInboxCount } from '@/features/contracts/hooks/useApprovalInboxCount';
 import { AccountMenu } from './AccountMenu';
 import './MainLayout.css';
 
@@ -16,6 +19,7 @@ export function MainLayout() {
 
   return (
     <SessionProvider user={user}>
+      <NotificationsProvider userId={user.id}>
       <div className="app-shell" data-accent={workspace}>
         <Topbar user={user} />
         <div className="app-shell__body">
@@ -25,13 +29,13 @@ export function MainLayout() {
           </main>
         </div>
       </div>
+      </NotificationsProvider>
     </SessionProvider>
   );
 }
 
 function Topbar({ user }: { user: CurrentUser }) {
   const workspace = user.departmentInfo.workspace;
-  const hasUnread = getUnreadCount(workspace) > 0;
 
   return (
     <header className="topbar">
@@ -58,10 +62,7 @@ function Topbar({ user }: { user: CurrentUser }) {
         {user.departmentInfo.name}
       </span>
 
-      <button type="button" className="topbar__icon-button" aria-label="Thông báo">
-        <Icon name="bell" />
-        {hasUnread && <span className="topbar__unread" />}
-      </button>
+      <NotificationBell />
 
       <span className="topbar__divider" />
 
@@ -72,6 +73,7 @@ function Topbar({ user }: { user: CurrentUser }) {
 
 /** "Đổi mật khẩu" và "Đăng xuất" nằm trong menu tài khoản trên Topbar, không lặp lại ở Sidebar. */
 function Sidebar({ user }: { user: CurrentUser }) {
+  const inbox = useApprovalInboxCount(user);
   const areaRecordNavPath = user.departmentInfo.workspace === 'khai-thac' ? ROUTES.areas : ROUTES.areaLookup;
   const groups = WORKSPACE_NAV[user.departmentInfo.workspace]
     .map((group) => ({
@@ -91,7 +93,9 @@ function Sidebar({ user }: { user: CurrentUser }) {
           {group.items.map((item) => (
             <SidebarLink
               key={item.path}
-              item={item}
+              item={{ ...item, badge: item.approvalStep
+                ? item.approvalStep === inbox.step ? inbox.count : undefined
+                : IS_MOCK_AUTH ? item.badge : undefined }}
               activeForAreaRecord={item.path === areaRecordNavPath}
               activeForContractRecord={item.path === ROUTES.contracts}
               activeForTrackedProgress={item.path === ROUTES.approvalTracking}
@@ -141,7 +145,7 @@ function SidebarLink({
     >
       <Icon name={item.icon} />
       <span className="sidebar__label">{item.label}</span>
-      {item.badge ? <span className="sidebar__badge">{item.badge}</span> : null}
+      {item.badge ? <span className="sidebar__badge" aria-label={`${item.badge} hồ sơ chờ xử lý`}>{item.badge}</span> : null}
     </NavLink>
   );
 }

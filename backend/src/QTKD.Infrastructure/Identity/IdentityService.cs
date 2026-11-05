@@ -39,7 +39,7 @@ public sealed class IdentityService(IdentityDbContext db, UserManager<UserAccoun
             {
                 if (user.LockedUntil is not null) user.FailedLoginCount = 0;
                 user.FailedLoginCount++;
-                if (user.FailedLoginCount >= 5) { user.LockedUntil = Now.AddMinutes(15); user.Status = UserStatus.TemporarilyLocked; await RevokeAll(user.UserId, "locked", ct); }
+                if (user.FailedLoginCount >= 5) { user.LockedUntil = Now.AddMinutes(15); user.Status = UserStatus.TemporarilyLocked; await db.RevokeSessions(user.UserId, "locked", ct); }
                 await db.SaveChangesAsync(ct);
             }
             await transaction.CommitAsync(ct);
@@ -121,7 +121,7 @@ public sealed class IdentityService(IdentityDbContext db, UserManager<UserAccoun
             if (user.FailedLoginCount >= 5)
             {
                 user.Status = UserStatus.TemporarilyLocked; user.LockedUntil = Now.AddMinutes(15);
-                await RevokeAll(userId, "locked", ct);
+                await db.RevokeSessions(userId, "locked", ct);
             }
             await db.SaveChangesAsync(ct); await transaction.CommitAsync(ct);
             throw new IdentityFailure(400, user.FailedLoginCount >= 5 ? "LOCKED" : "WRONG_CURRENT", Math.Max(0, 5 - user.FailedLoginCount));
@@ -131,7 +131,8 @@ public sealed class IdentityService(IdentityDbContext db, UserManager<UserAccoun
         var changed = await users.ChangePasswordAsync(user, request.CurrentPassword, request.NewPassword);
         if (!changed.Succeeded) throw new IdentityFailure(400, "WEAK_PASSWORD");
         user.MustChangePassword = false; user.PasswordChangedAt = Now; user.FailedLoginCount = 0;
-        await RevokeAll(userId, "password-changed", ct, sessionId);
+        await db.InvalidatePasswordRecovery(userId, ct);
+        await db.RevokeSessions(userId, "password-changed", ct, sessionId);
         var refresh = refreshCookie![..65] + TokenIssuer.NewRefresh(); session.RefreshTokenHash = TokenIssuer.Hash(refresh); session.LastActivityAt = Now;
         var view = await View(user, ct);
         await db.SaveChangesAsync(ct); await transaction.CommitAsync(ct);
@@ -185,7 +186,8 @@ public sealed class IdentityService(IdentityDbContext db, UserManager<UserAccoun
         if (actorId == userId && (role != user.Role || status != user.Status || request.DepartmentId != user.DepartmentId)) throw new IdentityFailure(409, "SELF_ADMIN_CHANGE");
         if (user.Role == UserRole.SystemAdmin && user.Status == UserStatus.Active && (role != UserRole.SystemAdmin || status != UserStatus.Active)
             && !await db.Users.AnyAsync(x => x.UserId != userId && x.Role == UserRole.SystemAdmin && x.Status == UserStatus.Active, ct)) throw new IdentityFailure(409, "LAST_ADMIN");
-        if (role != user.Role || status != user.Status || request.DepartmentId != user.DepartmentId) await RevokeAll(userId, status == UserStatus.Disabled ? "disabled" : "permissions-changed", ct);
+        if (role != user.Role || status != user.Status || request.DepartmentId != user.DepartmentId) await db.RevokeSessions(userId, status == UserStatus.Disabled ? "disabled" : "permissions-changed", ct);
+        if (status == UserStatus.Disabled) await db.InvalidatePasswordRecovery(userId, ct);
         user.FullName = request.FullName.Trim(); user.DepartmentId = request.DepartmentId; user.Role = role; user.Status = status;
         user.LockedUntil = null; user.FailedLoginCount = 0;
         await db.SaveChangesAsync(ct); await transaction.CommitAsync(ct);
@@ -262,11 +264,6 @@ public sealed class IdentityService(IdentityDbContext db, UserManager<UserAccoun
         if (!TokenIssuer.IsSessionToken(token)) return Task.FromResult<LoginSession?>(null);
         var hash = TokenIssuer.Hash(token![..64]);
         return (tracked ? db.Sessions : db.Sessions.AsNoTracking()).SingleOrDefaultAsync(x => x.LogoutTokenHash == hash, ct);
-    }
-    private async Task RevokeAll(Guid userId, string reason, CancellationToken ct, Guid? except = null)
-    {
-        var sessions = await db.Sessions.Where(x => x.UserId == userId && !x.IsRevoked && (except == null || x.SessionId != except)).ToListAsync(ct);
-        foreach (var session in sessions) Revoke(session, SessionEndReason.Revoked, reason);
     }
     private static void Revoke(LoginSession session, SessionEndReason reason, string detail) { session.IsRevoked = true; session.EndReason = reason; session.RevocationReason = detail; }
     private AuthResult Result(UserAccount user, LoginSession session, AuthUser view, string refresh, LoginTrace? previous = null)

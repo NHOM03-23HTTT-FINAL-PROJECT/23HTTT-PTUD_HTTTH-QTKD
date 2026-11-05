@@ -19,7 +19,7 @@ dotnet --list-sdks
 
 | File | Điền gì | Ai sử dụng |
 | --- | --- | --- |
-| DB/.env | DIRECT_URL lấy từ Supabase; SEED_PASSWORD là mật khẩu tài khoản app demo | Prisma migrate/seed |
+| DB/.env | DIRECT_URL lấy từ Supabase; SEED_PASSWORD là mật khẩu tài khoản app demo | QTKD.DbTool migrate/seed (qua npm trong DB/) |
 | DB/.env.supabase-ca.crt | CA PostgreSQL đúng project nếu cần file CA riêng | Driver pg; BE qua PGSSLROOTCERT |
 | backend/.env | Jwt__SigningKey riêng; ConnectionStrings__Identity tùy chọn | Start-Api.ps1 nạp vào tiến trình .NET |
 | frontend/.env.local | VITE_AUTH_MODE=api, VITE_SESSION_IDLE_MINUTES=30 | Vite |
@@ -77,7 +77,7 @@ Thực hiện từng khối, chỉ tiếp tục sau khi lệnh trước thành c
 
 Chạy integration BE trong terminal riêng từ backend/ bằng `dotnet test QTKD.slnx --no-build --logger 'trx;LogFileName=identity.trx'`. Mặc định SQLite in-memory và middleware thật; cần DB/node_modules/bcryptjs và Node trong PATH cho bcrypt interop. Không đặt QTKD_TEST_DATABASE_CONNECTION trừ khi đã chọn project test riêng. Xem [gate và giới hạn test](../testing/test-cases/identity.md). Integration không phải điều kiện để API có thể khởi động, nhưng là gate trước nghiệm thu task.
 
-Nếu restore lỗi, kiểm tra DNS/proxy/mạng tới api.nuget.org, registry.npmjs.org và máy chủ engine Prisma. Không dùng --ignore-failed-sources để coi một restore thiếu package là thành công.
+Nếu restore lỗi, kiểm tra DNS/proxy/mạng tới api.nuget.org, registry.npmjs.org và các nguồn package khác. Không dùng --ignore-failed-sources để coi một restore thiếu package là thành công.
 
 ## 5. Chuẩn bị DB mới hoặc cập nhật schema
 
@@ -88,13 +88,14 @@ Các lệnh sau ghi vào Supabase được DIRECT_URL trỏ tới:
 ```powershell
 Push-Location DB
 npm run migrate:status
+npm run migrate:adopt   # chỉ một lần cho DB do Prisma dựng trước 04/11/2026
 npm run migrate:deploy
 npm run seed
 npm run migrate:status
 Pop-Location
 ```
 
-Chỉ chạy phần ghi sau khi người phụ trách đã chọn đúng DB mới/dev/test hoặc lên lịch cập nhật DB chung. Project mới chạy cả ba migration; Prisma chỉ apply migration còn pending trên project hiện có. Không chạy migrate dev/reset, db push hoặc xóa lịch sử Prisma. Nếu báo migration cũ bị sửa/checksum khác hoặc natural-key collision khi seed, dừng và đối chiếu, không xóa dữ liệu để ép chạy.
+Chỉ chạy phần ghi sau khi người phụ trách đã chọn đúng DB mới/dev/test hoặc lên lịch cập nhật DB chung. Project mới chạy mọi migration EF; project hiện có chỉ apply migration còn pending. DB do Prisma dựng phải `migrate:adopt` trước (xem DB/README.md). Không chạy `dotnet ef database update`, xóa `_prisma_migrations` hay `__EFMigrationsHistory`. Nếu báo migration cũ bị sửa/checksum khác hoặc natural-key collision khi seed, dừng và đối chiếu, không xóa dữ liệu để ép chạy.
 
 Trên project dev/test riêng, chạy seed thêm một lần để kiểm tra tính chạy lại. Seed giữ nguyên tài khoản/mật khẩu đã có, không cập nhật mật khẩu chỉ vì thay SEED_PASSWORD.
 
@@ -103,13 +104,13 @@ Ngày 02/11/2026, theo phê duyệt riêng của người dùng, 9 tài khoản 
 Mở SQL Editor và chạy các truy vấn đọc:
 
 ```sql
-select migration_name, finished_at, rolled_back_at
-from qtkd._prisma_migrations order by started_at;
+select "MigrationId", "ProductVersion"
+from qtkd."__EFMigrationsHistory" order by "MigrationId";
 
 select count(*) as app_tables
 from information_schema.tables
 where table_schema = 'qtkd' and table_type = 'BASE TABLE'
-  and table_name <> '_prisma_migrations';
+  and table_name not in ('_prisma_migrations', '__EFMigrationsHistory');
 
 select count(*) as departments from qtkd.department;
 select count(*) as roles from qtkd.role_definition;
@@ -117,7 +118,7 @@ select username, role, status, must_change_password
 from qtkd.user_account where username like 'demo.%' order by username;
 ```
 
-Sau khi migration và seed thành công trên project mới: 29 bảng app, 6 phòng ban, 8 role, 9 tài khoản demo. Database đã có dữ liệu khác có thể nhiều hơn. Trong Table Editor chọn schema qtkd. Không công khai schema/quyền cho anon để xem từ FE; backend dùng kết nối PostgreSQL server.
+Sau khi migration và seed thành công trên project mới: 32 bảng app, 6 phòng ban, 10 role, 11 tài khoản demo. Database đã có dữ liệu khác có thể nhiều hơn. Trong Table Editor chọn schema qtkd. Không công khai schema/quyền cho anon để xem từ FE; backend dùng kết nối PostgreSQL server.
 
 ## 6. Chạy hai terminal
 
@@ -161,7 +162,7 @@ Mở **http://localhost:5173** (không thay bằng IP LAN hoặc hostname khác)
 - Liveness 200 nhưng login 500: xem log BE và DB connectivity; liveness không kiểm tra database.
 - API SESSION_ENDED/CSRF_REJECTED: xem cookie và Origin/X-QTKD-CSRF trong DevTools, dùng đúng localhost:5173 và Vite proxy; không gọi FE trực tiếp bằng IP.
 - Script bị Execution Policy chặn: xem chính sách của máy và dùng terminal PowerShell được cho phép. Không đổi policy toàn máy chỉ để chạy project.
-- ERR_MODULE_NOT_FOUND trỏ generated/prisma/client.js: cập nhật bản sửa import `.ts`, chạy `npm run generate` trong DB rồi `npm run seed:check`. `npm run seed` đã có preseed để tự generate. DEP0205 trên Node 26 là cảnh báo độc lập; toàn bộ `npm run check` đã PASS trên Node 26.13.0. Có thể dùng Node 24 LTS theo cấu hình môi trường đề xuất.
+- `migrate` báo "DB do Prisma dựng nhưng chưa adopt": chạy `npm run migrate:adopt` một lần (chỉ người phụ trách DB), rồi `npm run migrate:deploy`.
 
 Sau full build và PostgreSQL replay/seed đạt, cập nhật kết quả thực tế vào docs/testing/test-cases/identity.md rồi mới nghiệm thu các phase. Các hướng dẫn này không chứng minh các bước đã chạy thành công.
 

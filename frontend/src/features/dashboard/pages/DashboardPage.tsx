@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { Alert } from '@/components/feedback/Alert';
+import { useNotifications } from '@/features/notifications/hooks/useNotifications';
 import { getDashboardBase } from '@/mocks/seed/dashboards';
 import { DashboardHeader, PendingTasksCard, StatGrid } from '../components/DashboardCards';
 import {
@@ -49,6 +50,7 @@ export function DashboardPage() {
   const { user } = useAuth();
   const location = useLocation();
   const [opsData, setOpsData] = useState<AreaDashboardDto | null>(() => cachedOpsData || areasApi.getCachedDashboard());
+  const { unread, setPanelOpen } = useNotifications();
 
   const workspace = user?.departmentInfo.workspace;
 
@@ -158,7 +160,7 @@ export function DashboardPage() {
           theo vai trò.
         </Alert>
       )}
-      <PendingTasksCard pending={pending} />
+      <PendingTasksCard pending={pending} unread={unread} onOpenNotifications={() => setPanelOpen(true)} />
       <StatGrid stats={stats} />
       {workspace === 'kinh-doanh' && <SalesWorkspace />}
       {workspace === 'khai-thac' && <OperationsWorkspace areas={recentAreas} areaTree={treeNodes} />}

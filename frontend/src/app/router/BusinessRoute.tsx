@@ -7,13 +7,14 @@ import { IS_MOCK_AUTH } from '@/features/auth/api/authApi';
 import { RequirePermission } from './guards';
 import './PlaceholderPages.css';
 
-/** Các màn nghiệp vụ: cho phép mount khi dùng danh tính prototype hoặc các phân hệ đã có Backend API (Khu vực - ARE). */
-export function BusinessRoute({ permission, label, children }: {
+/** Các màn nghiệp vụ: cho phép mount khi dùng danh tính prototype hoặc các phân hệ đã có Backend API (Khu vực - ARE, Hợp đồng - CTR). */
+export function BusinessRoute({ permission, label, children, apiReady = false }: {
   permission?: Permission;
   label: string;
   children: ReactNode;
+  apiReady?: boolean;
 }) {
-  const isAvailable = IS_MOCK_AUTH || permission?.startsWith('areas.');
+  const isAvailable = IS_MOCK_AUTH || apiReady || permission?.startsWith('areas.');
   return (
     <RequirePermission permission={permission} label={label}>
       {isAvailable ? children : (

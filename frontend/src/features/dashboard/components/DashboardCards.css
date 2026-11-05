@@ -126,8 +126,19 @@
   color: var(--text-secondary);
 }
 
+.pending-card__unread:hover {
+  color: var(--accent-strong);
+  text-decoration: underline;
+}
+
 .pending-card__unread {
   display: flex;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: none;
   align-items: center;
   gap: 6px;
   flex-shrink: 0;

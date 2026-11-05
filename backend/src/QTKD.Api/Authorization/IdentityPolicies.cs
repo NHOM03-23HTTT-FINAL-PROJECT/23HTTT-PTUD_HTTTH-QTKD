@@ -36,7 +36,7 @@ public sealed class ResourceAccessHandler(IIdentityService identity) : Authoriza
 public static class PermissionCatalog
 {
     public static readonly string[] Codes = ["customers.view", "customers.create", "customers.update", "customers.change-status",
-        "contracts.view", "contracts.create", "approvals.track", "approvals.review-legal", "approvals.approve",
+        "contracts.view", "contracts.create", "approvals.track", "approvals.review-legal", "approvals.approve", "approvals.assign",
         "areas.view", "areas.create", "areas.update", "areas.manage", "payments.view", "users.manage", "departments.manage",
         "roles.manage", "workflows.manage", "audit.view", "catalogs.manage"];
 }

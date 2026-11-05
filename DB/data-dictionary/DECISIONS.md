@@ -27,12 +27,25 @@ Nguồn là `data-dictionary.md` và `spec nghiệp vụ + hệ thống (8).docx
 
 Migration có CHECK về MST, liên hệ khách hàng, kích thước/cấp khu vực, ngày hiệu lực, số tiền và dữ liệu quyết định. Index chặn hai lượt duyệt đang chạy trên cùng hồ sơ, hai bước hiện hành trong cùng lượt và hai phiên ký đang chạy cho cùng hồ sơ. Trigger cấm sửa/xóa/truncate audit log, giữ snapshot/lịch sử duyệt, bảo vệ nội dung hợp đồng ngoài Draft/RevisionRequested và tính đường dẫn cây khu vực.
 
-RLS bật cho cả 26 bảng, thu hồi quyền của anon/authenticated; chưa tạo policy mở dữ liệu. Backend cần kết nối server được cấp quyền riêng. Không giả định dùng Supabase Auth hay nối USER_ACCOUNT với auth.users; không đưa Prisma Client hoặc PostgreSQL password vào frontend.
+RLS bật cho cả 26 bảng (và các bảng Identity thêm sau), thu hồi quyền của anon/authenticated; chưa tạo policy mở dữ liệu. Backend cần kết nối server được cấp quyền riêng. Không giả định dùng Supabase Auth hay nối USER_ACCOUNT với auth.users; không đưa thông tin kết nối DB hoặc PostgreSQL password vào frontend.
 
 ## Công việc vẫn cần có ở backend hoặc migration tiếp theo
 
 Quyền theo vai trò/phạm vi hồ sơ, danh tính người thực hiện và assignee hiện tại phải kiểm tra ở API. CHECK decided_by = assignee_id không xác thực người gửi request. Transaction phải cập nhật nhất quán hồ sơ, lượt, bước và audit; hiện chưa có API/interceptor tự ghi audit. Kiểm tra khu vực/dịch vụ/khách hàng Active và các trạng thái chuyển tiếp không được thay thế bằng nút ẩn ở FE.
 
-Dictionary chưa có bảng cấu hình/version workflow, Outbox, Idempotency-Key, dedup sự kiện callback ký, lịch sử phiên bản sản lượng hoặc đề nghị mở khóa. Không tự thêm các bảng này ngoài phạm vi 26 bảng. Snapshot demo chứa đối tượng workflow để minh họa bảo toàn cấu hình, chưa có engine/cấu hình workflow thật.
+Dictionary chưa có Outbox, Idempotency-Key, dedup sự kiện callback ký, lịch sử phiên bản sản lượng hoặc đề nghị mở khóa. Không tự thêm các bảng này ngoài phạm vi 26 bảng. Snapshot demo chứa đối tượng workflow để minh họa bảo toàn cấu hình.
+
+SYS-CTR-10 (chốt 03/11/2026): trưởng bộ phận phân công người duyệt cho từng hồ sơ, lưu thẳng vào `approval_step.assignee_id`; không có bảng cấu hình. Bảng `workflow_config` tạo ở migration `202611030002` đã bị bỏ ở `202611030003_approval_assignment`. Trigger `guard_approval_history` cho đổi người khi bước `NotStarted` hoặc `Pending` chưa tiếp nhận; quyết định và thứ tự vẫn không sửa được. Trưởng bộ phận xác định qua `department.manager_id`; người phân công còn phải có quyền `approvals.assign`, chỉ cấp cho vai trò trưởng: SalesManager, LegalManager (Trưởng phòng Pháp chế), BoardChair (Tổng Giám đốc). Seed đặt trưởng Pháp chế là `demo.legal.manager`, trưởng BGĐ là `demo.board.chair`.
 
 Seed nhập lịch sử giả lập bằng INSERT; trigger bảo vệ cập nhật lịch sử không biến dữ liệu nhập sẵn thành bằng chứng quy trình đã thực thi. Các kiểm tra race condition, trigger, RLS, rollback và seed hai lần vẫn cần môi trường Supabase thực tế. Test offline chỉ xác nhận hình dạng và tính nhất quán của dữ liệu.
+
+## Chuyển nguồn migration từ Prisma sang EF Core (04/11/2026)
+
+Theo yêu cầu người dùng, EF Core sở hữu migration của toàn bộ schema `qtkd` qua `QtkdDbContext`; Prisma bị gỡ khỏi repo. Quyết định này thay cho bước trung gian cùng ngày (chỉ chuyển bảng `notification` sang `NotificationDbContext`), vốn chưa áp lên DB nào.
+
+- 9 migration Prisma được giữ nguyên nội dung thành 9 migration EF đầu tiên (SQL gốc ở `backend/.../Persistence/Migrations/Sql`). DB mới dựng từ EF giống hệt DB cũ do Prisma dựng, kể cả CHECK, trigger, RLS và grants ban đầu.
+- DB đã dựng bằng Prisma được "adopt": `QTKD.DbTool adopt` ghi 9 id EF tương ứng vào `__EFMigrationsHistory` sau khi xác nhận `_prisma_migrations` đủ 9 migration hoàn tất, không chạy DDL. `_prisma_migrations` giữ làm lịch sử.
+- Model EF mô tả bảng/cột/khóa/index thường/sequence/enum. Test `DB/tests/ef-schema-parity.mjs` so model với DB dựng từ SQL trên PGlite. Lần đối chiếu đầu phát hiện 2 FK `contract_department_fk`, `contract_cancelled_by_fk` và unique `NULLS NOT DISTINCT` của `contract_item`: các phần này được thêm bằng SQL thô ở `202611020004_contracts`, nên `schema.prisma` cũ không có. Model EF nay đã có cả 3. CHECK, trigger, RLS và index biểu thức vẫn chỉ ở SQL.
+- EF không biểu diễn được `ON UPDATE` của FK. FK hiện có giữ `ON UPDATE RESTRICT/CASCADE` trong DB; FK do EF tạo về sau là `NO ACTION`.
+- Seed chuyển sang .NET (`QTKD.DbTool seed`). Fixture xuất nguyên từ `seed-data.ts` sang `demo-seed.json`, cùng ID, cùng thứ tự chèn, cùng quy tắc không ghi đè. Các kiểm tra của `validate-seed.ts` được port sang `DemoSeedValidator`.
+- Code hợp đồng/phê duyệt vẫn dùng SQL thô, không đổi trong lượt này. Chưa áp `adopt`/`migrate` lên Supabase dùng chung.

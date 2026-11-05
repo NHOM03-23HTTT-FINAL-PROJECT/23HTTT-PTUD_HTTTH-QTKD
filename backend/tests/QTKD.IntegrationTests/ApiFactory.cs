@@ -11,7 +11,11 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
 using Npgsql.NameTranslation;
 using QTKD.Api.Authorization;
+using QTKD.Application.Common.Interfaces;
+using QTKD.Application.Features.ContractApprovals;
+using QTKD.Application.Features.Notifications;
 using QTKD.Domain.Identity;
+using QTKD.Infrastructure.Identity;
 using QTKD.Infrastructure.Persistence;
 
 namespace QTKD.IntegrationTests;
@@ -20,6 +24,12 @@ namespace QTKD.IntegrationTests;
 // SQLite supplies offline API checks only. The same suite can target an explicitly disposable Supabase DB.
 public sealed class ApiFactory : WebApplicationFactory<Program>
 {
+    public IContractApprovalEngine? ApprovalEngine { get; init; }
+    public IApprovalStore? ApprovalStore { get; init; }
+    public INotificationRepository? NotificationRepository { get; init; }
+    public IPasswordRecoveryMailSender? RecoveryMail { get; init; }
+    public TimeProvider? Clock { get; init; }
+    public string EnvironmentName { get; init; } = "Testing";
     private readonly SqliteConnection sqlite = new("Data Source=:memory:");
     public readonly string Key = Convert.ToBase64String(RandomNumberGenerator.GetBytes(48));
     public readonly string Password = "Identity.Test@2026";
@@ -34,11 +44,42 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        builder.UseEnvironment("Testing");
+        builder.UseEnvironment(EnvironmentName);
         builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
         { ["Jwt:SigningKey"] = Key, ["Jwt:Issuer"] = "qtkd-api", ["Jwt:Audience"] = "qtkd-web", ["ConnectionStrings:Identity"] = "test-context-replaced-by-factory" }));
         builder.ConfigureTestServices(services =>
         {
+            if (Clock is not null)
+            {
+                services.RemoveAll<TimeProvider>();
+                services.AddSingleton(Clock);
+            }
+            if (RecoveryMail is not null)
+            {
+                services.RemoveAll<IPasswordRecoveryMailSender>();
+                services.AddSingleton(RecoveryMail);
+                services.Configure<PasswordRecoveryMailOptions>(options =>
+                {
+                    options.Enabled = true;
+                    options.Host = "example.invalid";
+                    options.From = "recovery@example.invalid";
+                });
+            }
+            if (ApprovalStore is not null)
+            {
+                services.RemoveAll<IApprovalStore>();
+                services.AddSingleton(ApprovalStore);
+            }
+            if (NotificationRepository is not null)
+            {
+                services.RemoveAll<INotificationRepository>();
+                services.AddSingleton(NotificationRepository);
+            }
+            if (ApprovalEngine is not null)
+            {
+                services.RemoveAll<IContractApprovalEngine>();
+                services.AddSingleton(ApprovalEngine);
+            }
             services.RemoveAll<IdentityDbContext>();
             services.RemoveAll<DbContextOptions<IdentityDbContext>>();
             services.RemoveAll<IDbContextOptionsConfiguration<IdentityDbContext>>();
@@ -51,12 +92,16 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
                 if (!(parsed.Host.EndsWith("supabase.co") || parsed.Host.EndsWith("supabase.com")) || parsed.Port != 5432 || parsed.SslMode < SslMode.Require)
                     throw new InvalidOperationException("A dedicated Supabase direct/session test connection with TLS is required.");
                 PostgreSql = true;
+                var names = new NpgsqlNullNameTranslator(); // shared: see Program.cs
                 services.AddDbContext<IdentityDbContext>(options => options.UseNpgsql(connection, pg =>
-                { var names = new NpgsqlNullNameTranslator(); pg.MapEnum<UserRole>("user_role", "qtkd", names); pg.MapEnum<UserStatus>("user_status", "qtkd", names); pg.MapEnum<SessionEndReason>("session_end_reason", "qtkd", names); }));
+                { pg.MapEnum<UserRole>("user_role", "qtkd", names); pg.MapEnum<UserStatus>("user_status", "qtkd", names); pg.MapEnum<SessionEndReason>("session_end_reason", "qtkd", names); }));
             }
             else
             {
                 sqlite.Open(); services.AddDbContext<IdentityDbContext>(options => options.UseSqlite(sqlite));
+                // CurrentActor reads PostgreSQL via PgDatabase; on SQLite the same rule reads the test DbContext.
+                services.RemoveAll<ICurrentActor>();
+                services.AddScoped<ICurrentActor, SqliteCurrentActor>();
             }
         });
     }
@@ -74,13 +119,13 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
                 var departmentCodes = new[] { "KD", "KT", "KTOAN", "PC", "BGD", "QTHT" };
                 db.Departments.AddRange(departmentCodes.Select(code => new Department { Code = code, DepartmentName = code }));
                 db.Roles.AddRange(Enum.GetValues<UserRole>().Select(role => new RoleDefinition { Code = role, Name = role.ToString(), DepartmentCode = role switch
-                { UserRole.SalesStaff or UserRole.SalesManager => "KD", UserRole.OperationsStaff or UserRole.OperationsManager => "KT", UserRole.Accountant => "KTOAN", UserRole.LegalStaff => "PC", UserRole.BoardMember => "BGD", _ => "QTHT" } }));
+                { UserRole.SalesStaff or UserRole.SalesManager => "KD", UserRole.OperationsStaff or UserRole.OperationsManager => "KT", UserRole.Accountant => "KTOAN", UserRole.LegalStaff or UserRole.LegalManager => "PC", UserRole.BoardMember or UserRole.BoardChair => "BGD", _ => "QTHT" } }));
                 db.Permissions.AddRange(PermissionCatalog.Codes.Select(code => new Permission { Code = code, Name = code }));
                 db.Grants.AddRange(new[] { "users.manage", "roles.manage", "departments.manage" }.Select(code => new RolePermission { Role = UserRole.SystemAdmin, PermissionCode = code }));
                 db.Grants.Add(new RolePermission { Role = UserRole.SalesStaff, PermissionCode = "contracts.create" });
                 await db.SaveChangesAsync();
             }
-            else if (await db.Roles.CountAsync() != 8) throw new InvalidOperationException("Apply Prisma migrations to the dedicated test DB first.");
+            else if (await db.Roles.CountAsync() != 10) throw new InvalidOperationException("Apply the EF Core migrations (QTKD.DbTool migrate) to the dedicated test DB first.");
             var departments = await db.Departments.ToDictionaryAsync(x => x.Code, x => x.DepartmentId);
             SalesDepartment = departments["KD"];
             string hash = BCrypt.Net.BCrypt.HashPassword(Password, 12);
@@ -101,6 +146,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
             // Only this factory's synthetic rows, after explicit test-project acknowledgement.
             var ids = db.Users.Where(x => x.Username.StartsWith(Prefix + ".")).Select(x => x.UserId).ToArray();
             db.Sessions.Where(x => ids.Contains(x.UserId)).ExecuteDelete();
+            db.PasswordOtps.Where(x => ids.Contains(x.UserId)).ExecuteDelete();
             db.Users.Where(x => ids.Contains(x.UserId)).ExecuteDelete();
         }
         base.Dispose(disposing); if (disposing) sqlite.Dispose();

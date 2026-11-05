@@ -1,29 +1,51 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Conventions;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using QTKD.Domain.Entities;
-using QTKD.Domain.Enums;
 using QTKD.Domain.Identity;
+using QTKD.Domain.Notifications;
+using QTKD.Infrastructure.Persistence.Schema;
 
 namespace QTKD.Infrastructure.Persistence;
 
-public class QtkdDbContext : DbContext
+/// <summary>
+/// Owner of the qtkd schema and its EF Core migrations (Persistence/Migrations). The model mirrors the tables,
+/// columns, keys, foreign keys, plain indexes, sequences and enums. CHECK constraints, triggers, functions, RLS and
+/// expression/partial indexes exist only in the migration SQL.
+/// </summary>
+public sealed class QtkdDbContext : DbContext
 {
+    public const string Schema = "qtkd";
+    public const string HistoryTable = "__EFMigrationsHistory";
+
     public QtkdDbContext(DbContextOptions<QtkdDbContext> options) : base(options)
     {
     }
 
-    public DbSet<Area> Areas => Set<Area>();
-    public DbSet<Service> Services => Set<Service>();
-    public DbSet<AreaService> AreaServices => Set<AreaService>();
-    public DbSet<AreaAssignment> AreaAssignments => Set<AreaAssignment>();
-    public DbSet<UserAccount> UserAccounts => Set<UserAccount>();
+    public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<Contract> Contracts => Set<Contract>();
+    public DbSet<QTKD.Domain.Entities.Area> Areas => Set<QTKD.Domain.Entities.Area>();
+    public DbSet<QTKD.Domain.Entities.Service> Services => Set<QTKD.Domain.Entities.Service>();
+    public DbSet<QTKD.Domain.Entities.AreaService> AreaServices => Set<QTKD.Domain.Entities.AreaService>();
+    public DbSet<QTKD.Domain.Entities.AreaAssignment> AreaAssignments => Set<QTKD.Domain.Entities.AreaAssignment>();
+    public DbSet<QTKD.Domain.Identity.UserAccount> UserAccounts => Set<QTKD.Domain.Identity.UserAccount>();
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
-        base.OnModelCreating(modelBuilder);
-        modelBuilder.HasDefaultSchema("qtkd");
+        // The database only has the indexes the original DDL declared; EF must not add one per foreign key.
+        configurationBuilder.Conventions.Remove<ForeignKeyIndexConvention>();
+    }
+
+    protected override void OnModelCreating(ModelBuilder b)
+    {
+        b.HasDefaultSchema(Schema);
+        b.ApplyConfigurationsFromAssembly(typeof(QtkdDbContext).Assembly,
+            t => t.Namespace?.StartsWith("QTKD.Infrastructure.Persistence.Configurations", StringComparison.Ordinal) == true
+                 && !t.Namespace.Contains("Configurations.Areas")
+                 && !t.Namespace.Contains("Configurations.Catalogs"));
 
         // Area configuration
-        modelBuilder.Entity<Area>(entity =>
+        b.Entity<QTKD.Domain.Entities.Area>(entity =>
         {
             entity.ToTable("area");
             entity.HasKey(e => e.AreaId);
@@ -49,7 +71,7 @@ public class QtkdDbContext : DbContext
         });
 
         // Service configuration
-        modelBuilder.Entity<Service>(entity =>
+        b.Entity<QTKD.Domain.Entities.Service>(entity =>
         {
             entity.ToTable("service");
             entity.HasKey(e => e.ServiceId);
@@ -61,7 +83,7 @@ public class QtkdDbContext : DbContext
         });
 
         // AreaService configuration (composite key)
-        modelBuilder.Entity<AreaService>(entity =>
+        b.Entity<QTKD.Domain.Entities.AreaService>(entity =>
         {
             entity.ToTable("area_service");
             entity.HasKey(e => new { e.AreaId, e.ServiceId });
@@ -81,7 +103,7 @@ public class QtkdDbContext : DbContext
         });
 
         // AreaAssignment configuration
-        modelBuilder.Entity<AreaAssignment>(entity =>
+        b.Entity<QTKD.Domain.Entities.AreaAssignment>(entity =>
         {
             entity.ToTable("area_assignment");
             entity.HasKey(e => e.AssignmentId);
@@ -104,7 +126,7 @@ public class QtkdDbContext : DbContext
         });
 
         // UserAccount configuration
-        modelBuilder.Entity<UserAccount>(entity =>
+        b.Entity<QTKD.Domain.Identity.UserAccount>(entity =>
         {
             entity.ToTable("user_account");
             entity.HasKey(e => e.UserId);
@@ -123,5 +145,32 @@ public class QtkdDbContext : DbContext
             entity.Property(e => e.CanSign).HasColumnName("can_sign");
             entity.Property(e => e.PasswordChangedAt).HasColumnName("password_changed_at");
         });
+
+        if (Database.ProviderName?.Contains("Sqlite") == true)
+        {
+            UseSqliteTestShape(b);
+            return;
+        }
+
+        b.HasSequence<long>("customer_code_seq");
+        b.HasSequence<long>("service_code_seq");
+        b.HasSequence<long>("contract_code_seq");
+    }
+
+    // Offline tests only: SQLite has no PostgreSQL enums, column types, default functions or sequences.
+    private static void UseSqliteTestShape(ModelBuilder b)
+    {
+        foreach (var entity in b.Model.GetEntityTypes())
+        {
+            foreach (var property in entity.GetProperties())
+            {
+                property.SetColumnType(null);
+                property.SetDefaultValueSql(null);
+                var type = Nullable.GetUnderlyingType(property.ClrType) ?? property.ClrType;
+                if (type.IsEnum)
+                    property.SetValueConverter((ValueConverter)Activator.CreateInstance(
+                        typeof(EnumToStringConverter<>).MakeGenericType(type), [null])!);
+            }
+        }
     }
 }
