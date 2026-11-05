@@ -4,7 +4,9 @@ Cập nhật trên `cus-flow` ngày 05/11/2026, sau khi ghép `main` tại `93b5
 
 Theo yêu cầu của người dùng, **backend SYS-CUS-03 đã được gỡ**: không còn endpoint rà soát/tạm ngưng, không cấp mới ủy quyền `suspend`. `canSuspend` luôn bằng `false`. Lịch sử Suspend và trạng thái Suspended có sẵn vẫn được đọc để phục vụ SYS-CUS-04; không xóa dữ liệu lịch sử.
 
-Frontend được giữ nguyên toàn bộ theo `main`: các adapter khách hàng vẫn là mock và `BusinessRoute` chưa cho mở màn khách hàng với danh tính API. Tên hàm frontend dưới đây không có nghĩa là đã tích hợp API thật.
+Frontend đã nối API thật cho danh sách, tạo, sửa, chi tiết, quyền thao tác và kích hoạt lại; giữ bố cục/component của main. Chế độ `VITE_AUTH_MODE=api` gọi HTTP có JWT/CSRF, không gửi actor do client tự chọn và không fallback sang mock khi API lỗi. Chỉ chế độ `mock` mới dùng prototype.
+
+Trưởng phòng mở **Ủy quyền kích hoạt lại** từ danh sách khách hàng để cấp/thu hồi quyền cá nhân qua API. Không có lựa chọn cấp quyền tạm ngưng mới. Các nhóm hồ sơ chưa nối nguồn hiển thị phụ thuộc; kích hoạt lại chỉ cho xác nhận khi nguồn server đã xác minh. Xem [16 ca UI/API/PostgreSQL](../../testing/test-cases/customers-api-ui.md).
 
 | Method | Endpoint | SYS | Hành vi backend |
 |---|---|---|---|

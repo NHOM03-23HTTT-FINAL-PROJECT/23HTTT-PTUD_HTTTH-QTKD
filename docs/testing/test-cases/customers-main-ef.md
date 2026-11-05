@@ -2,6 +2,8 @@
 
 Ngày kiểm thử: **05/11/2026**. Nhánh: `cus-flow`; main được ghép: `93b5447`. Phạm vi theo yêu cầu: chuyển migration khách hàng sang EF, gỡ backend SYS-CUS-03, giữ nguyên frontend của main, kiểm thử, không push và không ghi Supabase dùng chung.
 
+Báo cáo này ghi kết quả tại commit `6ef4062`, trước khi nối frontend. Sau yêu cầu nối API, các màn khách hàng đã được tích hợp và kiểm thử lại: xem [báo cáo UI/API mới](customers-api-ui.md). Các mô tả UI chưa nối bên dưới là kết quả của giai đoạn trước.
+
 Căn cứ kỹ thuật: [DB/README](../../../DB/README.md), [STRUCTURE](../../architecture/STRUCTURE.md), [API khách hàng](../../specs/customers/list_api-customer.md). Mã SYS-CUS-03 là tạm ngưng (US-CUS-04); SYS-CUS-04 là kích hoạt lại (US-CUS-05). Không nhầm số SYS với US.
 
 ## Thay đổi và kết quả migration

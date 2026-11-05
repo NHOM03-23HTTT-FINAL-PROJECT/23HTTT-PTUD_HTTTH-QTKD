@@ -74,7 +74,7 @@ export function CustomerConflictDialog({ conflict, base, values, catalogs, onDis
       }
     >
       <p className="dialog__body">
-        {conflict.updatedBy} đã lưu phiên bản {latest.version} lúc {formatDateTime(conflict.updatedAt)} trong khi bạn đang sửa
+        {conflict.updatedBy} đã lưu phiên bản {latest.version} lúc {conflict.updatedAt ? formatDateTime(conflict.updatedAt) : 'chưa rõ thời điểm'} trong khi bạn đang sửa
         phiên bản {base.version}. Hệ thống không ghi đè. Hãy tải lại và đối chiếu dữ liệu mới nhất trước khi tiếp tục cập nhật.
       </p>
       <div className="conflict-table__wrap">

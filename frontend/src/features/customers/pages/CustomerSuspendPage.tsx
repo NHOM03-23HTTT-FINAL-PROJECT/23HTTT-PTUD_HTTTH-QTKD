@@ -12,7 +12,8 @@ import { Icon, type IconName } from '@/components/icon/Icon';
 import { StatusBadge } from '@/components/status-badge/StatusBadge';
 import { ROUTES } from '@/constants/routes';
 import { formatTime } from '@/utils/format';
-import { customersApi } from '../api/customersApi';
+import { IS_MOCK_AUTH } from '@/features/auth/api/authApi';
+import { useCustomer } from '../hooks/useCustomer';
 import { customerStatusApi } from '../api/customerStatusApi';
 import { DecisionItem, StepProgress } from '../components/CustomerStatusPanels';
 import type { Customer } from '../types/customer';
@@ -50,8 +51,23 @@ function newIdempotencyKey() {
 
 /** UC-CUS-03 · Tạm ngưng giao dịch với khách hàng – frame 03.1 → 03.8. */
 export function CustomerSuspendPage() {
+  if (!IS_MOCK_AUTH) return (
+    <>
+      <h1>Tạm ngưng khách hàng</h1>
+      <Alert tone="info" title="Chức năng tạm ngưng chưa sẵn sàng">
+        Thao tác này chưa được cung cấp trong bản hiện tại. Trạng thái và lịch sử khách hàng được giữ nguyên.
+      </Alert>
+      <ButtonLink to={ROUTES.customers} variant="secondary">Về danh sách</ButtonLink>
+    </>
+  );
+  return <MockCustomerSuspendPage />;
+}
+
+function MockCustomerSuspendPage() {
   const { code = '' } = useParams();
-  const customer = customersApi.getCustomer(code);
+  const { customer, loading, failed } = useCustomer(code);
+  if (loading) return <Alert tone="info" title="Đang tải hồ sơ khách hàng" />;
+  if (failed) return <Alert tone="danger" title="Không tải được hồ sơ khách hàng" />;
 
   if (!customer) {
     return (

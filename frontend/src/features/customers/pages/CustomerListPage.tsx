@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/app/providers/AuthProvider';
+import { IS_MOCK_AUTH } from '@/features/auth/api/authApi';
 import { useSession } from '@/app/providers/SessionProvider';
 import { Button, ButtonLink } from '@/components/button/Button';
 import { DataTable, type Column } from '@/components/data-table/DataTable';
@@ -72,7 +73,7 @@ const COLUMNS: Column<CustomerListItem>[] = [
     width: 120,
     render: (row) => <StatusBadge label={CUSTOMER_STATUS_BADGE[row.status].label} tone={CUSTOMER_STATUS_BADGE[row.status].tone} />,
   },
-  { key: 'updatedAt', header: 'Cập nhật', width: 110, render: (row) => formatDateTime(row.updatedAt).slice(0, 10) },
+  { key: 'updatedAt', header: 'Cập nhật', width: 110, render: (row) => row.updatedAt ? formatDateTime(row.updatedAt).slice(0, 10) : 'Chưa rõ' },
   {
     key: 'actions',
     header: '',
@@ -95,6 +96,7 @@ type LoadState =
 /** UC-CUS-05 · Tìm khách hàng phục vụ công việc Kinh doanh – frame 05.1 → 05.4. */
 export function CustomerListPage() {
   const { user, can } = useAuth();
+  const actorKey = user ? [user.id, user.signedInAt, user.department, ...user.roles, ...[...user.permissions].sort()].join('|') : '';
   const { endSession } = useSession();
   const [searchParams, setSearchParams] = useSearchParams();
   const query = useMemo(() => readCustomerQuery(searchParams), [searchParams]);
@@ -105,6 +107,7 @@ export function CustomerListPage() {
   const [state, setState] = useState<LoadState>({ kind: 'loading' });
   // Kết quả cuối cùng hợp lệ, giữ hiển thị trong lúc tải trang mới.
   const lastResult = useRef<CustomerSearchResult | null>(null);
+  const resultScope = useRef('');
   const [retryCount, setRetryCount] = useState(0);
   const requestId = useRef(0);
 
@@ -118,6 +121,7 @@ export function CustomerListPage() {
       .search({ ...query, userId: user.id, signedInAt: user.signedInAt, retry: retryCount > 0 })
       .then((result) => {
         if (id !== requestId.current) return;
+        resultScope.current = actorKey;
         lastResult.current = result;
         setState({ kind: 'ok', result });
       })
@@ -127,9 +131,10 @@ export function CustomerListPage() {
         else if (error instanceof CustomerSearchError && error.code === 'FORBIDDEN') setState({ kind: 'forbidden' });
         else setState({ kind: 'error', reference: error instanceof CustomerSearchError ? error.reference : undefined });
       });
-    // Chạy lại khi điều kiện trên URL đổi (A5.2) hoặc khi người dùng chọn "Thử lại".
+    return () => { requestId.current++; };
+    // Actor scope and URL fully determine this read; never reuse another session's result.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [queryKey, retryCount, user?.id]);
+  }, [queryKey, retryCount, actorKey, endSession]);
 
   function update(patch: Partial<CustomerSearchQuery>) {
     const next = { ...query, ...patch };
@@ -152,7 +157,7 @@ export function CustomerListPage() {
 
   const filtered =
     query.keyword !== '' || query.status !== DEFAULT_CUSTOMER_QUERY.status || query.sort !== DEFAULT_CUSTOMER_QUERY.sort;
-  const shown = state.kind === 'ok' ? state.result : state.kind === 'loading' ? lastResult.current : null;
+  const shown = resultScope.current !== actorKey ? null : state.kind === 'ok' ? state.result : state.kind === 'loading' ? lastResult.current : null;
   const hasSuspended = (shown?.items ?? []).some((item) => item.status === 'suspended');
   const statusLabel = STATUS_OPTIONS.find((o) => o.value === query.status)?.label ?? '';
 
@@ -169,11 +174,13 @@ export function CustomerListPage() {
       <div className="page-header">
         <div className="page-header__title">
           <h1>Danh sách khách hàng</h1>
-          <p>Tìm theo mã, tên hoặc mã số thuế trong phạm vi được phân công.</p>
+          <p>Tìm theo mã, tên hoặc mã số thuế trong phạm vi phòng Kinh doanh.</p>
         </div>
-        {can('customers.create') && (
+        {(can('customers.create') || (!IS_MOCK_AUTH && user?.roles.includes('TP_KD') && can('customers.change-status'))) && (
           <div className="page-header__actions">
-            <ButtonLink to={ROUTES.customerCreate}>+ Tạo khách hàng</ButtonLink>
+            {!IS_MOCK_AUTH && user?.roles.includes('TP_KD') && can('customers.change-status') &&
+              <ButtonLink to={ROUTES.customerDelegations} variant="secondary">Ủy quyền kích hoạt lại</ButtonLink>}
+            {can('customers.create') && <ButtonLink to={ROUTES.customerCreate}>+ Tạo khách hàng</ButtonLink>}
           </div>
         )}
       </div>
@@ -272,7 +279,7 @@ export function CustomerListPage() {
                 <p>
                   {query.keyword
                     ? `${STATUS_SCOPE_TEXT[query.status]} · trong phạm vi của bạn`
-                    : 'Chỉ gồm khách hàng trong phạm vi được phân công cho bạn'}
+                    : 'Chỉ gồm khách hàng trong phạm vi phòng Kinh doanh'}
                 </p>
               </>
             )}

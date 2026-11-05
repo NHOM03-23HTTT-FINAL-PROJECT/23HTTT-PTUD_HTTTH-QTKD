@@ -15,6 +15,8 @@ type ServerAlert =
   | { kind: 'duplicate'; existing: DuplicateCustomer } // 01.4
   | { kind: 'save-failed' } // 01.6 – A6.3
   | { kind: 'network' } // 01.6 – A6.4
+  | { kind: 'server-invalid' }
+  | { kind: 'request-changed' }
   | { kind: 'forbidden' }; // 01.6 – A5
 
 export type CreateCustomerAlert =
@@ -94,6 +96,9 @@ export function useCreateCustomerForm({ onCreated, onSessionEnded }: Options) {
         case 'DUPLICATE_TAX_CODE':
           setServerAlert({ kind: 'duplicate', existing: error.existing! });
           break;
+        case 'IDEMPOTENCY_KEY_REUSED':
+          setServerAlert({ kind: 'request-changed' });
+          break;
         case 'SAVE_FAILED':
           setServerAlert({ kind: 'save-failed' });
           break;
@@ -101,7 +106,7 @@ export function useCreateCustomerForm({ onCreated, onSessionEnded }: Options) {
           setServerAlert({ kind: 'forbidden' });
           break;
         case 'VALIDATION':
-          // Server dùng cùng quy tắc với FE; nếu vẫn lệch thì hiển thị như lỗi kiểm tra dữ liệu.
+          setServerAlert({ kind: 'server-invalid' });
           return 'invalid';
         default:
           setServerAlert({ kind: 'network' });

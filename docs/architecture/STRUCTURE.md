@@ -8,7 +8,8 @@ EF Core quản lý schema và migration (`QtkdDbContext`, `Infrastructure/Persis
 
 Trên nhánh `cus-flow` sau ghép main ngày 05/11/2026, Customers có controller, validator Application và service Npgsql cũ.
 Migration khách hàng đã chuyển sang EF với model/configuration/snapshot; runtime chưa chuyển đầy đủ sang mẫu Repository EF LINQ.
-Backend SYS-CUS-03 được gỡ theo phạm vi người dùng; frontend giữ nguyên main.
+Backend SYS-CUS-03 được gỡ theo phạm vi người dùng. Bố cục frontend theo main; khách hàng đã nối API cho CRUD,
+tra cứu, chi tiết, quyền thao tác và quản lý ủy quyền kích hoạt lại. Nguồn xác minh kích hoạt lại/hồ sơ liên quan vẫn là phụ thuộc.
 Xem [test case và giới hạn đã kiểm chứng](../testing/test-cases/customers-main-ef.md).
 
 ## Nguyên tắc tổ chức

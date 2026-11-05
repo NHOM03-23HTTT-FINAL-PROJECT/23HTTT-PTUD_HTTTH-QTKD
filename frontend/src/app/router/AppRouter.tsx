@@ -11,6 +11,7 @@ import { AreaLookupPage } from '@/features/areas/pages/AreaLookupPage';
 import { ForgotPasswordPage } from '@/features/auth/pages/ForgotPasswordPage';
 import { LoginPage } from '@/features/auth/pages/LoginPage';
 import { CustomerCreatePage } from '@/features/customers/pages/CustomerCreatePage';
+import { CustomerDelegationsPage } from '@/features/customers/pages/CustomerDelegationsPage';
 import { CustomerDetailPage } from '@/features/customers/pages/CustomerDetailPage';
 import { CustomerEditPage } from '@/features/customers/pages/CustomerEditPage';
 import { CustomerListPage } from '@/features/customers/pages/CustomerListPage';
@@ -92,7 +93,7 @@ export function AppRoutes() {
             <Route
               path={ROUTES.customers}
               element={
-                <BusinessRoute permission="customers.view" label="Danh sách khách hàng">
+                <BusinessRoute permission="customers.view" label="Danh sách khách hàng" apiReady>
                   <CustomerListPage />
                 </BusinessRoute>
               }
@@ -100,7 +101,7 @@ export function AppRoutes() {
             <Route
               path={ROUTES.customerCreate}
               element={
-                <BusinessRoute permission="customers.create" label="Tạo khách hàng">
+                <BusinessRoute permission="customers.create" label="Tạo khách hàng" apiReady>
                   <CustomerCreatePage />
                 </BusinessRoute>
               }
@@ -108,15 +109,20 @@ export function AppRoutes() {
             <Route
               path="/khach-hang/:code"
               element={
-                <BusinessRoute permission="customers.view" label="Hồ sơ khách hàng">
+                <BusinessRoute permission="customers.view" label="Hồ sơ khách hàng" apiReady>
                   <CustomerDetailPage />
                 </BusinessRoute>
               }
             />
+            <Route path={ROUTES.customerDelegations} element={
+              <BusinessRoute permission="customers.change-status" label="Ủy quyền kích hoạt lại" apiReady>
+                <CustomerDelegationsPage />
+              </BusinessRoute>
+            } />
             <Route
               path="/khach-hang/:code/chinh-sua"
               element={
-                <BusinessRoute permission="customers.update" label="Chỉnh sửa khách hàng">
+                <BusinessRoute permission="customers.update" label="Chỉnh sửa khách hàng" apiReady>
                   <CustomerEditPage />
                 </BusinessRoute>
               }
@@ -124,7 +130,7 @@ export function AppRoutes() {
             <Route
               path="/khach-hang/:code/tam-ngung"
               element={
-                <BusinessRoute permission="customers.change-status" label="Tạm ngưng khách hàng">
+                <BusinessRoute permission="customers.change-status" label="Tạm ngưng khách hàng" apiReady>
                   <CustomerSuspendPage />
                 </BusinessRoute>
               }
@@ -132,7 +138,7 @@ export function AppRoutes() {
             <Route
               path="/khach-hang/:code/kich-hoat-lai"
               element={
-                <BusinessRoute permission="customers.change-status" label="Kích hoạt lại khách hàng">
+                <BusinessRoute permission="customers.view" label="Kích hoạt lại khách hàng" apiReady>
                   <CustomerReactivatePage />
                 </BusinessRoute>
               }

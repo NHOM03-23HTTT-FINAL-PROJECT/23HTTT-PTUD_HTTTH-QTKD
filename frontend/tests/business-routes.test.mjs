@@ -91,8 +91,9 @@ const authResult = {
 };
 const routes = [
   ['/khach-hang', 'customers.view'], ['/khach-hang/tao-moi', 'customers.create'],
+  ['/khach-hang/uy-quyen', 'customers.change-status'],
   ['/khach-hang/KH-001', 'customers.view'], ['/khach-hang/KH-001/chinh-sua', 'customers.update'],
-  ['/khach-hang/KH-001/tam-ngung', 'customers.change-status'], ['/khach-hang/KH-001/kich-hoat-lai', 'customers.change-status'],
+  ['/khach-hang/KH-001/tam-ngung', 'customers.change-status'], ['/khach-hang/KH-001/kich-hoat-lai', 'customers.view'],
   ['/khu-vuc', 'areas.view'], ['/khu-vuc/tra-cuu', 'areas.view'], ['/khu-vuc/so-do', 'areas.view'],
   ['/khu-vuc/tao-moi', 'areas.create'], ['/khu-vuc/KV-001', 'areas.view'], ['/khu-vuc/KV-001/chinh-sua', 'areas.update'],
   ['/hop-dong', 'contracts.view'], ['/hop-dong/tao-moi', 'contracts.create'],
@@ -112,11 +113,15 @@ function ignoreStaticRedirectWarning(t) {
   });
 }
 
-test('API identity opens approval inboxes and reviewer assignment while other mock business routes remain isolated', () => {
+test('API identity opens customer and approval routes while other mock business routes remain isolated', () => {
   api.acceptAuth(authResult);
   for (const [path, permission] of routes) {
     const html = api.renderRoute(path, { ...user, permissions: new Set([permission]) });
-    if (['/phe-duyet/cho-duyet', '/phe-duyet/cho-ra-soat', '/phe-duyet/da-ra-soat', '/phe-duyet/cho-phe-duyet'].includes(path)) {
+    if (path.startsWith('/khach-hang')) {
+      assert.ok(!html.includes('Chức năng chưa sẵn sàng'), path);
+      if (path.endsWith('/tam-ngung')) assert.ok(html.includes('Chức năng tạm ngưng chưa sẵn sàng'), path);
+      assert.ok(!html.includes('Vận tải Hoàng Long'), 'API route must not render the prototype customer');
+    } else if (['/phe-duyet/cho-duyet', '/phe-duyet/cho-ra-soat', '/phe-duyet/da-ra-soat', '/phe-duyet/cho-phe-duyet'].includes(path)) {
       assert.ok(!html.includes('Chức năng chưa sẵn sàng'), path);
       assert.ok(html.includes('Chỉ gồm hồ sơ mà bạn là người được giao chính thức'), path);
     } else if (path === '/phe-duyet/phan-cong') {
