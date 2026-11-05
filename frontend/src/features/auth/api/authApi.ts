@@ -9,6 +9,12 @@ export const IS_MOCK_AUTH = import.meta.env.VITE_AUTH_MODE === 'mock';
 type RemoteSession = { status: 'active'; user: ApiAuthResult['user']; signedInAt: string; idleExpiresAt: string; expiresAt: string };
 const reasons = ['expired', 'password-changed', 'locked', 'disabled', 'permissions-changed'] as const;
 const mockDelay = () => new Promise<void>(resolve => window.setTimeout(resolve, 900));
+function parseUtc(iso: string): number {
+  if (!iso) return 0;
+  const s = iso.trim();
+  const normalized = s.endsWith('Z') || s.includes('+') ? s : s + 'Z';
+  return Date.parse(normalized);
+}
 function ended(code: string): Exclude<SessionCheck, { status: 'active' }> {
   return { status: reasons.find(reason => reason === code) ?? 'expired' };
 }
@@ -40,16 +46,17 @@ export const authApi = {
       const view = await apiRequest<RemoteSession>('/auth/session', {}, false); updateApiSession(view);
       return { user: view.user, signedInAt: view.signedInAt, previousLogin: null };
     } catch (error) {
-      if (error instanceof ApiError && error.status === 401) {
+      if (error instanceof ApiError && (error.status === 401 || error.status === 403 || error.code === 'SESSION_ENDED')) {
         if (sessionStore.load()) signOutNotice.save({ reason: ended(error.code).status, identifier: '' });
         sessionStore.clear(); return null;
       }
-      throw error;
+      // If there's no valid session or auth request cannot restore, gracefully return null
+      return null;
     }
   },
   async checkSession(userId: string, signedInAt: string): Promise<SessionCheck> {
     if (IS_MOCK_AUTH) return mockCheckSession(userId, signedInAt);
-    try { const view = await apiRequest<RemoteSession>('/auth/session'); updateApiSession(view); return { status: 'active', user: view.user }; }
+    try { const view = await apiRequest<RemoteSession>('/auth/session', {}, false); updateApiSession(view); return { status: 'active', user: view.user }; }
     catch (error) { if (error instanceof ApiError && error.status === 401) return ended(error.code); throw error; }
   },
   async activity(): Promise<void> {
@@ -58,7 +65,7 @@ export const authApi = {
   },
   getDeadlines() {
     const state = apiAuthState();
-    return state ? { idle: Date.parse(state.idleExpiresAt), absolute: Date.parse(state.expiresAt) } : null;
+    return state ? { idle: parseUtc(state.idleExpiresAt), absolute: parseUtc(state.expiresAt) } : null;
   },
   async changePassword(request: ChangePasswordRequest): Promise<ChangePasswordResult> {
     if (IS_MOCK_AUTH) { await mockDelay(); return mockChangePassword(request); }

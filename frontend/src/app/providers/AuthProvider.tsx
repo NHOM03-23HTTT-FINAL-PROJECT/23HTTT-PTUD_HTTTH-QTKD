@@ -59,7 +59,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signOutNotice.clear(); setUser(resolved); return result;
   }, []);
   const logout = useCallback(() => { clearApiAuth(); sessionStore.clear(); setUser(null); }, []);
-  const syncUser = useCallback((next: AuthUser) => setUser(current => current ? buildCurrentUser(next, current.signedInAt) : current), []);
+  const syncUser = useCallback((next: AuthUser) => setUser(current => {
+    if (!current) return null;
+    if (current.id === next.id && current.username === next.username && current.roles[0] === next.roles[0] && current.department === next.department) {
+      return current;
+    }
+    return buildCurrentUser(next, current.signedInAt);
+  }), []);
   const refreshSession = useCallback((signedInAt: string) => {
     sessionStore.update({ signedInAt, lastActiveAt: Date.now() });
     if (IS_MOCK_AUTH) { setUser(current => current ? { ...current, signedInAt, mustChangePassword: false } : null); return; }

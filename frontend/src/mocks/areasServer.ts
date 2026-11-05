@@ -190,12 +190,12 @@ function assignmentEntry(user: AuthUser, area: Area, action: string, detail: str
 export function mockAssignAreaStaff({ userId, signedInAt, code, staffCode, title, shift, since }: AssignStaffRequest): AreaStaff {
   const { user, area } = authorizeOperation(userId, signedInAt, code);
   const person = STAFF_CATALOG.find((s) => s.staffCode === staffCode);
-  if (!person || !title.trim() || !shift || !/^\d{4}-\d{2}-\d{2}$/.test(since)) throw new AreaOperationError('VALIDATION');
+  if (!person || !/^\d{4}-\d{2}-\d{2}$/.test(since)) throw new AreaOperationError('VALIDATION');
   const current = recordsOf(area.id).staff;
   if (current.some((s) => s.staffCode === staffCode)) throw new AreaOperationError('ALREADY_ASSIGNED');
 
-  const assigned: AreaStaff = { name: person.name, staffCode, title: title.trim(), shift, since, phone: person.phone };
-  const detail = `Phân công ${person.name} (${staffCode}) – ${assigned.title}, ${shift}, từ ${since.split('-').reverse().join('/')}.`;
+  const assigned: AreaStaff = { name: person.name, staffCode, since, phone: person.phone, ...(title ? { title: title.trim() } : {}), ...(shift ? { shift } : {}) };
+  const detail = `Phân công ${person.name} (${staffCode}) từ ${since.split('-').reverse().join('/')}.`;
   mockStore.saveAreaRecords(area.id, { staff: [...current, assigned] }, assignmentEntry(user, area, 'Phân công nhân sự', detail));
   mockStore.audit({ action: 'AREA_STAFF_ASSIGNED', username: user.username, detail: `${code}: ${detail}` });
   return assigned;
