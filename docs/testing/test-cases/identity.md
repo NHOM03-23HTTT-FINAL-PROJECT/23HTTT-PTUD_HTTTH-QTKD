@@ -1,5 +1,17 @@
 # TASK-022/023 — kiểm thử Identity
 
+## OpenAPI và quên mật khẩu qua OTP - 05/11/2026
+
+| Kiểm tra | Kết quả |
+| --- | --- |
+| `dotnet restore QTKD.slnx --locked-mode` và build solution backend | PASS từ `backend/`. Build có 0 warning, 0 error. |
+| `PasswordRecoveryApiTests` và `AuthOpenApiTests` | 5/5 PASS qua TestServer và SQLite in-memory, thay SMTP bằng hộp thư test. Bao gồm hết hạn, dùng lại OTP/reset token, giới hạn lần thử, thu hồi JWT và refresh cookie của hai thiết bị, Swagger Bearer/CSRF và phản hồi lỗi. |
+| `IdentityApiTests` | 27 ca offline PASS qua TestServer, gồm bcrypt hai chiều. Ca refresh đồng thời cần PostgreSQL được bỏ qua. |
+| `npm run test:auth` và `npm run build` trong `frontend/` | 24/24 PASS trên Node 26.13.0, build PASS. Có ca render route quên mật khẩu và kiểm tra ba request của adapter API. |
+| `node --test tests/identity-offline.test.mjs` trong `DB/` | 3/3 PASS. |
+
+VSTest bị ngắt do testhost không kết nối sau 90 giây. Kết quả BE ở trên đến từ chạy trực tiếp các ca xUnit trong cùng tiến trình qua TestServer. Cụm PostgreSQL 18 tạm khởi động được nhưng môi trường từ chối kết nối loopback với lỗi quyền `10013`. Giao thư SMTP và hành vi khóa dòng trên PostgreSQL cần kiểm chứng trên môi trường test riêng. Xem [cấu hình SMTP](../../../backend/README.md#swagger-và-email-otp).
+
 ## Kiểm tra tài liệu onboarding và launcher - 02/11/2026
 
 Lượt chuẩn hóa README/đề xuất commit chỉ sửa tài liệu, không thay runtime hoặc DB.

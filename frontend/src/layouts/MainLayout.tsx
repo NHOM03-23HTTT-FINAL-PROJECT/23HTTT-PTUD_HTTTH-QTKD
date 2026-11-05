@@ -6,7 +6,6 @@ import { WORKSPACE_NAV, WORKSPACE_SEARCH_PLACEHOLDER, type NavItem } from '@/con
 import { ROUTES } from '@/constants/routes';
 import { NotificationBell } from '@/features/notifications/components/NotificationBell';
 import { NotificationsProvider } from '@/features/notifications/hooks/useNotifications';
-import { getUnreadCount } from '@/mocks/seed/dashboards';
 import { IS_MOCK_AUTH } from '@/features/auth/api/authApi';
 import { useApprovalInboxCount } from '@/features/contracts/hooks/useApprovalInboxCount';
 import { AccountMenu } from './AccountMenu';

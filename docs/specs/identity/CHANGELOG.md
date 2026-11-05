@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | Vị trí và tầng BE | `backend/src/QTKD.Api`, Application, Domain, Infrastructure; .NET 10 | Không dựng thêm backend trong BE/. Application/Domain giữ độc lập với HTTP/EF; Api là composition root |
 | Identity | Identity Core với custom UserAccountStore trên schema qtkd, UserManager cho user/password/email | Không tạo schema AspNetUsers/AspNetRoles song song; role/grants qua IIdentityService |
-| Chủ sở hữu schema | Prisma là nguồn migration duy nhất, EF Core/Npgsql map và truy cập DB | Thêm DDL trong DB/prisma/migrations; không EF Migrate/EnsureCreated trên DB ứng dụng. EnsureCreated trong fixture SQLite chỉ dùng cho test offline |
+| Chủ sở hữu schema | `QtkdDbContext` sở hữu migration EF Core từ 04/11/2026 | Áp migration bằng `QTKD.DbTool`; `IdentityDbContext` map bảng Identity khi chạy API |
 | Schema Identity | Migration 202611020003_identity bổ sung 3 bảng role_definition/permission/role_permission, department.code, metadata mật khẩu/phiên; 29 model | Giữ nguyên hai migration cũ. Kiểm tra migrate:status trên từng DB; không suy ra đã deploy từ source |
 | Role bắt buộc | Một tài khoản đúng một role; DTO roles giữ array một phần tử. Bỏ NO_ROLE và hai mock thiếu role | Role hợp lệ có thể không có permission. Lỗi role/config khi login là 500 SYSTEM_ERROR, không tạo phiên |
 | Quyền hiện hành | Đọc grants từ DB mỗi request; FE API mode dùng permissions BE trả, không suy từ role | Thiếu quyền trả 403 và giữ phiên. Module sở hữu vẫn phải kiểm tra scope/owner/assignee/trạng thái ở BE |
@@ -20,7 +20,15 @@
 | Ranh giới prototype | BusinessRoute kiểm tra permission rồi chặn 26 route nghiệp vụ mock trong API mode | Khi có API nghiệp vụ, thay adapter và mở từng route tương ứng; không nối UUID thật vào mockCheckSession. Dashboard hiện vẫn là dữ liệu minh họa |
 | Runtime grants/seed | Migration bootstrap grants; seed dùng ID cố định/skipDuplicates, không reset password hay phục hồi quyền admin đã gỡ | Thay SEED_PASSWORD không đổi user đã có. Hai username kế toán dùng cùng role Accountant, hiện không có grants; tên reviewer không tạo thêm quyền |
 | Cấu hình và TLS | .env chia sẻ riêng; DB dùng verify-full và sslrootcert, BE hiện cần PGSSLROOTCERT nếu CA chưa được máy tin cậy | Đường dẫn CA cần chỉnh theo máy. Launcher chưa chuyển sslrootcert sang Npgsql; HTTPS dev cert khác CA PostgreSQL |
-| Quản trị và phần chưa làm | API users/departments/roles/permissions đã có source, chưa có UI quản trị đầy đủ | Không có OTP/email thật, API nghiệp vụ hoặc audit interceptor TASK-024 từ thay đổi này. Không coi log vận hành là audit nghiệp vụ |
+| Quên mật khẩu | FE API mode gọi ba endpoint recovery. Worker chuyển OTP qua SMTP và dùng bảng `qtkd.password_otp` hiện có | OTP 5 phút, tối đa 5 lần thử, đổi sang reset token một lần. Reset thu hồi mọi phiên trong cùng transaction |
+| Tài liệu API | OpenAPI JSON và Swagger UI trong `Development` | Swagger mô tả Bearer JWT, header CSRF và phản hồi lỗi của API xác thực |
+| Quản trị và audit | API users/departments/roles/permissions đã có source, chưa có UI quản trị đầy đủ | Audit interceptor append-only thuộc TASK-024 |
+
+## 2026-11-05 - OpenAPI và quên mật khẩu qua OTP
+
+- Gắn Swagger/OpenAPI vào API xác thực. Bật link quên mật khẩu trong API mode và giữ luồng giả lập riêng cho mock mode.
+- Gửi yêu cầu recovery vào hàng đợi bộ nhớ. Worker kiểm tra giới hạn gửi theo tài khoản, sinh mã và chuyển đến email công ty qua SMTP STARTTLS. API chỉ trả thông tin thời hạn chung khi nhận yêu cầu.
+- Lưu HMAC của OTP và hash của reset token trong `password_otp`. Khóa theo tài khoản khi phát hoặc tiêu thụ mã, cập nhật mật khẩu và thu hồi phiên trong một transaction khi reset. Dùng schema EF Core hiện hành, không cần migration mới.
 
 ## 2026-11-02 - Chuẩn hóa hướng dẫn sau khi pull và đề xuất commit
 

@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFile } from 'node:fs/promises';
-import { stripTypeScriptTypes } from 'node:module';
 import { randomUUID } from 'node:crypto';
+import ts from 'typescript';
 
 async function fixture(t) {
   const originalWindow = globalThis.window;
@@ -15,7 +15,7 @@ async function fixture(t) {
   const source = (
     await readFile(new URL('../src/features/contracts/api/contractHttp.ts', import.meta.url), 'utf8')
   ).replace("'@/lib/http/client'", JSON.stringify(identityUrl.href));
-  const javascript = stripTypeScriptTypes(source, { mode: 'transform' });
+  const javascript = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.ESNext } }).outputText;
   const contracts = await import('data:text/javascript;base64,' + Buffer.from(javascript).toString('base64'));
   const session = {
     accessToken: 'fixture-token',

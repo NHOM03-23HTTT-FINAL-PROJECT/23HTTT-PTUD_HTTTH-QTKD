@@ -1,0 +1,69 @@
+@startuml UC-CHUNG-04-doi-mat-khau
+<style>
+    sequenceDiagram {
+        actor {
+            BackgroundColor #E7F0F7
+            BorderColor #32536C
+        }
+        participant {
+            BackgroundColor #E7F0F7
+            BorderColor #32536C
+        }
+        arrow {
+            LineColor #32536C
+        }
+    }
+</style>
+
+title UC-CHUNG-04 · Đổi mật khẩu
+hide footbox
+autonumber "<b>[000]"
+
+actor "Người dùng" as User
+boundary "Giao diện đổi mật khẩu" as Web
+control "Dịch vụ xác thực" as Auth
+database "Cơ sở dữ liệu" as Db
+
+alt Người dùng đang sử dụng hệ thống
+    User -> Web: Mở màn Đổi mật khẩu
+else Người dùng vừa đăng nhập bằng mật khẩu tạm
+    Web --> User: Mở màn Đổi mật khẩu bắt buộc
+end
+
+User -> Web: Nhập mật khẩu hiện tại, mật khẩu mới và xác nhận
+break Thiếu dữ liệu, xác nhận lệch hoặc mật khẩu mới chưa đạt yêu cầu
+    Web --> User: Báo lỗi tại trường nhập
+end
+
+Web -> Auth: Yêu cầu đổi mật khẩu bằng phiên đang dùng
+Auth -> Db: Kiểm tra phiên và tài khoản
+Db --> Auth: Trạng thái phiên và thông tin xác thực
+
+break Phiên hoặc cookie bị từ chối
+    Auth --> Web: Phiên không hợp lệ
+    Web --> User: Về đăng nhập nếu không thể khôi phục phiên
+end
+
+Auth -> Auth: Xác minh mật khẩu hiện tại
+alt Mật khẩu hiện tại sai
+    Auth -> Db: Ghi nhận lần nhập sai
+    alt Đủ 5 lần sai
+        Auth -> Db: Khóa tài khoản 15 phút và thu hồi mọi phiên
+        Auth --> Web: Báo tài khoản bị tạm khóa
+        Web --> User: Về trang đăng nhập và hiển thị lý do
+    else Còn lượt thử
+        Auth --> Web: Mật khẩu hiện tại sai và số lần còn lại
+        Web --> User: Yêu cầu nhập lại mật khẩu hiện tại
+    end
+else Mật khẩu mới trùng mật khẩu hiện tại hoặc chưa đạt yêu cầu
+    Auth --> Web: Báo lỗi mật khẩu mới
+    Web --> User: Yêu cầu sửa mật khẩu mới
+else Mật khẩu hiện tại đúng và mật khẩu mới hợp lệ
+    Auth -> Db: Lưu mật khẩu mới, bỏ yêu cầu đổi mật khẩu tạm,\nvô hiệu mã khôi phục và thu hồi các phiên khác
+    Auth -> Db: Đổi mã làm mới của phiên hiện tại
+    Auth --> Web: Xác nhận thành công và trả thông tin xác thực đã cập nhật
+    Web -> Web: Cập nhật thông tin phiên hiện tại
+    Web --> User: Báo thành công và cho phép tiếp tục làm việc
+end
+
+@enduml
