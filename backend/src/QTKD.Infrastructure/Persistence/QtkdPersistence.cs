@@ -41,6 +41,7 @@ public static class QtkdPersistence
         pg.MapEnum<DocumentRecordType>("document_record_type", s, enumNames);
         pg.MapEnum<SendStatus>("send_status", s, enumNames);
         pg.MapEnum<ActiveStatus>("active_status", s, enumNames);
+        pg.MapEnum<QTKD.Domain.Enums.ActiveStatus>("active_status", s, enumNames);
         pg.MapEnum<CustomerDecisionType>("customer_decision_type", s, enumNames);
         pg.MapEnum<ContractDocumentType>("contract_document_type", s, enumNames);
         pg.MapEnum<ContractStatus>("contract_status", s, enumNames);

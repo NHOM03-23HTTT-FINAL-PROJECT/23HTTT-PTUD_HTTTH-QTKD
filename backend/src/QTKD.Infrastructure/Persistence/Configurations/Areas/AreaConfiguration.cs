@@ -6,6 +6,8 @@ using SessionEndReason = QTKD.Domain.Identity.SessionEndReason;
 using RecordType = QTKD.Domain.Notifications.RecordType;
 using SendStatus = QTKD.Domain.Notifications.SendStatus;
 using QTKD.Infrastructure.Persistence.Schema;
+using Area = QTKD.Domain.Entities.Area;
+using ActiveStatus = QTKD.Domain.Enums.ActiveStatus;
 
 namespace QTKD.Infrastructure.Persistence.Configurations.Areas;
 
@@ -31,7 +33,7 @@ public sealed class AreaConfiguration : IEntityTypeConfiguration<Area>
         b.Property(x => x.RowVersion).HasColumnName("row_version").HasDefaultValue(1);
         b.HasIndex(x => x.AreaCode).IsUnique().HasDatabaseName("area_area_code_key");
         b.HasIndex(x => x.ParentAreaId).HasDatabaseName("area_parent_area_id_idx");
-        b.HasOne<Area>().WithMany().HasForeignKey(x => x.ParentAreaId)
+        b.HasOne(x => x.ParentArea).WithMany(p => p.SubAreas).HasForeignKey(x => x.ParentAreaId)
             .HasConstraintName("area_parent_area_id_fkey").OnDelete(DeleteBehavior.Restrict);
     }
 }
