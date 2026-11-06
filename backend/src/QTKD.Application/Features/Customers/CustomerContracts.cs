@@ -19,6 +19,7 @@ public sealed record CustomerView(
 public sealed record CustomerListItem(string Code, string Name, string Address, string TaxCode, string Status, DateTime? UpdatedAt);
 public sealed record CustomerSearchResult(CustomerListItem[] Items, int Total, int Page, int Size);
 public sealed record CreateCustomerResult(CustomerView Customer, bool Replayed);
+public sealed record DuplicateCustomerReference(string Code, string Name, string TaxCode, string Status);
 public sealed record UpdateCustomerResult(CustomerView Customer, string[] ChangedFields, bool Replayed);
 
 public sealed record StatusEvidence(string? Name, long Size);

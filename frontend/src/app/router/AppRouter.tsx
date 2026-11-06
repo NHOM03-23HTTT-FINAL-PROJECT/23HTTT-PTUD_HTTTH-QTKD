@@ -1,5 +1,6 @@
 import { BACKEND_ENABLED as CONTRACTS_API_ENABLED } from '@/features/contracts/config/backend';
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { useState } from 'react';
+import { createBrowserRouter, RouterProvider, Route, Routes } from 'react-router-dom';
 import { ACCOUNT_NAV, WORKSPACE_NAV } from '@/constants/navigation';
 import { ROUTES } from '@/constants/routes';
 import { ChangePasswordPage } from '@/features/auth/pages/ChangePasswordPage';
@@ -66,11 +67,10 @@ const NAV_PATHS = [
 ].filter((path) => !IMPLEMENTED_PATHS.has(path));
 
 export function AppRouter() {
-  return (
-    <BrowserRouter>
-      <AppRoutes />
-    </BrowserRouter>
-  );
+  // A data router lets customer forms block PUSH, REPLACE and browser back/forward
+  // through the supported useBlocker API; the existing route tree is unchanged.
+  const [router] = useState(() => createBrowserRouter([{ path: '*', element: <AppRoutes /> }]));
+  return <RouterProvider router={router} />;
 }
 
 export function AppRoutes() {

@@ -14,6 +14,7 @@ import { StatusBadge } from '@/components/status-badge/StatusBadge';
 import { ROUTES } from '@/constants/routes';
 import { CustomerConflictDialog, UnsavedChangesCard } from '../components/CustomerChangePanels';
 import { FormSection } from '../components/FormSection';
+import { CustomerNavigationGuard } from '../components/CustomerNavigationGuard';
 import { useEditCustomerForm, type EditCustomerAlert } from '../hooks/useEditCustomerForm';
 import { useCustomer } from '../hooks/useCustomer';
 import { useCustomerCatalogs } from '../hooks/useCustomerCatalogs';
@@ -86,11 +87,13 @@ function CustomerEditForm({ customer }: { customer: Customer }) {
   const navigate = useNavigate();
   const { endSession } = useSession();
   const formRef = useRef<HTMLFormElement>(null);
+  const bypassNavigation = useRef(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const { catalogs, loading: loadingCatalogs, failed: catalogsFailed } = useCustomerCatalogs();
   const form = useEditCustomerForm(customer, {
     onUpdated: ({ customer: updated, changedFields, replayed }) => {
       const state: CustomerDetailState = { updated: true, changedFields, replayed };
+      bypassNavigation.current = true;
       // Thay mục lịch sử để "Quay lại" không mở lại biểu mẫu đã lưu.
       navigate(ROUTES.customerDetail(updated.code), { replace: true, state });
     },
@@ -285,6 +288,7 @@ function CustomerEditForm({ customer }: { customer: Customer }) {
         </aside>
       </div>
 
+      <CustomerNavigationGuard dirty={form.dirty} bypass={bypassNavigation} />
       {confirmCancel && (
         <Dialog
           title="Hủy chỉnh sửa?"
@@ -296,7 +300,7 @@ function CustomerEditForm({ customer }: { customer: Customer }) {
               <Button variant="secondary" onClick={() => setConfirmCancel(false)}>
                 Tiếp tục chỉnh sửa
               </Button>
-              <Button variant="danger" onClick={() => navigate(detailPath)}>
+              <Button variant="danger" onClick={() => { bypassNavigation.current = true; navigate(detailPath); }}>
                 Hủy chỉnh sửa
               </Button>
             </>
@@ -315,7 +319,7 @@ function CustomerEditForm({ customer }: { customer: Customer }) {
           base={baseline}
           values={values}
           catalogs={catalogs}
-          onDiscard={() => navigate(detailPath)}
+          onDiscard={() => { bypassNavigation.current = true; navigate(detailPath); }}
           onReload={form.reloadLatest}
           onClose={form.closeConflict}
         />

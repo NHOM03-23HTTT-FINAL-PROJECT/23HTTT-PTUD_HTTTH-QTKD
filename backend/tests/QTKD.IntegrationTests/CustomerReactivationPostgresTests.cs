@@ -153,6 +153,46 @@ public sealed class CustomerReactivationPostgresTests
         new { baseVersion = version, reason, evidence = Array.Empty<object>() };
 
     [LocalCustomerPostgresFact]
+    public async Task Duplicate_tax_returns_reference_only_inside_scope_and_does_not_write_history()
+    {
+        await using var f = await Fixture.Create();
+        using var staff = await f.Client("staff");
+        foreach (var (owner, suspended) in new[] { ("staff", false), ("other", false), ("staff", true), ("outside", false) })
+        {
+            var code = await f.Customer(owner, suspended);
+            string tax; Guid id;
+            await using (var lookup = new NpgsqlCommand("SELECT tax_code,customer_id FROM qtkd.customer WHERE customer_code=@code", f.Db))
+            {
+                lookup.Parameters.AddWithValue("code", code);
+                await using var reader = await lookup.ExecuteReaderAsync();
+                Assert.True(await reader.ReadAsync());
+                tax = reader.GetString(0); id = reader.GetGuid(1);
+            }
+            var response = await Post(staff, "/api/v1/customers", new { draft = new
+            {
+                name = "Hồ sơ không được tạo trùng", taxCode = tax, address = "Địa chỉ thử",
+                representative = "Người thử", phone = "0900000000", serviceGroups = Array.Empty<string>()
+            } }, Guid.NewGuid().ToString());
+            Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+            var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+            Assert.Equal("DUPLICATE_TAX_CODE", body.GetProperty("code").GetString());
+            var existing = body.GetProperty("detail").GetProperty("existing");
+            if (owner == "outside")
+                Assert.Equal(JsonValueKind.Null, existing.ValueKind);
+            else
+            {
+                Assert.Equal(code, existing.GetProperty("code").GetString());
+                Assert.Equal(tax, existing.GetProperty("taxCode").GetString());
+                Assert.Equal("Khách kiểm thử", existing.GetProperty("name").GetString());
+                Assert.Equal(suspended ? "suspended" : "active", existing.GetProperty("status").GetString());
+            }
+            Assert.Equal(1, await f.Count("SELECT count(*) FROM qtkd.customer WHERE customer_id=@id", id));
+            Assert.Equal(0, await f.Count("SELECT count(*) FROM qtkd.customer_operation WHERE customer_id=@id", id));
+            Assert.Equal(0, await f.Count("SELECT count(*) FROM qtkd.audit_log WHERE entity_id=@id", id));
+        }
+    }
+
+    [LocalCustomerPostgresFact]
     public async Task Removed_suspension_endpoints_do_not_mutate_customers()
     {
         await using var f = await Fixture.Create(); using var manager = await f.Client("manager");

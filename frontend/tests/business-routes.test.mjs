@@ -59,6 +59,7 @@ async function harness(mode) {
     ...await load('features/contracts/api/approvalApi.ts'),
     ...await load('features/auth/api/authApi.ts'), ...await load('features/auth/api/passwordRecoveryApi.ts'),
     ...await load('lib/http/client.ts'), ...await load('constants/routes.ts'),
+    ...await load('features/customers/api/customersApi.ts'),
     ...await load('mocks/contractsServer.ts'), ...await load('mocks/seed/users.ts'),
     renderRoute(path, user) {
       setUser(user);
@@ -103,6 +104,29 @@ const routes = [
   ['/phe-duyet/da-ra-soat', 'approvals.review-legal'], ['/phe-duyet/cho-phe-duyet', 'approvals.approve'],
   ['/phe-duyet/tien-do', 'approvals.track'], ['/phe-duyet/phan-cong', 'approvals.assign'],
 ];
+
+test('customer duplicate API keeps scoped reference and handles a hidden duplicate without inventing a link', async t => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  const taxCode = '0123456789';
+  const cases = [
+    { code: 'KH-000123', name: 'Visible customer', taxCode, status: 'active' },
+    { code: 'KH-000124', name: 'Suspended customer', taxCode, status: 'suspended' },
+    null,
+  ];
+  let responseExisting;
+  globalThis.fetch = async path => new Response(JSON.stringify(path.endsWith('/auth/login') ? authResult
+    : { code: 'DUPLICATE_TAX_CODE', detail: { existing: responseExisting } }), { status: path.endsWith('/auth/login') ? 200 : 409 });
+  await api.loginHttp({ identifier: 'synthetic', password: 'synthetic' });
+  for (responseExisting of cases) {
+    await assert.rejects(api.customersApi.create({ userId: user.id, signedInAt: user.signedInAt,
+      idempotencyKey: 'duplicate-test', draft: { taxCode } }), error => {
+      assert.equal(error.code, 'DUPLICATE_TAX_CODE');
+      assert.deepEqual(error.existing, responseExisting ?? { taxCode });
+      return true;
+    });
+  }
+});
 
 function ignoreStaticRedirectWarning(t) {
   const warn = console.warn;

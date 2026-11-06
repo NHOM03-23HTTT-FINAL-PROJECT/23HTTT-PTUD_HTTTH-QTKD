@@ -231,6 +231,9 @@ public sealed partial class CustomerService(IdentityDbContext identity, IOptions
             return replay with { Replayed = true };
         }
         var d = Validate(request.Draft);
+        // A unique violation aborts the current transaction. Recover only the
+        // insertion so authorization locks remain held while resolving a safe link.
+        await tx.SaveAsync("customer_insert", ct);
         Guid id;
         try
         {
@@ -241,7 +244,20 @@ public sealed partial class CustomerService(IdentityDbContext identity, IOptions
                 ("contact", d.ContactName), ("title", d.ContactTitle), ("phone", d.Phone), ("email", d.Email), ("group", d.CustomerGroup), ("actor", actorId));
             id = (Guid)(await insert.ExecuteScalarAsync(ct))!;
         }
-        catch (PostgresException e) when (e.SqlState == PostgresErrorCodes.UniqueViolation) { throw new CustomerFailure(409, "DUPLICATE_TAX_CODE"); }
+        catch (PostgresException e) when (e.SqlState == PostgresErrorCodes.UniqueViolation && e.ConstraintName == "customer_tax_code_key")
+        {
+            await tx.RollbackAsync("customer_insert", ct);
+            DuplicateCustomerReference? existing = null;
+            await using (var duplicate = Cmd(c, tx, """
+                SELECT c.customer_code,c.customer_name,c.tax_code,c.status::text
+                FROM qtkd.customer c
+                JOIN qtkd.user_account owner ON owner.user_id=c.account_manager_id
+                WHERE c.tax_code=@tax AND owner.department_id=@department
+                """, ("tax", d.TaxCode), ("department", actor.DepartmentId)))
+            await using (var reader = await duplicate.ExecuteReaderAsync(ct))
+                if (await reader.ReadAsync(ct)) existing = new(reader.GetString(0), reader.GetString(1), reader.GetString(2), Status(reader.GetString(3)));
+            throw new CustomerFailure(409, "DUPLICATE_TAX_CODE", new { existing });
+        }
         await using (var profile = Cmd(c, tx, "INSERT INTO qtkd.customer_profile_data(customer_id,service_groups,created_at,created_by,updated_at) VALUES (@id,@groups,clock_timestamp(),@actor,clock_timestamp())",
             ("id", id), ("groups", d.ServiceGroups), ("actor", actorId))) await profile.ExecuteNonQueryAsync(ct);
         var row = await Find(c, tx, actor, id, false, ct);

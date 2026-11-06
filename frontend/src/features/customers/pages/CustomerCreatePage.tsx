@@ -10,6 +10,7 @@ import { MultiSelectField, SelectField } from '@/components/form/SelectField';
 import { StatusBadge } from '@/components/status-badge/StatusBadge';
 import { ROUTES } from '@/constants/routes';
 import { FormSection } from '../components/FormSection';
+import { CustomerNavigationGuard } from '../components/CustomerNavigationGuard';
 import { useCreateCustomerForm, type CreateCustomerAlert } from '../hooks/useCreateCustomerForm';
 import { useCustomerCatalogs } from '../hooks/useCustomerCatalogs';
 import type { CustomerDraft } from '../types/customer';
@@ -57,6 +58,7 @@ export function CustomerCreatePage() {
   const { endSession } = useSession();
   const navigate = useNavigate();
   const formRef = useRef<HTMLFormElement>(null);
+  const bypassNavigation = useRef(false);
   const [leaveTarget, setLeaveTarget] = useState<string | null>(null);
   const { catalogs, loading: loadingCatalogs, failed: catalogsFailed } = useCustomerCatalogs();
   const options = useMemo(() => {
@@ -68,6 +70,7 @@ export function CustomerCreatePage() {
   const form = useCreateCustomerForm({
     onCreated: ({ customer, replayed }) => {
       const state: CustomerDetailState = { created: true, replayed };
+      bypassNavigation.current = true;
       // Thay mục lịch sử để "Quay lại" không mở lại biểu mẫu đã lưu.
       navigate(ROUTES.customerDetail(customer.code), { replace: true, state });
     },
@@ -225,6 +228,7 @@ export function CustomerCreatePage() {
         </aside>
       </div>
 
+      <CustomerNavigationGuard dirty={form.dirty} bypass={bypassNavigation} />
       {leaveTarget && (
         <Dialog
           title="Rời biểu mẫu tạo khách hàng?"
@@ -236,7 +240,7 @@ export function CustomerCreatePage() {
               <Button variant="secondary" onClick={() => setLeaveTarget(null)}>
                 Tiếp tục nhập
               </Button>
-              <Button variant="danger" onClick={() => navigate(leaveTarget)}>
+              <Button variant="danger" onClick={() => { bypassNavigation.current = true; navigate(leaveTarget); }}>
                 Rời biểu mẫu
               </Button>
             </>
