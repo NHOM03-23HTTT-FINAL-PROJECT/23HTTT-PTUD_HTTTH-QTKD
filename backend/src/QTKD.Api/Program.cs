@@ -14,6 +14,7 @@ using QTKD.Api.Authentication;
 using QTKD.Application.Common.Interfaces;
 using QTKD.Application.Features.Contracts;
 using QTKD.Application.Features.Notifications;
+using QTKD.Application.Features.Audit;
 using QTKD.Domain.Contracts;
 using QTKD.Api.Authorization;
 using QTKD.Api.Endpoints;
@@ -159,6 +160,7 @@ builder.Services.AddQtkdPersistence(
     sp => sp.GetRequiredService<IConfiguration>().GetConnectionString("Identity") ?? throw new InvalidOperationException("ConnectionStrings:Identity is required."),
     enumNames);
 builder.Services.AddScoped<NotificationService>();
+builder.Services.AddScoped<AuditLogService>();
 builder.Services.AddAreaInfrastructure(builder.Configuration);
 
 var app = builder.Build();

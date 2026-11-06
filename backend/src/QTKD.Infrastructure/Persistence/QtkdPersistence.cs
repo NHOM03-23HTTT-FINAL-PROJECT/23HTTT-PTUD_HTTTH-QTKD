@@ -27,6 +27,7 @@ public static class QtkdPersistence
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<IContractRepository, ContractRepository>();
         services.AddScoped<IApprovalAssignmentRepository, ApprovalAssignmentRepository>();
+        services.AddScoped<IAuditLogRepository, AuditLogRepository>();
         return services;
     }
 
