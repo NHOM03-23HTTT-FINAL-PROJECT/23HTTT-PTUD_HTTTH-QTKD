@@ -30,7 +30,7 @@ public sealed class AuditLogService(IAuditLogRepository repository, TimeProvider
         var before = Json(r.ValueBefore);
         var after = Json(r.ValueAfter);
         return new(r.Id, r.ActedAt, r.ActorId, r.ActorName, r.Action, r.EntityType, r.EntityId, r.StatusBefore, r.StatusAfter,
-            r.IpAddress, r.Note, Changes(r.StatusBefore, r.StatusAfter, before, after), before, after);
+            r.IpAddress, r.EntityCode, r.Note, Changes(r.StatusBefore, r.StatusAfter, before, after), before, after);
     }
 
     /// <summary>Records the attempt, then refuses with 405 AUDIT_IMMUTABLE. Nothing in the log is changed.</summary>
@@ -75,7 +75,7 @@ public sealed class AuditLogService(IAuditLogRepository repository, TimeProvider
     }
 
     private static AuditLogItem ToItem(AuditLogRecord r) =>
-        new(r.Id, r.ActedAt, r.ActorId, r.ActorName, r.Action, r.EntityType, r.EntityId, r.StatusBefore, r.StatusAfter, r.IpAddress);
+        new(r.Id, r.ActedAt, r.ActorId, r.ActorName, r.Action, r.EntityType, r.EntityId, r.StatusBefore, r.StatusAfter, r.IpAddress, r.EntityCode);
 
     private static JsonElement? Json(string? value) => value is null ? null : JsonDocument.Parse(value).RootElement.Clone();
 

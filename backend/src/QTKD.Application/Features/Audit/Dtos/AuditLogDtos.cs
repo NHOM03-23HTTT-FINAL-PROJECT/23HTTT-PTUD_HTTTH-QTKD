@@ -31,7 +31,7 @@ public sealed record AuditQuery(DateTime? From, DateTime? To, Guid? ActorId, str
 }
 
 public sealed record AuditLogItem(Guid Id, DateTime ActedAt, Guid? ActorId, string? ActorName, string Action,
-    string EntityType, Guid? EntityId, string? StatusBefore, string? StatusAfter, string? IpAddress);
+    string EntityType, Guid? EntityId, string? StatusBefore, string? StatusAfter, string? IpAddress, string? EntityCode);
 
 /// <summary>The applied From/To are returned so the screen shows the window actually searched.</summary>
 public sealed record AuditLogPage(IReadOnlyList<AuditLogItem> Items, int Total, int Page, int PageSize, DateTime? From, DateTime? To);
@@ -39,7 +39,7 @@ public sealed record AuditLogPage(IReadOnlyList<AuditLogItem> Items, int Total, 
 public sealed record AuditFieldChange(string Field, JsonElement? Before, JsonElement? After);
 
 public sealed record AuditLogDetail(Guid Id, DateTime ActedAt, Guid? ActorId, string? ActorName, string Action,
-    string EntityType, Guid? EntityId, string? StatusBefore, string? StatusAfter, string? IpAddress, string? Note,
+    string EntityType, Guid? EntityId, string? StatusBefore, string? StatusAfter, string? IpAddress, string? EntityCode, string? Note,
     IReadOnlyList<AuditFieldChange> Changes, JsonElement? ValueBefore, JsonElement? ValueAfter);
 
 public sealed record AuditActorOption(Guid Id, string Name);
@@ -48,9 +48,9 @@ public sealed record AuditFilterOptions(IReadOnlyList<string> EntityTypes, IRead
 
 public static class AuditActions
 {
-    public const string Search = "audit.search";
-    public const string View = "audit.view";
-    public const string MutationRejected = "audit.mutation-rejected";
+    public const string Search = "AUDIT_SEARCHED";
+    public const string View = "AUDIT_VIEWED";
+    public const string MutationRejected = "AUDIT_MUTATION_REJECTED";
 
     /// <summary>entity_type of rows that record work on the audit log itself.</summary>
     public const string EntityType = "AuditLog";

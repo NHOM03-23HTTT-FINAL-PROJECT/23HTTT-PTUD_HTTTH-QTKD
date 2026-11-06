@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
@@ -17,7 +18,7 @@ namespace QTKD.Infrastructure.Repositories;
 /// transaction, they lock the rows they read (FOR SHARE); the contract document is read with PostgresApprovalStore.Load
 /// so the board returns the same shape as the review screens.
 /// </summary>
-public sealed class ApprovalAssignmentRepository(QtkdDbContext db) : IApprovalAssignmentRepository
+public sealed class ApprovalAssignmentRepository(QtkdDbContext db, IHttpContextAccessor? http = null) : IApprovalAssignmentRepository
 {
     private const string AssignerSql = """
         SELECT 1 AS "Value"
@@ -140,7 +141,7 @@ public sealed class ApprovalAssignmentRepository(QtkdDbContext db) : IApprovalAs
         db.Add(new AuditLog
         {
             EntityType = "ContractApprovalAssignment", EntityId = contractId, Action = action, ActorId = actorId,
-            ValueBefore = before, ValueAfter = after
+            ValueBefore = before, ValueAfter = after, IpAddress = http?.HttpContext?.Connection.RemoteIpAddress?.ToString()
         });
         await db.SaveChangesAsync(ct);
     }

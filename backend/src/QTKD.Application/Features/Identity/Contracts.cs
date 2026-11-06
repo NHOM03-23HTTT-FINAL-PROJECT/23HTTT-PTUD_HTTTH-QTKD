@@ -29,9 +29,10 @@ public interface IIdentityService
 {
     Task<AuthResult> Login(LoginRequest request, string? ip, string? device, CancellationToken ct);
     Task<AuthResult> Refresh(string token, CancellationToken ct);
-    Task Logout(string? token, CancellationToken ct);
+    /// <summary>audit: true only for a deliberate sign-out; the login path replaces the previous session without recording LOGOUT.</summary>
+    Task Logout(string? token, string? ip, bool audit, CancellationToken ct);
     Task<SessionView> Session(Guid userId, Guid sessionId, bool activity, CancellationToken ct);
-    Task<AuthResult> ChangePassword(Guid userId, Guid sessionId, PasswordRequest request, string? refreshCookie, CancellationToken ct);
+    Task<AuthResult> ChangePassword(Guid userId, Guid sessionId, PasswordRequest request, string? refreshCookie, string? ip, CancellationToken ct);
     Task<bool> HasPermission(Guid userId, string permission, CancellationToken ct);
     Task<IReadOnlyList<AuthUser>> Users(CancellationToken ct);
     Task<AuthUser> User(Guid userId, CancellationToken ct);

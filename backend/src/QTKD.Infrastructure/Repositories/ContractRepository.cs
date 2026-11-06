@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using QTKD.Application.Common.Interfaces;
@@ -18,7 +19,7 @@ namespace QTKD.Infrastructure.Repositories;
 /// SYS-CTR-04 through EF Core LINQ on QtkdDbContext. Every read is filtered by the contract or by the actor's scope.
 /// Writes join the transaction opened by IdempotentAsync.
 /// </summary>
-public sealed class ContractRepository(QtkdDbContext db) : IContractRepository
+public sealed class ContractRepository(QtkdDbContext db, IHttpContextAccessor? http = null) : IContractRepository
 {
     private static readonly JsonSerializerOptions Web = new(JsonSerializerDefaults.Web);
 
@@ -274,7 +275,8 @@ public sealed class ContractRepository(QtkdDbContext db) : IContractRepository
             StatusAfter = afterStatus,
             ValueBefore = before?.ToJsonString(),
             ValueAfter = after.ToJsonString(),
-            Note = note
+            Note = note,
+            IpAddress = http?.HttpContext?.Connection.RemoteIpAddress?.ToString()
         });
         await db.SaveChangesAsync(ct);
     }

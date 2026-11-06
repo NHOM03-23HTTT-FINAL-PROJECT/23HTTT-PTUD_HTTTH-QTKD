@@ -154,7 +154,8 @@ builder.Services.AddSingleton<PgDatabase>();
 builder.Services.AddScoped<ICurrentActor, CurrentActor>();
 builder.Services.AddScoped<IContractStore>(sp => new PostgresContractStore(
     sp.GetRequiredService<PgDatabase>(),
-    Path.GetFullPath(builder.Configuration["Storage:Root"] ?? Path.Combine(builder.Environment.ContentRootPath, ".data", "uploads"))));
+    Path.GetFullPath(builder.Configuration["Storage:Root"] ?? Path.Combine(builder.Environment.ContentRootPath, ".data", "uploads")),
+    sp.GetRequiredService<IHttpContextAccessor>()));
 builder.Services.AddScoped<ContractService>();
 builder.Services.AddQtkdPersistence(
     sp => sp.GetRequiredService<IConfiguration>().GetConnectionString("Identity") ?? throw new InvalidOperationException("ConnectionStrings:Identity is required."),
@@ -281,7 +282,7 @@ auth.MapPost("/login", async (LoginRequest request, IIdentityService identity, H
     var result = await identity.Login(request, context.Connection.RemoteIpAddress?.ToString(), context.Request.Headers.UserAgent.ToString(), ct);
     // One current refresh cookie per browser. Another device uses a separate cookie jar.
     var currentCookie = GetRefreshCookie(context) ?? context.Request.Cookies[cookieName];
-    if (!string.IsNullOrEmpty(currentCookie)) await identity.Logout(currentCookie, ct);
+    if (!string.IsNullOrEmpty(currentCookie)) await identity.Logout(currentCookie, null, false, ct);
     SetRefresh(context, result); return TypedResults.Ok(AuthResponse.From(result));
 }).AllowAnonymous().RequireRateLimiting("auth")
     .WithDescription("Returns an access JWT and sets the refresh cookie. Errors: VALIDATION, INVALID_CREDENTIALS, DISABLED, LOCKED, CSRF_REJECTED, RATE_LIMITED.")
@@ -295,7 +296,7 @@ auth.MapPost("/refresh", async (IIdentityService identity, HttpContext context, 
     .AuthErrors(401, 403, 429);
 auth.MapPost("/logout", async (IIdentityService identity, HttpContext context, CancellationToken ct) =>
 {
-    RequireCsrf(context); await identity.Logout(GetRefreshCookie(context) ?? context.Request.Cookies[cookieName], ct);
+    RequireCsrf(context); await identity.Logout(GetRefreshCookie(context) ?? context.Request.Cookies[cookieName], context.Connection.RemoteIpAddress?.ToString(), true, ct);
     context.Response.Cookies.Delete(cookieName, new CookieOptions { Secure = true, HttpOnly = true, SameSite = SameSiteMode.Strict, Path = "/" });
     context.Response.Cookies.Delete("qtkd-refresh", new CookieOptions { Secure = false, HttpOnly = true, SameSite = SameSiteMode.Lax, Path = "/" });
     return TypedResults.NoContent();
@@ -313,7 +314,7 @@ auth.MapPost("/password/change", async (PasswordRequest request, IIdentityServic
 {
     RequireCsrf(context); var subject = Subject(context);
     var currentCookie = GetRefreshCookie(context) ?? context.Request.Cookies[cookieName];
-    var result = await identity.ChangePassword(subject.User, subject.Session, request, currentCookie, ct);
+    var result = await identity.ChangePassword(subject.User, subject.Session, request, currentCookie, context.Connection.RemoteIpAddress?.ToString(), ct);
     SetRefresh(context, result); return TypedResults.Ok(AuthResponse.From(result));
 }).RequireAuthorization().RequireRateLimiting("auth")
     .WithDescription("Requires the current password, Bearer JWT and refresh cookie. Errors include WRONG_CURRENT, LOCKED, WEAK_PASSWORD and SAME_AS_CURRENT.")
@@ -346,7 +347,7 @@ recovery.MapPost("/verify", async (VerifyOtpRequest request, PasswordRecoverySer
 recovery.MapPost("/reset", async (ResetPasswordRequest request, PasswordRecoveryService service, HttpContext context, CancellationToken ct) =>
 {
     RequireCsrf(context);
-    return TypedResults.Ok(await service.Reset(request, ct));
+    return TypedResults.Ok(await service.Reset(request, context.Connection.RemoteIpAddress?.ToString(), ct));
 }).WithDescription("Consumes a reset token and revokes all account sessions. Errors include TOKEN_EXPIRED, WEAK_PASSWORD and SAME_AS_CURRENT.")
     .AuthErrors(400, 403, 429);
 

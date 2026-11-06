@@ -79,6 +79,24 @@ public sealed class AuditLogRepositorySqliteTests : IDisposable
     }
 
     [Fact]
+    public async Task Entity_code_resolves_for_contracts_and_areas_and_is_null_once_the_entity_is_gone()
+    {
+        var area = Guid.NewGuid();
+        db.Set<QTKD.Infrastructure.Persistence.Schema.Contract>().Add(new() { ContractId = contract, ContractCode = "HD-000001", Title = "HĐ" });
+        db.Set<QTKD.Domain.Entities.Area>().Add(new() { AreaId = area, AreaCode = "KV-01", AreaName = "Khu A", AreaType = "Area", HierarchyPath = "/KV-01" });
+        db.SaveChanges();
+        db.ChangeTracker.Clear();
+        var contractLog = Add(alice, "CONTRACT_SUBMITTED", 1, "Contract", contract);
+        var areaLog = Add(alice, "CREATE", 2, "Area", area);
+        var goneLog = Add(alice, "CONTRACT_SUBMITTED", 3, "Contract", Guid.NewGuid());
+
+        var repository = new AuditLogRepository(db);
+        Assert.Equal("HD-000001", (await repository.FindAsync(contractLog.LogId, default))!.EntityCode);
+        Assert.Equal("KV-01", (await repository.FindAsync(areaLog.LogId, default))!.EntityCode);
+        Assert.Null((await repository.FindAsync(goneLog.LogId, default))!.EntityCode);
+    }
+
+    [Fact]
     public async Task Find_options_and_append()
     {
         var log = Add(bob, "CONTRACT_SUBMITTED", 1);
@@ -94,7 +112,7 @@ public sealed class AuditLogRepositorySqliteTests : IDisposable
         var options = await repository.OptionsAsync(default);
         // String order follows the database collation, so only the distinct values are compared.
         Assert.Equal(["AuditLog", "Contract"], options.EntityTypes.Order(StringComparer.Ordinal));
-        Assert.Equal(["CONTRACT_SUBMITTED", AuditActions.Search], options.Actions.Order(StringComparer.Ordinal));
+        Assert.Equal([AuditActions.Search, "CONTRACT_SUBMITTED"], options.Actions.Order(StringComparer.Ordinal));
         Assert.Equal(["Alice", "Bob"], options.Actors.Select(a => a.Name));
     }
 }

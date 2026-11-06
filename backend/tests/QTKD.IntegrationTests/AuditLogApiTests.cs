@@ -50,7 +50,7 @@ public sealed class AuditLogApiTests : IDisposable
     public async Task Admin_searches_newest_first_and_the_search_is_recorded()
     {
         var row = new AuditLogRecord(Guid.NewGuid(), DateTime.UtcNow, factory.AdminId, "Admin Test", "CONTRACT_SUBMITTED", "Contract",
-            Guid.NewGuid(), "Draft", "Submitted", null, """{"title":"A"}""", null, "10.0.0.1");
+            Guid.NewGuid(), "Draft", "Submitted", null, """{"title":"A"}""", null, "10.0.0.1", "HD-000001");
         store.Items.Add(row);
         var admin = await SignIn("admin");
 

@@ -40,8 +40,9 @@ public sealed class IdentityService(IdentityDbContext db, UserManager<UserAccoun
                 if (user.LockedUntil is not null) user.FailedLoginCount = 0;
                 user.FailedLoginCount++;
                 if (user.FailedLoginCount >= 5) { user.LockedUntil = Now.AddMinutes(15); user.Status = UserStatus.TemporarilyLocked; await db.RevokeSessions(user.UserId, "locked", ct); }
-                await db.SaveChangesAsync(ct);
             }
+            db.Audit("LOGIN_FAILED", user.UserId, ip, Now, new { reason = "wrong-password", failedCount = user.FailedLoginCount, locked = user.LockedUntil > Now });
+            await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
             log.LogWarning("LOGIN_FAILED {UserId}", user.UserId);
             throw new IdentityFailure(401, "INVALID_CREDENTIALS");
@@ -57,7 +58,9 @@ public sealed class IdentityService(IdentityDbContext db, UserManager<UserAccoun
         var session = new LoginSession { UserId = user.UserId, RefreshTokenHash = TokenIssuer.Hash(refresh), LogoutTokenHash = TokenIssuer.Hash(refresh[..64]), CreatedAt = Now,
             LastActivityAt = Now, ExpiresAt = Now.AddHours(options.CurrentValue.AbsoluteHours), Remember = request.Remember,
             IpAddress = ip, Device = device?[..Math.Min(device.Length, 500)] };
-        db.Sessions.Add(session); await db.SaveChangesAsync(ct); await transaction.CommitAsync(ct);
+        db.Sessions.Add(session);
+        db.Audit("LOGIN_SUCCESS", user.UserId, ip, Now, new { device = session.Device });
+        await db.SaveChangesAsync(ct); await transaction.CommitAsync(ct);
         log.LogInformation("LOGIN_SUCCESS {UserId} {SessionId}", user.UserId, session.SessionId);
         return Result(user, session, view, refresh, previous);
     }
@@ -74,7 +77,7 @@ public sealed class IdentityService(IdentityDbContext db, UserManager<UserAccoun
         await db.SaveChangesAsync(ct); await transaction.CommitAsync(ct);
         return Result(user, session, view, refresh);
     }
-    public async Task Logout(string? token, CancellationToken ct)
+    public async Task Logout(string? token, string? ip, bool audit, CancellationToken ct)
     {
         var candidate = await FindLogout(token, ct);
         if (candidate is null) return;
@@ -83,7 +86,10 @@ public sealed class IdentityService(IdentityDbContext db, UserManager<UserAccoun
         var session = await FindLogout(token, ct, tracked: true);
         if (session is not null && !session.IsRevoked)
         {
-            Revoke(session, Now >= session.ExpiresAt || Now >= session.LastActivityAt + Idle ? SessionEndReason.Expired : SessionEndReason.Logout, "logout");
+            var reason = Now >= session.ExpiresAt || Now >= session.LastActivityAt + Idle ? SessionEndReason.Expired : SessionEndReason.Logout;
+            Revoke(session, reason, "logout");
+            // Only a deliberate sign-out is recorded; an expired session ending is not a user action.
+            if (audit && reason == SessionEndReason.Logout) db.Audit("LOGOUT", session.UserId, ip, Now);
             await db.SaveChangesAsync(ct);
             log.LogInformation("LOGOUT {UserId} {SessionId}", session.UserId, session.SessionId);
         }
@@ -105,7 +111,7 @@ public sealed class IdentityService(IdentityDbContext db, UserManager<UserAccoun
         var account = await Valid(userId, current, ct);
         return new("active", await View(account, ct), current.CreatedAt, current.LastActivityAt + Idle, current.ExpiresAt);
     }
-    public async Task<AuthResult> ChangePassword(Guid userId, Guid sessionId, PasswordRequest request, string? refreshCookie, CancellationToken ct)
+    public async Task<AuthResult> ChangePassword(Guid userId, Guid sessionId, PasswordRequest request, string? refreshCookie, string? ip, CancellationToken ct)
     {
         if (string.IsNullOrEmpty(request.CurrentPassword) || Encoding.UTF8.GetByteCount(request.CurrentPassword) > 72)
             throw new IdentityFailure(400, "VALIDATION");
@@ -135,6 +141,7 @@ public sealed class IdentityService(IdentityDbContext db, UserManager<UserAccoun
         await db.RevokeSessions(userId, "password-changed", ct, sessionId);
         var refresh = refreshCookie![..65] + TokenIssuer.NewRefresh(); session.RefreshTokenHash = TokenIssuer.Hash(refresh); session.LastActivityAt = Now;
         var view = await View(user, ct);
+        db.Audit("PASSWORD_CHANGED", userId, ip, Now);
         await db.SaveChangesAsync(ct); await transaction.CommitAsync(ct);
         log.LogInformation("PASSWORD_CHANGED {UserId} {SessionId}", userId, sessionId);
         return Result(user, session, view, refresh);

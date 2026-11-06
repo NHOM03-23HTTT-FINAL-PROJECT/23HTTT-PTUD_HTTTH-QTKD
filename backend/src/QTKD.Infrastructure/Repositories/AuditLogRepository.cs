@@ -14,6 +14,8 @@ public sealed class AuditLogRepository(QtkdDbContext db) : IAuditLogRepository
 
     private IQueryable<AuditLog> Logs => db.Set<AuditLog>().AsNoTracking();
     private IQueryable<UserAccount> Users => db.Set<UserAccount>().AsNoTracking();
+    private IQueryable<Contract> Contracts => db.Set<Contract>().AsNoTracking();
+    private IQueryable<QTKD.Domain.Entities.Area> Areas => db.Set<QTKD.Domain.Entities.Area>().AsNoTracking();
 
     public async Task<(IReadOnlyList<AuditLogRecord> Items, int Total)> SearchAsync(AuditQuery query, CancellationToken ct)
     {
@@ -61,8 +63,11 @@ public sealed class AuditLogRepository(QtkdDbContext db) : IAuditLogRepository
         await db.SaveChangesAsync(ct);
     }
 
+    // Entity ids are UUIDs, so a contract id never matches an area row: the first non-null lookup is the right one.
     private IQueryable<AuditLogRecord> WithActor(IQueryable<AuditLog> source) => source.Select(l => new AuditLogRecord(
         l.LogId, l.ActedAt, l.ActorId,
         Users.Where(u => u.UserId == l.ActorId).Select(u => u.FullName).FirstOrDefault(),
-        l.Action, l.EntityType, l.EntityId, l.StatusBefore, l.StatusAfter, l.ValueBefore, l.ValueAfter, l.Note, l.IpAddress));
+        l.Action, l.EntityType, l.EntityId, l.StatusBefore, l.StatusAfter, l.ValueBefore, l.ValueAfter, l.Note, l.IpAddress,
+        Contracts.Where(c => c.ContractId == l.EntityId).Select(c => c.ContractCode).FirstOrDefault()
+            ?? Areas.Where(a => a.AreaId == l.EntityId).Select(a => a.AreaCode).FirstOrDefault()));
 }

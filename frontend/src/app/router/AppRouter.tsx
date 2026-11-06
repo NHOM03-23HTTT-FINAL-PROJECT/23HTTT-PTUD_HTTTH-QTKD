@@ -25,6 +25,7 @@ import { ContractEditPage } from '@/features/contracts/pages/ContractEditPage';
 import { ContractListPage } from '@/features/contracts/pages/ContractListPage';
 import { ContractProgressPage } from '@/features/contracts/pages/ContractProgressPage';
 import { ApprovalAssignmentPage } from '@/features/contracts/pages/ApprovalAssignmentPage';
+import { AuditLogPage } from '@/features/audit-logs/pages/AuditLogPage';
 import { DashboardPage } from '@/features/dashboard/pages/DashboardPage';
 import { NotificationOpenPage } from '@/features/notifications/pages/NotificationOpenPage';
 import { NotificationsPage } from '@/features/notifications/pages/NotificationsPage';
@@ -36,6 +37,7 @@ import { NavPlaceholderPage, NotFoundPage, RecordPlaceholderPage } from './Place
 /** Đường dẫn trong menu đã có màn hình thật, không dùng trang giữ chỗ. */
 const IMPLEMENTED_PATHS = new Set<string>([
   '/phe-duyet/phoi-hop',
+  ROUTES.auditLogs,
   ROUTES.changePassword,
   ROUTES.customers,
   ROUTES.customerCreate,
@@ -283,6 +285,14 @@ export function AppRoutes() {
             />
             <Route path="/phe-duyet/ho-so/:id" element={<ContractReviewPage />} />
             <Route path="/phe-duyet/phoi-hop" element={<BusinessRoute apiReady label="Phối hợp phòng ban"><CoordinationInboxPage /></BusinessRoute>} />
+            <Route
+              path={ROUTES.auditLogs}
+              element={
+                <BusinessRoute apiReady permission="audit.view" label="Nhật ký hệ thống">
+                  <AuditLogPage />
+                </BusinessRoute>
+              }
+            />
             <Route path="/bang-thanh-toan/:code" element={<RecordPlaceholderPage kind="payment" />} />
             {NAV_PATHS.map((path) => (
               <Route key={path} path={path} element={<NavPlaceholderPage />} />

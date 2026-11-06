@@ -20,9 +20,10 @@ public interface IAuditLogRepository
 }
 
 /// <summary>A stored row with the actor's name; ValueBefore/ValueAfter are raw JSON text.</summary>
+/// <summary>EntityCode is the contract or area code the entity still has; null when it is gone or of another type.</summary>
 public sealed record AuditLogRecord(Guid Id, DateTime ActedAt, Guid? ActorId, string? ActorName, string Action,
     string EntityType, Guid? EntityId, string? StatusBefore, string? StatusAfter, string? ValueBefore, string? ValueAfter,
-    string? Note, string? IpAddress);
+    string? Note, string? IpAddress, string? EntityCode);
 
 /// <summary>A new row; ValueAfter is serialized to JSON. ActedAt is set by the database.</summary>
 public sealed record AuditEntry(Guid ActorId, string Action, string EntityType, Guid? EntityId, object? ValueAfter, string? IpAddress);

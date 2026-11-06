@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Microsoft.AspNetCore.Http;
 using Npgsql;
 using QTKD.Application.Common.Interfaces;
 using QTKD.Application.Features.Contracts;
@@ -14,11 +15,13 @@ public partial class PostgresContractStore : IContractStore
 {
     private readonly PgDatabase _db;
     private readonly string _uploadRoot;
+    private readonly IHttpContextAccessor? _http;
 
-    public PostgresContractStore(PgDatabase db, string uploadRoot)
+    public PostgresContractStore(PgDatabase db, string uploadRoot, IHttpContextAccessor? http = null)
     {
         _db = db;
         _uploadRoot = uploadRoot;
+        _http = http;
     }
 
     // All scope checks happen before filtering, counting and pagination. A role alone never grants board/legal access.
@@ -517,7 +520,7 @@ public partial class PostgresContractStore : IContractStore
         return result;
     }
 
-    private static Task Audit(
+    private Task Audit(
         NpgsqlConnection c,
         NpgsqlTransaction tx,
         Actor actor,
@@ -542,9 +545,10 @@ public partial class PostgresContractStore : IContractStore
         return Execute(c, tx, """
             INSERT INTO qtkd.audit_log(
                 entity_type, entity_id, action, actor_id, status_before,
-                status_after, value_before, value_after, note
+                status_after, value_before, value_after, note, ip_address
             )
-            VALUES('Contract', $1, $2, $3, $4, $5, $6, $7, $8)
-            """, ct, id, action, actor.Id, beforeStatus, afterStatus, before, snapshot, note);
+            VALUES('Contract', $1, $2, $3, $4, $5, $6, $7, $8, $9)
+            """, ct, id, action, actor.Id, beforeStatus, afterStatus, before, snapshot, note,
+            _http?.HttpContext?.Connection.RemoteIpAddress?.ToString());
     }
 }

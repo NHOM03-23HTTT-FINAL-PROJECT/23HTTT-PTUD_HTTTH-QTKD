@@ -15,7 +15,7 @@ public sealed class AuditLogServiceTests
 
     private static AuditLogRecord Record(string? before = null, string? after = null, string? statusBefore = null, string? statusAfter = null) =>
         new(Guid.NewGuid(), DateTime.UtcNow, Guid.NewGuid(), "Người lập", "CONTRACT_SUBMITTED", "Contract", Guid.NewGuid(),
-            statusBefore, statusAfter, before, after, "Lượt 1", "10.0.0.1");
+            statusBefore, statusAfter, before, after, "Lượt 1", "10.0.0.1", "HD-000001");
 
     [Fact]
     public async Task Search_returns_the_applied_window_and_records_the_filter()

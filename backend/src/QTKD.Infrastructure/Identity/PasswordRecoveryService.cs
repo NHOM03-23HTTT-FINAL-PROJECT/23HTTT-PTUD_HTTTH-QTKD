@@ -83,7 +83,7 @@ public sealed class PasswordRecoveryService(IdentityDbContext db, IPasswordHashe
         return new(resetToken, user.CompanyEmail);
     }
 
-    public async Task<ResetPasswordResult> Reset(ResetPasswordRequest request, CancellationToken ct)
+    public async Task<ResetPasswordResult> Reset(ResetPasswordRequest request, string? ip, CancellationToken ct)
     {
         if (request.ResetToken is not { Length: 97 } token || token[32] != '.'
             || !Guid.TryParseExact(token[..32], "N", out var otpId) || !token[33..].All(Uri.IsHexDigit)) throw InvalidToken();
@@ -109,6 +109,7 @@ public sealed class PasswordRecoveryService(IdentityDbContext db, IPasswordHashe
         user.Status = UserStatus.Active;
         await db.InvalidatePasswordRecovery(id, ct);
         await db.RevokeSessions(id, "password-changed", ct);
+        db.Audit("PASSWORD_RESET", id, ip, Now);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         return new(user.Username);
