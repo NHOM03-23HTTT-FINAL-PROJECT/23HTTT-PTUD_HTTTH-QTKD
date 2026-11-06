@@ -265,6 +265,12 @@ export function ContractDetailPage() {
               Chỉnh sửa
             </ButtonLink>
           )}
+          {BACKEND_ENABLED && contract.id && user?.permissions.has('audit.view') && (
+            // A1: mở nhật ký đã lọc theo hồ sơ này; không giới hạn thời gian mặc định.
+            <ButtonLink to={`${ROUTES.auditLogs}?entityId=${encodeURIComponent(contract.id)}`} variant="secondary">
+              Xem nhật ký
+            </ButtonLink>
+          )}
           {editable && contract.status === 'draft' && (
             <Button
               variant="secondary"

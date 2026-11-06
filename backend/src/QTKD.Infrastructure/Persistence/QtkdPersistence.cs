@@ -29,6 +29,7 @@ public static class QtkdPersistence
         services.AddScoped<IContractRepository>(sp => sp.GetRequiredService<ContractRepository>());
         services.AddScoped<IContractManagementRepository>(sp => sp.GetRequiredService<ContractRepository>());
         services.AddScoped<IApprovalAssignmentRepository, ApprovalAssignmentRepository>();
+        services.AddScoped<IAuditLogRepository, AuditLogRepository>();
         return services;
     }
 

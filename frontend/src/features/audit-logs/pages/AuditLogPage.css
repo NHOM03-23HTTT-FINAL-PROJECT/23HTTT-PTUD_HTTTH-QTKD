@@ -1,0 +1,59 @@
+.audit-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 16px;
+  align-items: end;
+  margin: 16px 0;
+}
+
+.audit-filters__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.audit-detail {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 8px 16px;
+  margin: 0 0 16px;
+}
+
+.audit-detail dt {
+  font-weight: 600;
+}
+
+.audit-detail dd {
+  margin: 0;
+}
+
+.audit-detail__note {
+  margin: 0 0 16px;
+}
+
+.audit-changes {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.audit-changes th,
+.audit-changes td {
+  padding: 8px;
+  border-bottom: 1px solid currentColor;
+  text-align: left;
+  vertical-align: top;
+}
+
+.audit-changes__scroll {
+  max-height: 50vh;
+  overflow: auto;
+}
+
+.audit-changes pre {
+  max-height: 200px;
+  overflow: auto;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+}

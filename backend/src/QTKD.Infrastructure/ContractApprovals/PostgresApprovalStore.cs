@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Npgsql;
 using QTKD.Application.Features.ContractApprovals;
@@ -6,7 +7,7 @@ using QTKD.Application.Features.ContractApprovals;
 namespace QTKD.Infrastructure.ContractApprovals;
 
 /// <summary>Uses Prisma-owned tables; never creates/migrates a database at application startup.</summary>
-public sealed class PostgresApprovalStore(IConfiguration configuration) : IApprovalStore
+public sealed class PostgresApprovalStore(IConfiguration configuration, IHttpContextAccessor? http = null) : IApprovalStore
 {
     private async Task<NpgsqlConnection> Open(CancellationToken ct)
     {
@@ -45,7 +46,8 @@ public sealed class PostgresApprovalStore(IConfiguration configuration) : IAppro
         await using (var roundLock = Command(c, tx, "SELECT round_id FROM qtkd.approval_round WHERE contract_id=@id ORDER BY round_no DESC LIMIT 1 FOR UPDATE", ("id", id)))
             await roundLock.ExecuteScalarAsync(ct);
         var stored = await Load(c, tx, id, ct) ?? throw new ReviewFailure(409, "STEP_NOT_READY");
-        var result = await action(new PostgresApprovalTransaction(c, tx, stored.Document, stored.OwnerId));
+        var result = await action(new PostgresApprovalTransaction(c, tx, stored.Document, stored.OwnerId,
+            http?.HttpContext?.Connection.RemoteIpAddress?.ToString()));
         await tx.CommitAsync(ct);
         return result;
     }
@@ -125,7 +127,7 @@ public sealed class PostgresApprovalStore(IConfiguration configuration) : IAppro
     private static string Result(string value) => value switch { "Running" => "in-progress", "Completed" => "completed", "RevisionRequested" => "revision", "Rejected" => "rejected", _ => "withdrawn" };
 }
 
-public sealed class PostgresApprovalTransaction(NpgsqlConnection connection, NpgsqlTransaction transaction, ReviewDocument document, Guid ownerId) : IApprovalTransaction
+public sealed class PostgresApprovalTransaction(NpgsqlConnection connection, NpgsqlTransaction transaction, ReviewDocument document, Guid ownerId, string? ip = null) : IApprovalTransaction
 {
     public ReviewDocument Document => document;
     public Guid OwnerId => ownerId;
@@ -190,12 +192,18 @@ public sealed class PostgresApprovalTransaction(NpgsqlConnection connection, Npg
                 """, ("recipient", message.RecipientId), ("id", next.Id), ("content", message.Content));
             await cmd.ExecuteNonQueryAsync(ct);
         }
+        // Audit action names are UPPER_SNAKE_CASE; command.Action stays the API verb.
+        var action = command.Action switch
+        {
+            "accept" => "REVIEW_ACCEPTED", "handoff" => "REVIEW_HANDED_OFF", "approve" => "REVIEW_APPROVED",
+            "revision" => "REVIEW_REVISION_REQUESTED", "reject" => "REVIEW_REJECTED", var other => other,
+        };
         await using var audit = PostgresApprovalStore.Command(connection, transaction, """
-            INSERT INTO qtkd.audit_log(log_id,entity_type,entity_id,action,actor_id,acted_at,status_before,status_after,value_after,note)
-            VALUES(gen_random_uuid(),'ContractApproval',@id,@action,@actor,now(),@before,@after,@value::jsonb,@note)
-            """, ("id", next.Id), ("action", command.Action), ("actor", command.Actor.Id), ("before", Document.Status), ("after", next.Status),
+            INSERT INTO qtkd.audit_log(log_id,entity_type,entity_id,action,actor_id,acted_at,status_before,status_after,value_after,note,ip_address)
+            VALUES(gen_random_uuid(),'ContractApproval',@id,@action,@actor,now(),@before,@after,@value::jsonb,@note,@ip)
+            """, ("id", next.Id), ("action", action), ("actor", command.Actor.Id), ("before", Document.Status), ("after", next.Status),
             ("value", JsonSerializer.Serialize(new { key = command.IdempotencyKey, fingerprint, outcome = new ReviewOutcome(next, next.PendingTask),
-                roundId = next.RoundId, stepId = command.Expected.StepId, version = next.SubmittedVersion })), ("note", command.Comment));
+                roundId = next.RoundId, stepId = command.Expected.StepId, version = next.SubmittedVersion })), ("note", command.Comment), ("ip", ip));
         await audit.ExecuteNonQueryAsync(ct);
     }
 }

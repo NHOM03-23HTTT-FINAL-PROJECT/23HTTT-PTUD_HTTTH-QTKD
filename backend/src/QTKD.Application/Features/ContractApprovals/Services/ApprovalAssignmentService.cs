@@ -65,7 +65,7 @@ public sealed class ApprovalAssignmentService(IApprovalAssignmentRepository repo
         if (step.AssigneeId is { } previous)
             await repository.NotifyAsync(previous, id, NotificationKinds.Revoked(label, document.Title), ct);
 
-        await repository.AuditAsync(id, step.AssigneeId is null ? "assign" : "reassign", actor.Id,
+        await repository.AuditAsync(id, step.AssigneeId is null ? "APPROVER_ASSIGNED" : "APPROVER_REASSIGNED", actor.Id,
             JsonSerializer.Serialize(new { stepId = step.Id, step = step.Key, assigneeId = step.AssigneeId }),
             JsonSerializer.Serialize(new { stepId = step.Id, step = step.Key, assigneeId = request.AssigneeId, activated = activates }), ct);
 

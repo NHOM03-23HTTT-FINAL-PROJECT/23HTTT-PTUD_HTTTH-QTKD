@@ -1,6 +1,8 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Npgsql.NameTranslation;
 using QTKD.Domain.Identity;
+using AuditLog = QTKD.Infrastructure.Persistence.Schema.AuditLog;
 using PasswordOtp = QTKD.Infrastructure.Persistence.Schema.PasswordOtp;
 
 namespace QTKD.Infrastructure.Persistence;
@@ -14,11 +16,16 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
     public DbSet<RoleDefinition> Roles => Set<RoleDefinition>();
     public DbSet<Permission> Permissions => Set<Permission>();
     public DbSet<RolePermission> Grants => Set<RolePermission>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
         b.HasDefaultSchema("qtkd");
         b.Entity<UserAccount>().ToTable("user_account").HasKey(x => x.UserId);
+        b.Entity<AuditLog>().ToTable("audit_log").HasKey(x => x.LogId);
+        // Without this, Npgsql sends these as text parameters (even when null) and PostgreSQL rejects them for the jsonb columns (42804).
+        b.Entity<AuditLog>().Property(x => x.ValueBefore).HasColumnType("jsonb");
+        b.Entity<AuditLog>().Property(x => x.ValueAfter).HasColumnType("jsonb");
         b.Entity<Department>().ToTable("department").HasKey(x => x.DepartmentId);
         b.Entity<LoginSession>().ToTable("login_session").HasKey(x => x.SessionId);
         b.Entity<PasswordOtp>().ToTable("password_otp").HasKey(x => x.OtpId);
@@ -49,6 +56,14 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             b.Entity<LoginSession>().Property(x => x.EndReason).HasConversion<string>();
         }
     }
+
+    /// <summary>Adds one audit_log row for a user-level action. The caller saves it with the change it records.</summary>
+    public void Audit(string action, Guid userId, string? ip, DateTime at, object? valueAfter = null) =>
+        AuditLogs.Add(new AuditLog
+        {
+            LogId = Guid.NewGuid(), EntityType = "UserAccount", EntityId = userId, Action = action, ActorId = userId,
+            ActedAt = at, ValueAfter = valueAfter is null ? null : JsonSerializer.Serialize(valueAfter), IpAddress = ip,
+        });
 
     public async Task LockUser(Guid id, CancellationToken ct)
     {

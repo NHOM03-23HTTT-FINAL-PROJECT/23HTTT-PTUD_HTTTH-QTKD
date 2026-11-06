@@ -73,7 +73,7 @@ public sealed class ApprovalAssignmentServiceTests
 
         await Service().Assign(legalHead, repository.Document.Id, Request("legal", second), default);
         Assert.Equal([first, second, first], repository.Notified);
-        Assert.Equal(["assign", "reassign"], repository.Audits);
+        Assert.Equal(["APPROVER_ASSIGNED", "APPROVER_REASSIGNED"], repository.Audits);
         repository.SetAssignee("legal", second, "waiting");
 
         await Service().Assign(legalHead, repository.Document.Id, Request("legal", second), default);

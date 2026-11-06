@@ -115,7 +115,18 @@ public class AreaService : IAreaService
 
             while (await reader.ReadAsync(ct))
             {
-                var action = reader.IsDBNull(0) ? "UNKNOWN" : reader.GetString(0);
+                // audit_log is append-only: rows written before the rename keep the old action names.
+                var action = (reader.IsDBNull(0) ? "UNKNOWN" : reader.GetString(0)) switch
+                {
+                    "CREATE" => "AREA_CREATED",
+                    "UPDATE" => "AREA_UPDATED",
+                    "CHANGE_PARENT" => "AREA_PARENT_CHANGED",
+                    "CHANGE_STATUS" => "AREA_STATUS_CHANGED",
+                    "ASSIGN_STAFF" => "AREA_STAFF_ASSIGNED",
+                    "END_STAFF" => "AREA_STAFF_ENDED",
+                    "SET_SERVICES" => "AREA_SERVICES_UPDATED",
+                    var name => name
+                };
                 var actedAt = reader.IsDBNull(1) ? DateTime.UtcNow : reader.GetDateTime(1);
                 var statusBefore = reader.IsDBNull(2) ? null : reader.GetString(2);
                 var statusAfter = reader.IsDBNull(3) ? null : reader.GetString(3);
@@ -137,7 +148,7 @@ public class AreaService : IAreaService
                 string actionTitle = "Chỉnh sửa thông tin";
                 string detail = note ?? "Cập nhật hồ sơ";
 
-                if (action == "CHANGE_STATUS")
+                if (action == "AREA_STATUS_CHANGED")
                 {
                     kind = "status";
                     currentVersion++;
@@ -147,39 +158,39 @@ public class AreaService : IAreaService
                         ? $"Chuyển Hoạt động → Tạm ngưng (phiên bản {currentVersion})"
                         : $"Chuyển Tạm ngưng → Hoạt động (phiên bản {currentVersion})";
                 }
-                else if (action == "CREATE")
+                else if (action == "AREA_CREATED")
                 {
                     kind = "create";
                     actionTitle = "Tạo mới khu vực";
                     detail = note ?? "Khởi tạo hồ sơ khu vực";
                 }
-                else if (action == "UPDATE")
+                else if (action == "AREA_UPDATED")
                 {
                     kind = "update";
                     currentVersion++;
                     actionTitle = "Chỉnh sửa thông tin";
                     detail = note ?? "Cập nhật thông số mặt bằng";
                 }
-                else if (action == "CHANGE_PARENT")
+                else if (action == "AREA_PARENT_CHANGED")
                 {
                     kind = "update";
                     currentVersion++;
                     actionTitle = "Điều chuyển khu vực cha";
                     detail = note ?? "Điều chuyển vị trí phân cấp";
                 }
-                else if (action == "ASSIGN_STAFF")
+                else if (action == "AREA_STAFF_ASSIGNED")
                 {
                     kind = "assignment";
                     actionTitle = "Phân công nhân sự";
                     detail = note ?? "Gán nhân sự phụ trách địa bàn";
                 }
-                else if (action == "END_STAFF")
+                else if (action == "AREA_STAFF_ENDED")
                 {
                     kind = "assignment";
                     actionTitle = "Kết thúc phân công";
                     detail = note ?? "Rút nhân sự khỏi địa bàn";
                 }
-                else if (action == "SET_SERVICES")
+                else if (action == "AREA_SERVICES_UPDATED")
                 {
                     kind = "assignment";
                     actionTitle = "Cập nhật dịch vụ khai thác";
@@ -451,7 +462,7 @@ public class AreaService : IAreaService
 
         await LogAuditAsync(
             newArea.AreaId,
-            "CREATE",
+            "AREA_CREATED",
             null,
             ActiveStatus.Active.ToString(),
             $"Tạo mới khu vực {cleanCode} - {cleanName}",
@@ -506,7 +517,7 @@ public class AreaService : IAreaService
 
         await LogAuditAsync(
             area.AreaId,
-            "UPDATE",
+            "AREA_UPDATED",
             null,
             null,
             "Cập nhật thông số mặt bằng và quy chuẩn kỹ thuật",
@@ -595,7 +606,7 @@ public class AreaService : IAreaService
 
         await LogAuditAsync(
             area.AreaId,
-            "CHANGE_PARENT",
+            "AREA_PARENT_CHANGED",
             null,
             null,
             $"Điều chuyển khu vực cấp cha từ '{oldPath}' sang '{newPath}'",
@@ -635,7 +646,7 @@ public class AreaService : IAreaService
 
         await LogAuditAsync(
             area.AreaId,
-            "CHANGE_STATUS",
+            "AREA_STATUS_CHANGED",
             oldStatus.ToString(),
             dto.Status.ToString(),
             dto.Reason,
@@ -762,7 +773,7 @@ public class AreaService : IAreaService
 
         await LogAuditAsync(
             area.AreaId,
-            "ASSIGN_STAFF",
+            "AREA_STAFF_ASSIGNED",
             null,
             null,
             $"Phân công nhân sự: {user.FullName} ({user.Username})",
@@ -815,7 +826,7 @@ public class AreaService : IAreaService
         {
             await LogAuditAsync(
                 targetArea.AreaId,
-                "END_STAFF",
+                "AREA_STAFF_ENDED",
                 null,
                 null,
                 $"Kết thúc phân công nhân sự",
@@ -877,7 +888,7 @@ public class AreaService : IAreaService
 
         await LogAuditAsync(
             area.AreaId,
-            "SET_SERVICES",
+            "AREA_SERVICES_UPDATED",
             null,
             null,
             $"Cập nhật dịch vụ khai thác ({targetServiceIds.Count} dịch vụ)",
