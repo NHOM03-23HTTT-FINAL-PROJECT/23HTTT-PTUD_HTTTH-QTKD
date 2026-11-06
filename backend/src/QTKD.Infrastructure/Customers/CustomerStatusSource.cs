@@ -1,4 +1,4 @@
-using Npgsql;
+using QTKD.Application.Common.Interfaces;
 using QTKD.Application.Features.Customers;
 
 namespace QTKD.Infrastructure.Customers;
@@ -6,21 +6,12 @@ namespace QTKD.Infrastructure.Customers;
 // A source is trusted server-side infrastructure, never request-supplied data.
 // Successful reviews must cover the necessary records and protect their freshness
 // through the transaction; missing sources cannot be represented as empty lists.
-public interface ICustomerStatusSource
-{
-    Task<ReactivationSourceResult> Reactivation(NpgsqlConnection connection, NpgsqlTransaction transaction,
-        Guid customerId, Guid actorId, string? reasonGroup, StatusException? exception, CancellationToken cancellationToken);
-}
-
-public sealed record ReactivationSourceResult(bool Complete, bool Allowed, string[] MissingSources,
-    ReactivationCheck[] Checks, string? VerifiedBasis);
-
 // Authoritative confirmations are not integrated. The provider reports that dependency
 // explicitly and never treats a browser-supplied exception as a verified decision.
 public sealed class PostgresCustomerStatusSource : ICustomerStatusSource
 {
-    public Task<ReactivationSourceResult> Reactivation(NpgsqlConnection connection, NpgsqlTransaction transaction,
-        Guid customerId, Guid actorId, string? reasonGroup, StatusException? exception, CancellationToken cancellationToken)
+    public Task<ReactivationSourceResult> Reactivation(Guid customerId, Guid actorId, string? reasonGroup,
+        StatusException? exception, CancellationToken cancellationToken)
     {
         var checks = reasonGroup switch
         {

@@ -2,11 +2,14 @@
 param(
     [switch]$ValidateOnly,
     [switch]$NoBuild,
-    [string]$ApiEnvFile = (Join-Path $PSScriptRoot '.env'),
-    [string]$DatabaseEnvFile = (Join-Path $PSScriptRoot '../DB/.env')
+    [string]$ApiEnvFile,
+    [string]$DatabaseEnvFile
 )
 $ErrorActionPreference = 'Stop'
-Import-Module (Join-Path $PSScriptRoot 'scripts/LocalEnvironment.psm1') -Force
+$scriptDir = if ($PSScriptRoot) { $PSScriptRoot } elseif ($MyInvocation.MyCommand.Path) { Split-Path -Parent $MyInvocation.MyCommand.Path } else { (Resolve-Path './backend').Path }
+if (-not $ApiEnvFile) { $ApiEnvFile = Join-Path $scriptDir '.env' }
+if (-not $DatabaseEnvFile) { $DatabaseEnvFile = Join-Path $scriptDir '../DB/.env' }
+Import-Module (Join-Path $scriptDir 'scripts/LocalEnvironment.psm1') -Force
 $settings = Get-QtkdLocalSettings -ApiEnvFile $ApiEnvFile -DatabaseEnvFile $DatabaseEnvFile
 if ($ValidateOnly) {
     # Intentionally do not return the settings dictionary, URI, key, or connection string.
@@ -19,7 +22,7 @@ foreach ($name in $names) { $before[$name] = [Environment]::GetEnvironmentVariab
 try {
     [Environment]::SetEnvironmentVariable('Jwt__SigningKey', $settings.Jwt, 'Process')
     [Environment]::SetEnvironmentVariable('ConnectionStrings__Identity', $settings.Connection, 'Process')
-    Push-Location -LiteralPath $PSScriptRoot
+    Push-Location -LiteralPath $scriptDir
     try {
         $arguments = @('run', '--project', 'src/QTKD.Api', '--launch-profile', 'https')
         if ($NoBuild) { $arguments += '--no-build' }

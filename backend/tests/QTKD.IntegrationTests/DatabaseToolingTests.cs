@@ -220,7 +220,11 @@ public sealed class DatabaseToolingTests
         using var db = new QtkdDbContext(QtkdPersistence.Options("Host=offline.invalid"));
         var ids = db.Database.GetMigrations().ToList();
         Assert.Equal(MigrationSql.PrismaBaseline.Select(m => m.EfId), ids.Take(MigrationSql.PrismaBaseline.Count));
-        Assert.Equal(names.Count, ids.Count);
+        var metadataId = Assert.Single(ids, id => id.EndsWith("_CustomerEfRepositoryAlignment", StringComparison.Ordinal));
+        var assembly = db.GetService<Microsoft.EntityFrameworkCore.Migrations.IMigrationsAssembly>();
+        var metadata = assembly.CreateMigration(assembly.Migrations[metadataId], db.Database.ProviderName!);
+        Assert.Empty(metadata.UpOperations); Assert.Empty(metadata.DownOperations);
+        Assert.Equal(names.Count + 1, ids.Count);
     }
 
     [Fact]

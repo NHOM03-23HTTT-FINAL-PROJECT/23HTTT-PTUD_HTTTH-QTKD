@@ -51,6 +51,7 @@ async function withServer(prepare, body) {
 }
 
 const sqlFiles = (await readdir(sqlDir)).filter((n) => n.endsWith('.sql')).sort();
+const migrationCount = (await readdir(join(sqlDir, '..'))).filter(n => /^\d{14}_.+\.cs$/.test(n) && !n.endsWith('.Designer.cs')).length;
 const prismaFiles = sqlFiles.filter((n) => /^\d{12}_/.test(n));
 const count = async (db, sql) => Number((await db.query(sql)).rows[0].n);
 
@@ -64,7 +65,7 @@ try {
     assert.equal(r.code, 0, r.out);
     r = await run(port, 'status');
     assert.equal(r.code, 0, r.out);
-    assert.match(r.out, new RegExp(`${sqlFiles.length} applied, 0 pending`));
+    assert.match(r.out, new RegExp(`${migrationCount} applied, 0 pending`));
     assert.equal(await count(db, "SELECT count(*) n FROM pg_tables WHERE schemaname='qtkd'"), 37); // main's 32 + customer's 4 + EF history
     assert.equal(await count(db, "SELECT count(*) n FROM pg_tables WHERE schemaname='qtkd' AND tablename IN ('customer_profile_data','customer_operation','customer_status_outbox','customer_status_delegation') AND rowsecurity"), 4);
     for (const role of ['anon', 'authenticated'])
@@ -88,7 +89,7 @@ try {
       'a second seed must not reset passwords');
     const legal = (await db.query("SELECT u.username FROM qtkd.department d JOIN qtkd.user_account u ON u.user_id=d.manager_id WHERE d.code='PC'")).rows[0];
     assert.equal(legal.username, 'demo.legal.manager');
-    console.log(`PASS empty DB: migrate ${sqlFiles.length} migrations, seed twice (${users} users, ${steps} steps), status clean`);
+    console.log(`PASS empty DB: migrate ${migrationCount} migrations, seed twice (${users} users, ${steps} steps), status clean`);
   });
 
 
@@ -114,7 +115,7 @@ try {
     const audits = (await db.query('SELECT to_jsonb(a) data FROM qtkd.audit_log a ORDER BY log_id')).rows;
     r = await run(port, 'migrate');
     assert.equal(r.code, 0, r.out);
-    assert.match(r.out, /Applied: 20261105104547_CustomerFlow\s*$/);
+    assert.match(r.out, /Applied: 20261105104547_CustomerFlow, \d+_CustomerEfRepositoryAlignment\s*$/);
     assert.deepEqual((await db.query("SELECT to_jsonb(c)-'customer_updated_at'-'flow_revision' data FROM qtkd.customer c ORDER BY customer_id")).rows, customers);
     assert.deepEqual((await db.query("SELECT to_jsonb(d)-'review_metadata' data FROM qtkd.customer_status_decision d ORDER BY decision_id")).rows, decisions);
     assert.deepEqual((await db.query('SELECT to_jsonb(a) data FROM qtkd.audit_log a ORDER BY log_id')).rows, audits);
@@ -147,9 +148,9 @@ try {
     assert.match(r.out, /adopt từ trước/);
     r = await run(port, 'migrate');
     assert.equal(r.code, 0, r.out);
-    assert.match(r.out, /Applied: \d+_EfHistoryRls, \d+_CustomerFlow$/m);
+    assert.match(r.out, /Applied: \d+_EfHistoryRls, \d+_CustomerFlow, \d+_CustomerEfRepositoryAlignment$/m);
     r = await run(port, 'status');
-    assert.match(r.out, new RegExp(`${sqlFiles.length} applied, 0 pending`));
+    assert.match(r.out, new RegExp(`${migrationCount} applied, 0 pending`));
     assert.equal(await count(db, 'SELECT count(*) n FROM qtkd._prisma_migrations'), prismaFiles.length, 'Prisma history is kept');
     console.log('PASS Prisma DB: migrate refused before adopt, adopt idempotent, then only EF-native migrations ran');
   });

@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
 using QTKD.Application.Features.Customers;
+using QTKD.Application.Common.Interfaces;
 using QTKD.Infrastructure.Customers;
 using Xunit;
 
@@ -36,7 +37,7 @@ public sealed class CustomerReactivationPostgresTests
         public TaskCompletionSource<bool>? Started { get; set; }
         public TaskCompletionSource<bool>? Continue { get; set; }
 
-        public async Task<ReactivationSourceResult> Reactivation(NpgsqlConnection c, NpgsqlTransaction tx, Guid customerId,
+        public async Task<ReactivationSourceResult> Reactivation(Guid customerId,
             Guid actorId, string? reasonGroup, StatusException? exception, CancellationToken ct)
         {
             Started?.TrySetResult(true);

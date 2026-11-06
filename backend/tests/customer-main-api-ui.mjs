@@ -95,6 +95,32 @@ try {
     assert.equal(await page.getByText('Vận tải Hoàng Long', { exact: true }).count(), 0);
     assert.equal(await page.getByText('Chức năng chưa sẵn sàng', { exact: true }).count(), 0);
   });
+  await check('narrow customer list keeps names readable and scrolls inside the results card', page, async () => {
+    try {
+      await page.setViewportSize({ width: 910, height: 1000 });
+      const name = await page.locator('.data-table__row:not(.data-table__row--head) .data-table__cell:nth-child(2)').first().boundingBox();
+      const rowBox = await page.locator('.data-table__row:not(.data-table__row--head)').first().boundingBox();
+      assert(name && name.width >= 200, 'Customer name column must remain readable');
+      assert(rowBox && rowBox.height < 120, 'A collapsed name must not inflate the row');
+      const layout = await page.locator('.customer-results').evaluate(el => ({
+        scrolls: el.scrollWidth > el.clientWidth, documentFits: document.documentElement.scrollWidth <= innerWidth + 1,
+      }));
+      assert.deepEqual(layout, { scrolls: true, documentFits: true });
+      await page.screenshot({ path: join(output, 'customer-list-narrow.png'), fullPage: true });
+    } finally { await page.setViewportSize({ width: 1440, height: 1000 }); }
+  });
+  await check('dirty create form warns on sidebar navigation and keeps values when staying', page, async () => {
+    await page.getByRole('link', { name: 'Tạo khách hàng', exact: true }).click();
+    await page.getByLabel(/^Tên khách hàng/).fill('Bản nhập chưa lưu ' + prefix);
+    await page.getByRole('link', { name: 'Danh sách khách hàng', exact: true }).click();
+    await page.getByRole('heading', { name: 'Bạn có thay đổi chưa lưu', exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Tiếp tục chỉnh sửa', exact: true }).click();
+    assert.equal(await page.getByLabel(/^Tên khách hàng/).inputValue(), 'Bản nhập chưa lưu ' + prefix);
+    await page.getByRole('link', { name: 'Danh sách khách hàng', exact: true }).click();
+    await page.getByRole('button', { name: 'Rời trang', exact: true }).click();
+    await page.waitForURL(u => u.pathname === '/khach-hang');
+    assert.equal(writes.length, 0);
+  });
   await check('create validation does not send invalid data', page, async () => {
     await page.goto(base + '/khach-hang/tao-moi');
     await page.getByRole('button', { name: 'Lưu', exact: true }).click();
@@ -124,7 +150,10 @@ try {
     await page.getByPlaceholder('Tìm theo mã khách hàng, tên hoặc mã số thuế').fill('no-record-' + prefix);
     await page.getByRole('button', { name: 'Tìm kiếm', exact: true }).click();
     await page.getByText('Không tìm thấy khách hàng phù hợp', { exact: true }).waitFor();
-    await page.goto(base + '/khach-hang?trang-thai=suspended');
+    // Other customer suites share this disposable DB; target this fixture
+    // explicitly instead of assuming it is on the first page of all Suspended.
+    const suspendedRow = await row(suspended);
+    await page.goto(base + '/khach-hang?trang-thai=suspended&q=' + suspendedRow.tax_code);
     await page.getByRole('link', { name: suspended, exact: true }).waitFor();
     const paging = 'Paging ' + prefix;
     for (let i = 0; i < 10; i++) await db.query(
@@ -145,6 +174,24 @@ try {
     await page.getByRole('button', { name: 'Lưu', exact: true }).click();
     await page.getByText('Khách hàng đã tồn tại – không tạo hồ sơ mới', { exact: true }).waitFor();
     assert.equal(Number((await db.query('SELECT count(*) n FROM qtkd.customer WHERE tax_code=$1', [taxCode])).rows[0].n), 1);
+    await page.getByRole('button', { name: 'Mở hồ sơ hiện có', exact: true }).click();
+    await page.getByRole('button', { name: 'Rời biểu mẫu', exact: true }).click();
+    await page.waitForURL(u => u.pathname === '/khach-hang/' + code);
+    await page.getByRole('heading', { name: customerName, exact: true }).waitFor();
+  });
+  await check('dirty edit form keeps values when staying and cancels without saving or a second prompt', page, async () => {
+    const before = await row(code);
+    await page.getByRole('link', { name: 'Chỉnh sửa thông tin', exact: true }).click();
+    await page.getByLabel(/^Địa chỉ/).fill('Địa chỉ chưa lưu ' + prefix);
+    await page.getByRole('link', { name: 'Danh sách khách hàng', exact: true }).click();
+    await page.getByRole('heading', { name: 'Bạn có thay đổi chưa lưu', exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Tiếp tục chỉnh sửa', exact: true }).click();
+    assert.equal(await page.getByLabel(/^Địa chỉ/).inputValue(), 'Địa chỉ chưa lưu ' + prefix);
+    await page.getByRole('button', { name: 'Hủy', exact: true }).click();
+    await page.getByRole('button', { name: 'Hủy chỉnh sửa', exact: true }).click();
+    await page.waitForURL(u => u.pathname === '/khach-hang/' + code);
+    assert.equal((await row(code)).address, before.address);
+    assert.equal((await row(code)).version, before.version);
   });
   await check('edit persists version, reason and real history without changing tax', page, async () => {
     await page.goto(base + '/khach-hang/' + code + '/chinh-sua');

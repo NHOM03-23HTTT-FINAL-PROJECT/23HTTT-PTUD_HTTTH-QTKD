@@ -48,6 +48,7 @@ public class ContractsController : ControllerBase
     [HttpPost]
     [Authorize(Policy = "contracts.create")]
     [Authorize(Policy = "customers.view")]
+    [RequireCsrf]
     public async Task<System.Text.Json.Nodes.JsonObject> Create(
         CreateContract request,
         CancellationToken ct
@@ -58,6 +59,7 @@ public class ContractsController : ControllerBase
     [HttpPut("{code}")]
     [Authorize(Policy = "contracts.create")]
     [Authorize(Policy = "customers.view")]
+    [RequireCsrf]
     public async Task<System.Text.Json.Nodes.JsonObject> Update(
         string code,
         UpdateContract request,
@@ -81,6 +83,7 @@ public class ContractsController : ControllerBase
 
     [HttpPost("{code}/cancel")]
     [Authorize(Policy = "contracts.create")]
+    [RequireCsrf]
     public async Task<System.Text.Json.Nodes.JsonObject> Cancel(
         string code,
         CancelContract request,
@@ -91,6 +94,7 @@ public class ContractsController : ControllerBase
 
     [HttpPost("{code}/cancellation-requests")]
     [Authorize(Policy = "contracts.create")]
+    [RequireCsrf]
     public async Task<System.Text.Json.Nodes.JsonObject> RequestCancellation(
         string code,
         CancellationDraft request,
@@ -101,6 +105,7 @@ public class ContractsController : ControllerBase
 
     [HttpPost("{code}/cancellation-requests/{id:guid}/decision")]
     [Authorize(Policy = "approvals.approve")]
+    [RequireCsrf]
     public async Task<System.Text.Json.Nodes.JsonObject> Decide(
         string code,
         Guid id,
@@ -112,6 +117,7 @@ public class ContractsController : ControllerBase
 
     [HttpPost("{code}/attachments")]
     [Authorize(Policy = "contracts.create")]
+    [RequireCsrf]
     [RequestSizeLimit(21 * 1024 * 1024)]
     public async Task<object> Upload(string code, IFormFile file, [FromForm] int baseVersion, CancellationToken ct)
     {
@@ -122,6 +128,7 @@ public class ContractsController : ControllerBase
 
     [HttpDelete("{code}/attachments/{id:guid}")]
     [Authorize(Policy = "contracts.create")]
+    [RequireCsrf]
     public async Task<System.Text.Json.Nodes.JsonObject> Delete(
         string code,
         Guid id,

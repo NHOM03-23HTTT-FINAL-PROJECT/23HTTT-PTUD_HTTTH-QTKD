@@ -6,17 +6,18 @@ Backend thực tế ở `backend/`, theo bốn tầng. Module đã có code ch�
 
 EF Core quản lý schema và migration (`QtkdDbContext`, `Infrastructure/Persistence/Migrations`); `QTKD.DbTool` áp migration và seed. Api không tự tạo hay migrate DB. Phần lớn module đọc/ghi bằng SQL qua Npgsql; notifications dùng EF Core LINQ. Tên file dự kiến cho module mới là gợi ý để thống nhất, người chủ trì task quyết định khi triển khai.
 
-Trên nhánh `cus-flow` sau ghép main ngày 05/11/2026, Customers có controller, validator Application và service Npgsql cũ.
-Migration khách hàng đã chuyển sang EF với model/configuration/snapshot; runtime chưa chuyển đầy đủ sang mẫu Repository EF LINQ.
+Trên nhánh `cus-flow` sau ghép main ngày 06/11/2026 (`65d3092`), Customers theo Controller → service Application → `ICustomerRepository`/`CustomerRepository` EF Core trên `QtkdDbContext`.
+DTO/validator/service nằm trong Application; records trung lập với persistence ở Domain. Service không dùng DbContext, Npgsql hay SQL.
+CRUD, phạm vi hồ sơ, phân trang và lịch sử dùng EF LINQ; SQL khóa PostgreSQL/đồng hồ DB chỉ nằm trong repository.
 Backend SYS-CUS-03 được gỡ theo phạm vi người dùng. Bố cục frontend theo main; khách hàng đã nối API cho CRUD,
 tra cứu, chi tiết, quyền thao tác và quản lý ủy quyền kích hoạt lại. Nguồn xác minh kích hoạt lại/hồ sơ liên quan vẫn là phụ thuộc.
-Xem [test case và giới hạn đã kiểm chứng](../testing/test-cases/customers-main-ef.md).
+Xem [test case và giới hạn đã kiểm chứng](../testing/test-cases/customers-api-ui.md).
 
 ## Nguyên tắc tổ chức
 
 - **Chia theo module nghiệp vụ.** Cùng một tên module xuất hiện ở FE, BE (4 tầng), test và docs. Thêm module mới bằng cách nhân bản cấu trúc của module mẫu, không sửa module khác.
 - **BE theo 4 tầng** Api / Application / Domain / Infrastructure (TASK-049). Phụ thuộc một chiều: Api → Application → Domain. Application khai báo interface trong `Common/Interfaces/`, Infrastructure cài đặt, `Program.cs` đăng ký DI.
-- **Mẫu cho module mới: Controller → Service → Repository (EF Core)**, module mẫu là **Notifications** (xem [Mẫu module](#mẫu-module-controller--service--repository)). Module mới làm đúng mẫu này. Kiểu cũ không nhân bản: Contracts (`I<Module>Store` + Npgsql), Identity (endpoint trong `Program.cs`), ContractApprovals (`Endpoints/ContractApprovalEndpoints.cs`, service đặt trong Infrastructure). Người chủ trì các module đó tự chuyển khi sẵn sàng; không trộn hai kiểu trong cùng một module.
+- **Mẫu cho module mới: Controller → Service → Repository (EF Core)**, module mẫu là **Notifications** (xem [Mẫu module](#mẫu-module-controller--service--repository)). Module mới làm đúng mẫu này. Kiểu cũ không nhân bản: Contracts (`I<Module>Store` + Npgsql), Identity (endpoint trong `Program.cs`), ContractApprovals (`Endpoints/ContractApprovalEndpoints.cs`, service đặt trong Infrastructure; riêng phân công SYS-CTR-10 đã chuyển sang mẫu mới). Người chủ trì các module đó tự chuyển khi sẵn sàng; không trộn hai kiểu trong cùng một module.
 - **Phân quyền ở BE.** Mỗi permission code trong `PermissionCatalog` là một policy cùng tên; controller dùng `[Authorize(Policy = "<code>")]`. Người thao tác lấy qua `ICurrentActor` (tài khoản phải Active); kiểm tra phạm vi hồ sơ, assignee nằm trong service/repository của module.
 - **CSRF cho thao tác ghi.** Action ghi dùng `[RequireCsrf]` (`Api/Filters/`): yêu cầu `X-QTKD-CSRF: 1` và `Origin` thuộc `Cors:Origins`, sai trả 403 `CSRF_REJECTED`.
 - **Lỗi nghiệp vụ** dùng `BusinessException(code, status, details)` (đang đặt ở `Domain/Contracts`, dùng chung). Middleware trong `Program.cs` trả JSON `{ ...details, code }`. Module cũ còn `ReviewFailure`, `IdentityFailure`. Lỗi không xác định trả 500 `SYSTEM_ERROR`, không ghi chi tiết exception của provider.
@@ -31,10 +32,10 @@ Xem [test case và giới hạn đã kiểm chứng](../testing/test-cases/custo
 | `Identity` (Auth, Users, Departments, Roles, Permissions) | `auth`, `users` | 1 | PB-02 | Minh | Có code; Minimal API trong `Program.cs`, EF Core |
 | `Audit` | `audit-logs` | 1 | PB-03 | Minh | Giữ chỗ (API tra cứu UC-CHUNG-06 đang làm ở nhánh `feat/audit-log`) |
 | `Catalogs` (dịch vụ, nhóm dịch vụ, đơn vị tính, thuế suất) | `catalogs` | 1 | PB-04 | Đan Anh | Giữ chỗ |
-| `Customers` | `customers` | 1 (mở rộng S2, S3) | CUS-01, 02, 04, 05, 06, 07 | Hiếu | cus-flow: Controller + validator Application + service Npgsql cũ; migration EF. SYS-CUS-03 backend đã gỡ; nguồn xác minh kích hoạt lại/hồ sơ liên quan còn thiếu. Runtime chưa đạt mẫu Repository EF LINQ đầy đủ. |
+| `Customers` | `customers` | 1 (mở rộng S2, S3) | CUS-01, 02, 04, 05, 06, 07 | Hiếu | cus-flow: Controller → service Application → Repository EF Core; DTO/validator Application, records Domain, migration EF. SYS-CUS-03 backend đã gỡ; nguồn xác minh kích hoạt lại/hồ sơ liên quan còn phụ thuộc. |
 | `Areas` | `areas` | 1 (mở rộng S2, S3) | ARE-01, 02, 04, 12, 13 | Tuấn | Giữ chỗ |
 | `Contracts` | `contracts` | 1 (phụ lục S2, ký/chấm dứt/gia hạn S3) | CTR-01, 02, 03, 04, 05, 06, 16, 18 | Phong; CTR-04..06: Minh | Có code; Controller + Service + Store Npgsql (kiểu cũ). Đang chuyển sang mẫu mới: trình duyệt (SYS-CTR-04) đã theo Controller → `ContractService` → `IContractRepository`/`ContractRepository` (EF Core LINQ, không SQL) |
-| `Approvals` (workflow engine) | `approvals` | 1 (rút hồ sơ, chuyển người duyệt S2) | APR-01..06, 09, 10 | Lộc (BE), Đan Anh (FE tiến độ, cấu hình) | Có code: `Workflows` + `ContractApprovals`; Minimal API |
+| `Approvals` (workflow engine) | `approvals` | 1 (rút hồ sơ, chuyển người duyệt S2) | APR-01..06, 09, 10 | Lộc (BE), Đan Anh (FE tiến độ, cấu hình) | Có code: `Workflows` + `ContractApprovals`; Minimal API. Đang chuyển sang mẫu mới: phân công người duyệt (SYS-CTR-10) đã theo `ApprovalAssignmentsController` → `ApprovalAssignmentService` → `IApprovalAssignmentRepository`/`ApprovalAssignmentRepository` (EF Core; khóa dòng bằng SQL trong repository) |
 | `Pricing` (báo giá, bảng giá, phiên bản) | `pricing` | 2 | PRC-01..14 | Xuân, Đan Anh, Hiếu | Giữ chỗ |
 | `Outputs` (sản lượng, khóa kỳ) | `outputs` | 2 (mở khóa S3) | OUT-01..07, 13 | Minh | Giữ chỗ |
 | `Notifications` (Outbox) | `notifications` | 2 | PB-37 | Lộc, Đan Anh | Hộp thông báo in-app (UC-CHUNG-05); **module mẫu** Controller → Service → Repository (EF Core). Outbox/gửi ngoài chưa có |
@@ -95,7 +96,7 @@ Khi cần khóa dòng (`SELECT … FOR UPDATE`) hoặc SQL đặc thù, reposito
 | --- | --- | --- |
 | EF Core (`IdentityDbContext`) | Identity | Map một phần bảng Identity; không sinh migration |
 | EF Core (`QtkdDbContext`) | Toàn schema; Notifications | Sở hữu migration; LINQ cho notifications |
-| EF Core LINQ trong `Infrastructure/Repositories/<Module>Repository.cs` | Notifications; Contracts – trình duyệt (SYS-CTR-04) | **Mặc định cho module mới** |
+| EF Core LINQ trong `Infrastructure/Repositories/<Module>Repository.cs` | Notifications; Contracts – trình duyệt (SYS-CTR-04); ContractApprovals – phân công (SYS-CTR-10) | **Mặc định cho module mới** |
 | Npgsql qua `PgDatabase` (tham số `$1, $2…`) | Contracts | Kiểu cũ; module mới chỉ dùng bên trong repository khi LINQ không đủ |
 | Npgsql trực tiếp (`PostgresApprovalStore.Command`, tham số có tên) | ContractApprovals | Có khóa dòng `SELECT … FOR UPDATE`, idempotency |
 

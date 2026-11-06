@@ -280,7 +280,7 @@ export class UpdateAreaError extends Error {
 
 export type AreaService = { name: string; group: string; unit: string; since: string };
 
-export type AreaStaff = { name: string; staffCode: string; title: string; shift: string; since: string; phone: string };
+export type AreaStaff = { name: string; staffCode: string; title?: string; shift?: string; since: string; phone: string };
 
 export type AreaPriceList = {
   code: string;
@@ -341,7 +341,7 @@ export type ServiceOption = Omit<AreaService, 'since'>;
 
 type OperationBase = { userId: string; signedInAt: string; code: string };
 
-export type AssignStaffRequest = OperationBase & { staffCode: string; title: string; shift: string; since: string };
+export type AssignStaffRequest = OperationBase & { staffCode: string; title?: string; shift?: string; since: string };
 
 export type EndStaffRequest = OperationBase & { staffCode: string; reason: string };
 

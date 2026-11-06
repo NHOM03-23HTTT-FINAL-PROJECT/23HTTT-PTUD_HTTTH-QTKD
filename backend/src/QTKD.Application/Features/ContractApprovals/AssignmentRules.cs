@@ -2,11 +2,10 @@ namespace QTKD.Application.Features.ContractApprovals;
 
 public static class AssignmentRules
 {
-    public static readonly IReadOnlyList<string> StepKeys = ["sales", "legal", "board"];
+    public static readonly IReadOnlyList<string> StepKeys = ["legal", "board"];
 
     public static IReadOnlyList<string> StepRoles(string step) => step switch
     {
-        "sales" => ["SalesManager"],
         "legal" => ["LegalStaff", "LegalManager"],
         "board" => ["BoardMember", "BoardChair"],
         _ => throw new ReviewFailure(400, "VALIDATION"),
@@ -20,20 +19,21 @@ public static class AssignmentRules
         _ => step,
     };
 
-    public static string StepDepartment(ReviewDocument document, string step, IReadOnlyDictionary<string, string> roleDepartments) =>
-        step == "sales" ? document.Department : roleDepartments[StepRoles(step)[0]];
+    public static string StepDepartment(string step, IReadOnlyDictionary<string, string> roleDepartments) =>
+        roleDepartments[StepRoles(step)[0]];
 
     public static IReadOnlyList<string> ManagedSteps(ReviewDocument document, IReadOnlySet<string> managed,
         IReadOnlyDictionary<string, string> roleDepartments) =>
         document.Steps
-            .Where(step => StepKeys.Contains(step.Key) && managed.Contains(StepDepartment(document, step.Key, roleDepartments)))
+            .Where(step => StepKeys.Contains(step.Key) && managed.Contains(StepDepartment(step.Key, roleDepartments)))
             .Select(step => step.Key)
             .ToArray();
 
     public static bool CanAssign(ReviewDocument document, ReviewStep step) =>
         document.RoundResult == "in-progress"
+        && StepKeys.Contains(step.Key)
         && step.Decision is null
-        && step.State is "unassigned" or "waiting" or "pending-accept";
+        && step.State is "unassigned" or "waiting";
 
     public static bool ActivatesOnAssign(ReviewDocument document, ReviewStep step)
     {
@@ -43,8 +43,5 @@ public static class AssignmentRules
         return previous.Length == 0 || !previous[^1].RequiresHandoff;
     }
 
-    public static string StatusAfterAssign(ReviewStep step, bool activates) =>
-        activates ? (step.Key == "sales" ? "Pending" : "Reviewing")
-        : step.State == "pending-accept" ? "Pending"
-        : "NotStarted";
+    public static string StatusAfterAssign(bool activates) => activates ? "Reviewing" : "NotStarted";
 }

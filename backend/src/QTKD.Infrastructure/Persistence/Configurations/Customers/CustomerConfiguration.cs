@@ -28,7 +28,11 @@ public sealed class CustomerConfiguration : IEntityTypeConfiguration<Customer>
         b.Property(x => x.Email).HasColumnName("email").HasColumnType("character varying(254)");
         b.Property(x => x.CustomerGroup).HasColumnName("customer_group").HasColumnType("character varying(100)");
         b.Property(x => x.InterestedServices).HasColumnName("interested_services").HasColumnType("text");
-        b.Property(x => x.Status).HasColumnName("status").HasDefaultValue(ActiveStatus.Active);
+        // main's Area model registers this PG enum with its Domain CLR type.
+        // Convert the legacy customer enum to that same provider type, rather
+        // than registering two CLR enums for the same PostgreSQL type.
+        b.Property(x => x.Status).HasColumnName("status").HasDefaultValue(ActiveStatus.Active)
+            .HasConversion(v => (QTKD.Domain.Enums.ActiveStatus)(int)v, v => (ActiveStatus)(int)v);
         b.Property(x => x.AccountManagerId).HasColumnName("account_manager_id").HasColumnType("uuid");
         b.Property(x => x.Version).HasColumnName("version").HasDefaultValue(1);
         b.Property(x => x.CustomerUpdatedAt).HasColumnName("customer_updated_at").HasColumnType("timestamp(6) with time zone");

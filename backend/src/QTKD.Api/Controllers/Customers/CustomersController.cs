@@ -6,13 +6,13 @@ using QTKD.Api.Filters;
 using QTKD.Application.Common.Interfaces;
 using QTKD.Application.Features.Customers;
 using QTKD.Application.Features.Identity;
-using QTKD.Infrastructure.Customers;
 
 namespace QTKD.Api.Controllers.Customers;
 
 [ApiController]
 [Route("api/v1/customers")]
 [Authorize(Policy = "customers.view")]
+[TypeFilter(typeof(CustomerPersistenceExceptionFilter))]
 public sealed class CustomersController(CustomerService service, ICurrentActor currentActor, IIdentityService identity) : ControllerBase
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);

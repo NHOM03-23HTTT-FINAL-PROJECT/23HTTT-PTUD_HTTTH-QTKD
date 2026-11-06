@@ -650,7 +650,8 @@
           "Microsoft.EntityFrameworkCore": "[10.0.14, )",
           "Microsoft.EntityFrameworkCore.Relational": "[10.0.14, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )",
-          "QTKD.Application": "[1.0.0, )"
+          "QTKD.Application": "[1.0.0, )",
+          "QTKD.Domain": "[1.0.0, )"
         }
       }
     }

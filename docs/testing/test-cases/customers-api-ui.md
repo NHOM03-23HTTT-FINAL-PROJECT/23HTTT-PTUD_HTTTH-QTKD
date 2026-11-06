@@ -1,6 +1,42 @@
 # Kiểm thử UI khách hàng qua API
 
-## Cập nhật 06/11/2026: thông báo và kết nối Supabase
+## Cập nhật cuối 06/11/2026: ghép main và Repository EF Core
+
+Main được ghép tại `65d3092` (gồm bản refactor hợp đồng mới), nhánh `cus-flow`, chưa push. Xung đột Program/CORS/DI được giải quyết bằng cách giữ đăng ký Customer và Area; giữ repository hợp đồng của main. Chỉ đưa lại các kiểm tra tham chiếu khách hàng hợp lệ vào ranh giới chọn khách khi tạo/sửa hợp đồng, không khôi phục store Npgsql cũ của hợp đồng.
+
+### Cấu trúc và hành vi đã kiểm chứng
+
+- `CustomersController` → `Application/Features/Customers/Services/CustomerService` → `ICustomerRepository`/`Infrastructure/Repositories/CustomerRepository` trên `QtkdDbContext`. DTO chuyển vào Dtos; validator vẫn ở Application; records persistence-neutral ở Domain. Ba service Npgsql cũ trong Infrastructure đã xóa. Interface nguồn xác minh không còn nhận connection/transaction của provider.
+- CRUD, phạm vi, tìm kiếm, lọc, phân trang, audit/receipt/quyết định/ủy quyền dùng EF LINQ. SQL đặc thù khóa advisory/row lock và đồng hồ PostgreSQL nằm trong repository. Giữ transaction, chống retry trùng, so phiên bản và rollback khi outbox lỗi. Filter lỗi persistence chỉ áp dụng customer, giữ phản hồi 409/503 mà không sửa cách xử lý lỗi các module khác trên main.
+- Main đăng ký hai CLR enum cho cùng `qtkd.active_status`, gây lỗi khi dựng EF model. Customer chuyển enum legacy sang provider enum Domain dùng chung với Area; bỏ đăng ký PG trùng. Metadata được scaffold lại qua EF, không chỉnh nghiệp vụ Area.
+- Migration `20261106095056_CustomerEfRepositoryAlignment` có Up/Down rỗng: đồng bộ snapshot với CLR mapping sau ghép main, **không thay bảng, cột, kiểu dữ liệu, giá trị mặc định hoặc dữ liệu**. Test kiểm tra trực tiếp UpOperations/DownOperations đều rỗng. Supabase đã áp migration này: **13 applied, 0 pending**, giữ migration riêng của nhóm.
+- Sửa assertion cũ của script business theo `detail.existing = null`. Bổ sung unit test service, integration LINQ SQLite và 3 ca UI cho cảnh báo rời form/cửa sổ hẹp. Ca lọc khách Suspended tìm đúng MST fixture để không phụ thuộc trang đầu của dữ liệu từ bộ test khác.
+- UI danh sách trước đây ép cột tên về 0 khi cửa sổ hẹp, làm hàng rất cao. Chỉ sửa CSS bảng customer để cuộn ngang trong thẻ kết quả, giữ cột tên đọc được. Không đổi bố cục app dùng chung.
+
+### Kết quả lần chạy cuối
+
+| Phạm vi | Kết quả |
+|---|---|
+| Customer unit: 18 validator + 3 service | **21/21 PASS** |
+| Customer integration: 4 PostgreSQL + 3 SQLite repository | **7/7 PASS** |
+| Customer frontend adapter MST trùng | **1/1 PASS**, nằm trong bộ frontend 26/26 PASS |
+| UI → API → PostgreSQL customer | **19/19 PASS** |
+| Script business API/SQL customer | **PASS**: tạo/sửa, MST duy nhất, phạm vi, retry/đồng thời, audit, khách legacy, endpoint đã gỡ, nguồn thiếu và chọn khách hợp lệ cho hợp đồng |
+| Build BE / FE | **PASS**; FE còn cảnh báo bundle lớn, backend còn cảnh báo đã có từ main |
+| `npm run check` trong DB | **PASS**: 3 offline test, EF parity, migrate/seed lặp, nâng cấp DB main và adopt baseline; dữ liệu cũ giữ nguyên |
+| Computer use với API EF nối Supabase | **PASS**: đăng nhập, danh sách, tìm không dấu `anh duong` ra Ánh Dương, chặn MST trùng/mở hồ sơ, Back giữ dữ liệu, bảng cửa sổ hẹp |
+
+Tổng riêng customer hiện có **48 mục test/kịch bản tự động** (21 + 7 + 1 + 19); script business và các thao tác CUA được ghi riêng để tránh cộng trùng. SQLite không chứng minh enum/khóa PostgreSQL hoặc Unicode LOWER; những phần đó có test PostgreSQL/script business và thao tác Supabase.
+
+**Bộ test toàn repo chưa xanh:** unit 87 PASS; integration 92 PASS, **25 FAIL**, 4 SKIP. Chạy main nguyên bản trong worktree tách biệt cho thấy cả 25 tên test lỗi này cũng lỗi trên main (OpenAPI, rate limit khôi phục mật khẩu, ReviewFailure/phê duyệt). Lần đối chiếu đầu có thêm 1 lỗi Bcrypt interop do thiếu dependency Node; sau bổ sung dependency đã có, ca đó chạy lại PASS, không sửa code Identity. `regression-delta.json` ghi **0 lỗi mới** so với main. Không sửa nghiệp vụ Identity/phê duyệt ngoài phạm vi; không tuyên bố toàn repo đã pass.
+
+DB PostgreSQL test chạy trong tmpfs, API/UI test riêng cổng 7157/5174; sau kiểm thử đã dừng/xóa. Không có volume DB bền vững; cổng 55441/7157/5174 đã đóng. Cổng 5173/7156 tiếp tục chạy API thật nối Supabase từ env được cung cấp. Supabase trước/sau có cùng 10 khách, 2 quyết định, 46 audit và fingerprint; các bảng profile/operation/outbox/delegation vẫn 0 dòng. Không seed, sửa khách hoặc chuyển dữ liệu test lên DB chung.
+
+Bằng chứng: `D:/VSCode/PTUDHTTTHD/.qtkd-tools/customer-ef-main-20261106/`: TRX, `test-comparison.json`, `regression-delta.json`, `business.log`, `db-check.log`, `ui-final/api-ui-report.json`, ảnh CUA, snapshot Supabase trước/sau và `cleanup.json`.
+
+SYS-CUS-03 backend tiếp tục bị gỡ. Ca kích hoạt lại thành công chỉ được chứng minh với ControlledSource trên DB test; nguồn xác nhận thật, hồ sơ liên quan và worker outbox vẫn là phụ thuộc. Đây không phải bản nghiệm thu đầy đủ những phần đang thiếu nguồn.
+
+## Kết quả trước khi ghép main 06/11/2026: thông báo và kết nối Supabase
 
 Theo yêu cầu mới, phạm vi sửa chỉ gồm khách hàng và các UC đã thống nhất. Nhánh `cus-flow`; chưa commit các sửa đổi của lần này, không push. Dashboard, bố cục mobile dùng chung và giao diện chọn khách trong hợp đồng nằm ngoài phạm vi sửa lần này.
 

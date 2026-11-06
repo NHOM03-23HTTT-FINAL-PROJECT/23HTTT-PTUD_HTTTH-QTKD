@@ -6,6 +6,7 @@ using SessionEndReason = QTKD.Domain.Identity.SessionEndReason;
 using RecordType = QTKD.Domain.Notifications.RecordType;
 using SendStatus = QTKD.Domain.Notifications.SendStatus;
 using QTKD.Infrastructure.Persistence.Schema;
+using Service = QTKD.Domain.Entities.Service;
 
 namespace QTKD.Infrastructure.Persistence.Configurations.Catalogs;
 

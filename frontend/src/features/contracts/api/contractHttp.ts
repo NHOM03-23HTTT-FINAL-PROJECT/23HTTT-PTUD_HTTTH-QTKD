@@ -38,6 +38,9 @@ export class ApiError extends Error {
 
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes((init.method ?? 'GET').toUpperCase())) {
+    headers.set('X-QTKD-CSRF', '1');
+  }
   const token = await getContractAccessToken();
 
   if (token) {

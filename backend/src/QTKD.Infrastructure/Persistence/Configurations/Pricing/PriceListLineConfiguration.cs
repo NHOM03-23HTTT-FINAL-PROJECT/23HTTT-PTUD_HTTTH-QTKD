@@ -28,9 +28,9 @@ public sealed class PriceListLineConfiguration : IEntityTypeConfiguration<PriceL
         b.HasIndex(x => x.AreaId).HasDatabaseName("price_list_line_area_id_idx");
         b.HasOne<PriceList>().WithMany().HasForeignKey(x => x.PriceListId)
             .HasConstraintName("price_list_line_price_list_id_fkey").OnDelete(DeleteBehavior.Restrict);
-        b.HasOne<Service>().WithMany().HasForeignKey(x => x.ServiceId)
+        b.HasOne<QTKD.Domain.Entities.Service>().WithMany().HasForeignKey(x => x.ServiceId)
             .HasConstraintName("price_list_line_service_id_fkey").OnDelete(DeleteBehavior.Restrict);
-        b.HasOne<Area>().WithMany().HasForeignKey(x => x.AreaId)
+        b.HasOne<QTKD.Domain.Entities.Area>().WithMany().HasForeignKey(x => x.AreaId)
             .HasConstraintName("price_list_line_area_id_fkey").OnDelete(DeleteBehavior.Restrict);
     }
 }

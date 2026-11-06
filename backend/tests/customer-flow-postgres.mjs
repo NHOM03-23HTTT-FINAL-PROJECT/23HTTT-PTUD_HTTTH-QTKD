@@ -11,7 +11,10 @@ const requireDb = createRequire(new URL('../../DB/package.json', import.meta.url
 const { Client } = requireDb('pg');
 const bcrypt = requireDb('bcryptjs');
 const db = new Client({ host: '127.0.0.1', port, database: 'qtkdtest', user: 'postgres', password: 'qtkd-test-only' });
-const base = 'http://127.0.0.1:7156/api/v1';
+const apiOrigin = process.env.QTKD_CUSTOMER_TEST_API ?? 'http://127.0.0.1:7156';
+if (new URL(apiOrigin).protocol !== 'http:' || new URL(apiOrigin).hostname !== '127.0.0.1')
+  throw new Error('The disposable business API must use a loopback HTTP address');
+const base = apiOrigin + '/api/v1';
 const password = 'Customer.Test@2026';
 const unique = randomUUID().replaceAll('-', '').slice(0, 10);
 const names = Object.fromEntries(['staff', 'other', 'manager', 'accountant', 'outside'].map(x => [x, `cf.${unique}.${x}`]));
@@ -118,7 +121,7 @@ try {
   expect(hidden, 200); assert.equal(hidden.data.total, 0);
   expect(await call(`/customers/${outside.rows[0].customer_code}`, { token: tokens.staff }), 404, 'NOT_FOUND');
   const duplicateOutside = await call('/customers', { ...request, key: randomUUID(), body: { draft: { ...draft, taxCode: outsideTax } } });
-  expect(duplicateOutside, 409, 'DUPLICATE_TAX_CODE'); assert.equal(duplicateOutside.data.detail, null);
+  expect(duplicateOutside, 409, 'DUPLICATE_TAX_CODE'); assert.equal(duplicateOutside.data.detail.existing, null);
 
   const suspendedTax = '2' + String(Math.floor(Math.random() * 1_000_000_000)).padStart(9, '0');
   const legacy = await db.query(`INSERT INTO qtkd.customer(customer_name,tax_code,address,legal_representative,phone,account_manager_id,status,customer_group,interested_services)

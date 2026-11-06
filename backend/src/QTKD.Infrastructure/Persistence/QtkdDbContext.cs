@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using QTKD.Domain.Entities;
+using QTKD.Domain.Identity;
 using QTKD.Domain.Notifications;
 using QTKD.Infrastructure.Persistence.Schema;
 
@@ -9,16 +11,24 @@ namespace QTKD.Infrastructure.Persistence;
 /// <summary>
 /// Owner of the qtkd schema and its EF Core migrations (Persistence/Migrations). The model mirrors the tables,
 /// columns, keys, foreign keys, plain indexes, sequences and enums. CHECK constraints, triggers, functions, RLS and
-/// expression/partial indexes exist only in the migration SQL. Most runtime code still uses raw SQL; IdentityDbContext
-/// maps a subset of the same tables for Identity and never produces migrations.
+/// expression/partial indexes exist only in the migration SQL.
 /// </summary>
-public sealed class QtkdDbContext(DbContextOptions<QtkdDbContext> options) : DbContext(options)
+public sealed class QtkdDbContext : DbContext
 {
     public const string Schema = "qtkd";
     public const string HistoryTable = "__EFMigrationsHistory";
 
+    public QtkdDbContext(DbContextOptions<QtkdDbContext> options) : base(options)
+    {
+    }
+
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<Contract> Contracts => Set<Contract>();
+    public DbSet<QTKD.Domain.Entities.Area> Areas => Set<QTKD.Domain.Entities.Area>();
+    public DbSet<QTKD.Domain.Entities.Service> Services => Set<QTKD.Domain.Entities.Service>();
+    public DbSet<QTKD.Domain.Entities.AreaService> AreaServices => Set<QTKD.Domain.Entities.AreaService>();
+    public DbSet<QTKD.Domain.Entities.AreaAssignment> AreaAssignments => Set<QTKD.Domain.Entities.AreaAssignment>();
+    public DbSet<QTKD.Infrastructure.Persistence.Schema.UserAccount> UserAccounts => Set<QTKD.Infrastructure.Persistence.Schema.UserAccount>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {

@@ -8,7 +8,7 @@ import { formatDate, formatDateTime, todayIso } from '@/utils/format';
 import type { RecordState } from '../hooks/useAreaRecords';
 import type { Area, AreaContract, AreaHistoryEntry, AreaHistoryKind, AreaPriceList, AreaRecordData, AreaService, AreaStaff } from '../types/area';
 import { AREA_FIELD_LABELS } from '../utils/areaChanges';
-import { AREA_STATUS_BADGE, areaTypeLabel, formatAreaNumber, formatCapacity } from '../utils/areaFormat';
+import { areaTypeLabel, formatAreaNumber, formatCapacity, getAreaStatusBadge } from '../utils/areaFormat';
 import { LevelBadge } from './HierarchyChain';
 
 const numberFormat = new Intl.NumberFormat('vi-VN');
@@ -142,7 +142,7 @@ export function ChildrenTab({ area, items, onOpen }: { area: Area; items: Area[]
                     <td>{formatAreaNumber(child.areaSize)}</td>
                     <td>{formatCapacity(child.capacity, child.capacityUnit)}</td>
                     <td>
-                      <StatusBadge label={AREA_STATUS_BADGE[child.status].label} tone={AREA_STATUS_BADGE[child.status].tone} />
+                      {(() => { const b = getAreaStatusBadge(child.status); return <StatusBadge label={b.label} tone={b.tone} />; })()}
                     </td>
                     <td className="lookup-table__arrow">
                       <Icon name="arrow-right" size={16} />
@@ -239,7 +239,7 @@ export function StaffTab({ state, onAssign, onEnd, onRetry }: StaffTabProps) {
   return (
     <RecordCard
       title={(data) => `Nhân sự phụ trách địa bàn${data ? ` (${data.length})` : ''}`}
-      description="Cán bộ khai thác được phân công phụ trách khu vực theo ca trực."
+      description="Cán bộ khai thác được phân công phụ trách khu vực."
       state={state}
       source="nhân sự"
       action={
@@ -260,8 +260,6 @@ export function StaffTab({ state, onAssign, onEnd, onRetry }: StaffTabProps) {
               <thead>
                 <tr>
                   <th scope="col">Nhân viên</th>
-                  <th scope="col">Chức danh</th>
-                  <th scope="col">Ca trực</th>
                   <th scope="col">Phụ trách từ</th>
                   <th scope="col">Liên hệ</th>
                   {onEnd && <th scope="col" aria-label="Thao tác" />}
@@ -276,8 +274,6 @@ export function StaffTab({ state, onAssign, onEnd, onRetry }: StaffTabProps) {
                         <small>{person.staffCode}</small>
                       </span>
                     </td>
-                    <td>{person.title}</td>
-                    <td>{person.shift}</td>
                     <td>{formatDate(person.since)}</td>
                     <td>{person.phone}</td>
                     {onEnd && (
