@@ -1,5 +1,3 @@
-using System.Text.Json.Nodes;
-
 namespace QTKD.Application.Features.Contracts;
 
 public class ServiceDraft
@@ -67,26 +65,6 @@ public class ContractQuery
     public int Page { get; set; } = 1;
     public int Size { get; set; } = 10;
     public string? View { get; set; } = "all";
-}
-
-public class StoredContract
-{
-    public StoredContract(Guid id, Guid ownerId, Guid departmentId, string status, int version, JsonObject data)
-    {
-        Id = id;
-        OwnerId = ownerId;
-        DepartmentId = departmentId;
-        Status = status;
-        Version = version;
-        Data = data;
-    }
-
-    public Guid Id { get; set; }
-    public Guid OwnerId { get; set; }
-    public Guid DepartmentId { get; set; }
-    public string Status { get; set; } = string.Empty;
-    public int Version { get; set; }
-    public JsonObject Data { get; set; }
 }
 
 public class FileMetadata

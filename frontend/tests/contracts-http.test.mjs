@@ -69,3 +69,35 @@ test('attachment download token retrieval uses the same session-error normalizat
   );
   assert.equal(identity.apiAuthState(), null);
 });
+
+test('contract writes send CSRF for JSON, bodyless requests and multipart uploads', async (t) => {
+  const { contracts } = await fixture(t);
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  const requests = [];
+  globalThis.fetch = async (_, init) => {
+    requests.push(init);
+    return new Response('{}', { status: 200 });
+  };
+
+  for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
+    await contracts.api('/contracts/HD-1', {
+      method, headers: { 'Idempotency-Key': 'contract-write' },
+      ...(method === 'DELETE' ? {} : { body: contracts.json({ reason: 'test' }) }),
+    });
+  }
+  const form = new FormData();
+  form.set('file', new Blob(['test']), 'contract.pdf');
+  await contracts.api('/contracts/HD-1/attachments', { method: 'POST', body: form });
+  await contracts.api('/contracts/HD-1');
+
+  for (const request of requests.slice(0, 5)) {
+    assert.equal(request.headers.get('X-QTKD-CSRF'), '1');
+    assert.equal(request.headers.get('Authorization'), 'Bearer fixture-token');
+  }
+  assert.equal(requests[0].headers.get('Content-Type'), 'application/json');
+  assert.equal(requests[0].headers.get('Idempotency-Key'), 'contract-write');
+  assert.equal(requests[4].body, form);
+  assert.equal(requests[4].headers.has('Content-Type'), false, 'browser supplies the multipart boundary');
+  assert.equal(requests[5].headers.has('X-QTKD-CSRF'), false);
+});
