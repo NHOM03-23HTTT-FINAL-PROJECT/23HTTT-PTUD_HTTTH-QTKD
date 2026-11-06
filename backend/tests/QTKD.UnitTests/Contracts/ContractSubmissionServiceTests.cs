@@ -153,7 +153,7 @@ public sealed class ContractSubmissionServiceTests
             new(Guid.NewGuid(), 3, "Phê duyệt", Guid.NewGuid(), "BGĐ", "BoardMember", null, null, "NotStarted", null, null, null, null)
         };
         var round = new ApprovalRoundRecord(Guid.NewGuid(), 1, Owner, "NV KD", At, 3,
-            """{"workflow":{"version":1,"stages":["SalesManager","LegalStaff","BoardMember"]}}""", null, "Running", steps);
+            """{"workflow":{"version":1,"stages":["SalesManager","LegalStaff","BoardMember"]}}""", null, "Running", steps, []);
         repository.Current = Contract("RevisionRequested", rounds: [round]);
         repository.PendingCancellation = false;
 
@@ -172,6 +172,75 @@ public sealed class ContractSubmissionServiceTests
         Assert.Null(detail["revisionRequest"]);
         Assert.Equal("/api/v1/contracts/HD-1/attachments/" + repository.Current.Attachments[0].Id,
             detail["attachments"]![0]!["downloadUrl"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task Detail_builds_the_round_log_from_audited_actions()
+    {
+        const string Stages = """{"workflow":{"version":1,"stages":["SalesManager","LegalStaff","BoardMember"]}}""";
+        // Accept/decision times are left out here so that only the audit rows feed the log.
+        ApprovalStepRecord[] Steps() =>
+        [
+            new(Guid.NewGuid(), 1, "Rà soát kinh doanh", Guid.NewGuid(), "TP KD", "SalesManager", At, null, "Completed", "Approve", "TP KD", null, null),
+            new(Guid.NewGuid(), 2, "Rà soát pháp lý", Guid.NewGuid(), "NV PC", "LegalStaff", At, null, "Completed", "RequestRevision", "NV PC", null, "Bổ sung điều khoản"),
+            new(Guid.NewGuid(), 3, "Phê duyệt", null, null, null, null, null, "Skipped", null, null, null, null)
+        ];
+        var first = Steps();
+        ApprovalLogRecord L(int minutes, ApprovalStepRecord step, string action, string? from, string? to, string? note = null) =>
+            new(At.AddMinutes(minutes), step.Id, action, step.DecidedByName ?? "TP PC", from, to, note);
+        var round1 = new ApprovalRoundRecord(Guid.NewGuid(), 1, Owner, "NV KD", At, 3, Stages, At.AddMinutes(9), "RevisionRequested", first,
+        [
+            // Deliberately out of order: the log is sorted by time.
+            L(5, first[1], "APPROVER_ASSIGNED", null, null, "Giao cho NV PC"),
+            L(1, first[0], "REVIEW_ACCEPTED", "submitted", "under-review"),
+            L(2, first[0], "REVIEW_APPROVED", "under-review", "under-review", "Ổn"),
+            L(3, first[0], "REVIEW_HANDED_OFF", "under-review", "under-review"),
+            L(8, first[1], "REVIEW_REVISION_REQUESTED", "under-review", "revision-requested", "Bổ sung điều khoản"),
+            L(9, first[1], "UNKNOWN_ACTION", null, null)
+        ]);
+        var round2 = new ApprovalRoundRecord(Guid.NewGuid(), 2, Owner, "NV KD", At.AddDays(1), 4, Stages, null, "Running", Steps(), []);
+        repository.Current = Contract("RevisionRequested", rounds: [round1, round2]);
+
+        var detail = (await Service().Submit(actor, "HD-1", "key", default))["contract"]!;
+
+        var log = detail["rounds"]![0]!["log"]!.AsArray();
+        Assert.Equal(["submit", "accept", "approve", "handoff-legal", "assign", "request-revision"],
+            log.Select(e => e!["action"]!.GetValue<string>()));
+        Assert.Equal(("draft", "submitted"), (log[0]!["from"]!.GetValue<string>(), log[0]!["to"]!.GetValue<string>()));
+        // The assignment carries the status the contract had at that time.
+        Assert.Equal(("legal", "under-review", "under-review"),
+            (log[4]!["stepKey"]!.GetValue<string>(), log[4]!["from"]!.GetValue<string>(), log[4]!["to"]!.GetValue<string>()));
+        // Legal notes are hidden from a sales actor (A9); sales notes are not.
+        Assert.True(log[5]!["internal"]!.GetValue<bool>());
+        Assert.Null(log[5]!["note"]);
+        Assert.Equal("Ổn", log[2]!["note"]!.GetValue<string>());
+        Assert.Equal(3, log[5]!["version"]!.GetValue<int>());
+
+        var resubmit = detail["rounds"]![1]!["log"]!.AsArray();
+        Assert.Equal(("submit", "revision-requested"), (resubmit.Single()!["action"]!.GetValue<string>(), resubmit[0]!["from"]!.GetValue<string>()));
+    }
+
+    [Fact]
+    public async Task Detail_logs_steps_decided_without_audit_rows_like_demo_seed_data()
+    {
+        // Same timestamp for accept and decision, as in demo-seed.json: accept still comes first.
+        var steps = new ApprovalStepRecord[]
+        {
+            new(Guid.NewGuid(), 1, "Rà soát kinh doanh", Guid.NewGuid(), "TP KD", "SalesManager", At, At.AddHours(1), "Completed", "Approve", null, At.AddHours(1), "Đồng ý"),
+            new(Guid.NewGuid(), 2, "Rà soát pháp lý", Guid.NewGuid(), "NV PC", "LegalStaff", At, At.AddHours(2), "Completed", "Approve", "NV PC", At.AddHours(2), "Ổn"),
+            new(Guid.NewGuid(), 3, "Phê duyệt", Guid.NewGuid(), "GĐ", "BoardMember", At, At.AddHours(3), "Completed", "Approve", "GĐ", At.AddHours(3), null)
+        };
+        var round = new ApprovalRoundRecord(Guid.NewGuid(), 1, Owner, "NV KD", At, 3,
+            """{"workflow":{"version":1,"stages":["SalesManager","LegalStaff","BoardMember"]}}""", At.AddHours(3), "Completed", steps, []);
+        repository.Current = Contract("RevisionRequested", rounds: [round]);
+
+        var log = (await Service().Submit(actor, "HD-1", "key", default))["contract"]!["rounds"]![0]!["log"]!.AsArray();
+
+        Assert.Equal(["submit", "accept", "approve", "accept", "approve", "accept", "approve"], log.Select(e => e!["action"]!.GetValue<string>()));
+        Assert.Equal(("TP KD", "submitted", "under-review"),
+            (log[1]!["actorName"]!.GetValue<string>(), log[1]!["from"]!.GetValue<string>(), log[1]!["to"]!.GetValue<string>()));
+        Assert.Equal(("Đồng ý", "under-review", "approved"),
+            (log[2]!["note"]!.GetValue<string>(), log[5]!["from"]!.GetValue<string>(), log[6]!["to"]!.GetValue<string>()));
     }
 
     private static string[] Items(BusinessException error) =>

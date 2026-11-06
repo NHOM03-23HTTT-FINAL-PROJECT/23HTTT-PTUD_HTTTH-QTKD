@@ -108,6 +108,8 @@ public class ContractListItem
     public string OwnerName { get; set; } = string.Empty;
     public DateTime UpdatedAt { get; set; }
     public IReadOnlyList<string> AreaCodes { get; set; } = [];
+    /// <summary>Current step of the running approval round, if any (SYS-CTR-11 A10).</summary>
+    public string? StepLabel { get; set; }
 }
 
 public class ContractReferences

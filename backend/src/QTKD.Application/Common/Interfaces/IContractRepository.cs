@@ -64,7 +64,10 @@ public sealed record ContractAttachmentRecord(Guid Id, string Name, long Size);
 /// <summary>Snapshot is the JSON stored in approval_round.record_snapshot.</summary>
 public sealed record ApprovalRoundRecord(
     Guid Id, int No, Guid SubmittedById, string SubmittedByName, DateTime SubmittedAt, int RecordVersion,
-    string Snapshot, DateTime? EndedAt, string Result, IReadOnlyList<ApprovalStepRecord> Steps);
+    string Snapshot, DateTime? EndedAt, string Result, IReadOnlyList<ApprovalStepRecord> Steps, IReadOnlyList<ApprovalLogRecord> Log);
+
+/// <summary>One approval or assignment audit row of a round (SYS-CTR-11 bước 9). From/To are client statuses when recorded.</summary>
+public sealed record ApprovalLogRecord(DateTime At, Guid? StepId, string Action, string? ActorName, string? From, string? To, string? Note);
 
 public sealed record ApprovalStepRecord(
     Guid Id, int Order, string Label, Guid? AssigneeId, string? AssigneeName, string? AssigneeRole,

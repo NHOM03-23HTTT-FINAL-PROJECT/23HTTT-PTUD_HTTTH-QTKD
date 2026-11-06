@@ -325,14 +325,59 @@ public partial class ContractRepository(QtkdDbContext db, IHttpContextAccessor? 
             })
             .ToListAsync(ct);
 
+        var log = await ApprovalLogOf(contractId, steps.ToDictionary(s => s.Step.StepId, s => s.Step.RoundId), ct);
+
         return rounds.Select(x => new ApprovalRoundRecord(
             x.Round.RoundId, x.Round.RoundNo, x.Round.SubmittedBy, x.SubmittedByName, x.Round.SubmittedAt, x.Round.RecordVersion,
             x.Round.RecordSnapshot, x.Round.EndedAt, x.Round.Result.ToString(),
             steps.Where(s => s.Step.RoundId == x.Round.RoundId).Select(s => new ApprovalStepRecord(
                 s.Step.StepId, s.Step.StepOrder, s.Step.StepName, s.Step.AssigneeId, s.AssigneeName, s.AssigneeRole?.ToString(),
                 s.Step.AssignedAt, s.Step.AcceptedAt, s.Step.StepStatus.ToString(), s.Step.Decision?.ToString(),
-                s.DecidedByName, s.Step.DecidedAt, s.Step.Comment)).ToList())).ToList();
+                s.DecidedByName, s.Step.DecidedAt, s.Step.Comment)).ToList(),
+            log.Where(l => l.RoundId == x.Round.RoundId).Select(l => l.Entry).ToList())).ToList();
     }
+
+    /// <summary>Approval decisions and assignments of the contract, each matched to its round through the step it acted on.</summary>
+    private async Task<List<(Guid RoundId, ApprovalLogRecord Entry)>> ApprovalLogOf(Guid contractId, Dictionary<Guid, Guid> roundOfStep, CancellationToken ct)
+    {
+        var rows = await (
+            from a in db.Set<AuditLog>().AsNoTracking()
+                .Where(a => a.EntityId == contractId && (a.EntityType == "ContractApproval" || a.EntityType == "ContractApprovalAssignment"))
+            from u in Users.Where(u => u.UserId == a.ActorId).DefaultIfEmpty()
+            orderby a.ActedAt
+            select new { a.ActedAt, a.EntityType, a.Action, ActorName = u == null ? null : u.FullName, a.StatusBefore, a.StatusAfter, a.ValueAfter, a.Note })
+            .ToListAsync(ct);
+
+        var parsed = rows.Select(r =>
+        {
+            var value = r.ValueAfter is null ? null : JsonNode.Parse(r.ValueAfter);
+            return (Row: r, StepId: Id(value?["stepId"]), RoundId: Id(value?["roundId"]), AssigneeId: Id(value?["assigneeId"]));
+        }).ToList();
+
+        var assigneeIds = parsed.Where(p => p.AssigneeId is not null).Select(p => p.AssigneeId!.Value).Distinct().ToList();
+        var names = await Users.Where(u => assigneeIds.Contains(u.UserId)).ToDictionaryAsync(u => u.UserId, u => u.FullName, ct);
+
+        var result = new List<(Guid, ApprovalLogRecord)>();
+        foreach (var (r, stepId, roundId, assigneeId) in parsed)
+        {
+            if (stepId is not Guid step || !roundOfStep.TryGetValue(step, out var round) || (roundId is Guid id && id != round))
+            {
+                continue;
+            }
+
+            var assignment = r.EntityType == "ContractApprovalAssignment";
+            var note = assignment
+                ? assigneeId is Guid a && names.TryGetValue(a, out var name) ? $"Giao cho {name}" : null
+                : r.Note;
+            result.Add((round, new ApprovalLogRecord(r.ActedAt, step, r.Action, r.ActorName,
+                assignment ? null : r.StatusBefore, assignment ? null : r.StatusAfter, note)));
+        }
+
+        return result;
+    }
+
+    private static Guid? Id(JsonNode? node) =>
+        node is JsonValue v && v.TryGetValue<string>(out var s) && Guid.TryParse(s, out var id) ? id : null;
 
     private Task<List<CancellationRequestRecord>> CancellationRequestsOf(Guid contractId, CancellationToken ct) =>
         (from r in CancellationRequests.Where(r => r.ContractId == contractId)
