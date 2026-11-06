@@ -12,6 +12,9 @@ using QTKD.Infrastructure.Persistence;
 using QTKD.Infrastructure.Persistence.Schema;
 using UserRole = QTKD.Domain.Identity.UserRole;
 using UserStatus = QTKD.Domain.Identity.UserStatus;
+using Area = QTKD.Domain.Entities.Area;
+using Service = QTKD.Domain.Entities.Service;
+using AreaStatus = QTKD.Domain.Enums.ActiveStatus;
 
 namespace QTKD.Infrastructure.Repositories;
 
@@ -19,7 +22,7 @@ namespace QTKD.Infrastructure.Repositories;
 /// SYS-CTR-04 through EF Core LINQ on QtkdDbContext. Every read is filtered by the contract or by the actor's scope.
 /// Writes join the transaction opened by IdempotentAsync.
 /// </summary>
-public sealed class ContractRepository(QtkdDbContext db, IHttpContextAccessor? http = null) : IContractRepository
+public partial class ContractRepository(QtkdDbContext db, IHttpContextAccessor? http = null) : IContractRepository, IContractManagementRepository
 {
     private static readonly JsonSerializerOptions Web = new(JsonSerializerDefaults.Web);
 
@@ -97,7 +100,7 @@ public sealed class ContractRepository(QtkdDbContext db, IHttpContextAccessor? h
             from a in Areas.Where(a => a.AreaId == ci.AreaId).DefaultIfEmpty()
             orderby ci.ItemId
             select new ContractItemRecord(ci.ItemId, s.ServiceCode, s.ServiceName, s.Unit, s.RequiresArea,
-                a == null ? null : a.AreaCode, a == null ? null : (bool?)(a.Status == ActiveStatus.Active)))
+                a == null ? null : a.AreaCode, a == null ? null : (bool?)(a.Status == AreaStatus.Active)))
             .ToListAsync(ct);
 
         var attachments = await db.Set<Attachment>().AsNoTracking()
@@ -153,7 +156,7 @@ public sealed class ContractRepository(QtkdDbContext db, IHttpContextAccessor? h
             .ToListAsync(ct);
 
         // Load each item's area and all of its ancestors, one level per query.
-        var areas = new Dictionary<Guid, (Guid? Parent, ActiveStatus Status)>();
+        var areas = new Dictionary<Guid, (Guid? Parent, AreaStatus Status)>();
         var next = items.Select(i => i.AreaId).Distinct().ToList();
         while (next.Count > 0)
         {
@@ -175,7 +178,7 @@ public sealed class ContractRepository(QtkdDbContext db, IHttpContextAccessor? h
             var seen = new HashSet<Guid>();
             for (Guid? current = areaId; current is Guid id && seen.Add(id) && areas.TryGetValue(id, out var area); current = area.Parent)
             {
-                if (area.Status != ActiveStatus.Active)
+                if (area.Status != AreaStatus.Active)
                 {
                     return true;
                 }

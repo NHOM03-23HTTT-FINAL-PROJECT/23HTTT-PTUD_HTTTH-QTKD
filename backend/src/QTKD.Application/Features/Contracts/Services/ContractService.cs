@@ -5,28 +5,18 @@ using QTKD.Domain.Contracts;
 
 namespace QTKD.Application.Features.Contracts;
 
-public class ContractService
+public partial class ContractService
 {
-    private readonly IContractStore _store;
+    private readonly IContractManagementRepository _management;
     private readonly IContractRepository _contracts;
+    private readonly IContractFileStorage? _files;
 
-    public ContractService(IContractStore store, IContractRepository contracts)
+    public ContractService(IContractManagementRepository management, IContractRepository contracts, IContractFileStorage? files = null)
     {
-        _store = store;
+        _management = management;
         _contracts = contracts;
+        _files = files;
     }
-
-    public Task<JsonObject> Options(Actor actor, CancellationToken ct) =>
-        _store.FormOptions(actor, ct);
-
-    public Task<JsonObject> Filters(Actor actor, CancellationToken ct) =>
-        _store.FilterOptions(actor, ct);
-
-    public Task<JsonObject> List(Actor actor, ContractQuery query, CancellationToken ct) =>
-        _store.List(actor, query, ct);
-
-    public async Task<JsonObject> Get(Actor actor, string code, CancellationToken ct) =>
-        (await _store.Get(actor, code, ct)).Data;
 
     /// <summary>SYS-CTR-04 bước 3–5: kiểm tra hồ sơ trước khi hiển thị hộp thoại xác nhận.</summary>
     public async Task<JsonObject> SubmitCheck(Actor actor, string code, CancellationToken ct)
@@ -334,48 +324,6 @@ public class ContractService
         value is DateTime t
             ? new DateTimeOffset(DateTime.SpecifyKind(t, DateTimeKind.Utc)).ToString("yyyy-MM-dd'T'HH:mm:ss.FFFFFFzzz", CultureInfo.InvariantCulture)
             : null;
-
-    public Task<JsonObject> Cancel(Actor actor, string code, CancelContract request, string key, CancellationToken ct)
-    {
-        ContractValidator.Reason(request.Reason);
-        return _store.Cancel(actor, code, request, Key(key), ct);
-    }
-
-    public Task<JsonObject> RequestCancellation(Actor actor, string code, CancellationDraft request, string key, CancellationToken ct)
-    {
-        ContractValidator.Reason(request.Reason);
-        return _store.RequestCancellation(actor, code, request, Key(key), ct);
-    }
-
-    public Task<JsonObject> DecideCancellation(Actor actor, string code, Guid id, CancellationDecision request, string key, CancellationToken ct) =>
-        _store.DecideCancellation(actor, code, id, request, Key(key), ct);
-
-    public Task<JsonObject> Upload(Actor actor, string code, int version, string key, Stream content, string filename, long length, CancellationToken ct) =>
-        _store.Upload(actor, code, version, Key(key), content, filename, length, ct);
-
-    public Task<JsonObject> RemoveFile(Actor actor, string code, Guid id, int version, string key, CancellationToken ct) =>
-        _store.RemoveFile(actor, code, id, version, Key(key), ct);
-
-    public Task<(FileMetadata File, Stream Content)> Download(Actor actor, string code, Guid id, CancellationToken ct) =>
-        _store.Download(actor, code, id, ct);
-
-    public Task<JsonObject> Create(
-        Actor actor,
-        CreateContract request,
-        string key,
-        CancellationToken ct)
-    {
-        if (!actor.IsSalesStaff)
-        {
-            throw new BusinessException("FORBIDDEN", 403);
-        }
-
-        var value = ContractValidator.Validate(request.Draft);
-        return _store.Create(actor, request.Draft, value, Key(key), ct);
-    }
-
-    public Task<JsonObject> Update(Actor actor, string code, UpdateContract request, CancellationToken ct) =>
-        _store.Update(actor, code, request, ContractValidator.Validate(request.Draft), ct);
 
     public static string Key(string? key)
     {
