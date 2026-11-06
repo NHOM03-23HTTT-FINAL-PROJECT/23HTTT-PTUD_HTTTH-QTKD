@@ -2,7 +2,7 @@
 
 ## Hiện tại: đã bổ sung lại SYS-CUS-03
 
-Theo yêu cầu mới sau PR #33, backend tạm ngưng đã được bổ sung lại cùng API/UI và quyền cá nhân. Bản local hiện có **55 mục customer tự động PASS**: 21 unit, 12 integration, 2 adapter frontend, 20 kịch bản browser. Chi tiết, lỗi bảng rà soát đã sửa và phần nguồn thật còn thiếu ở [báo cáo tạm ngưng](customer-suspension.md). Những ghi nhận backend SYS-CUS-03 đã gỡ bên dưới là lịch sử kiểm thử tại `42445dd`, được thay thế bởi cập nhật này.
+Theo yêu cầu mới sau khi mở PR #33, backend tạm ngưng đã được bổ sung lại cùng API/UI và quyền cá nhân. Đã chạy lại sau khi ghép main `e9deffe`: **55 mục customer tự động PASS** gồm 21 unit, 12 integration, 2 adapter frontend, 20 kịch bản browser; toàn bộ unit backend 100/100 và frontend 36/36 cũng PASS. Chi tiết, lỗi bảng rà soát đã sửa và phần nguồn thật còn thiếu ở [báo cáo tạm ngưng](customer-suspension.md). Những ghi nhận backend SYS-CUS-03 đã gỡ bên dưới là lịch sử kiểm thử tại `42445dd`, được thay thế bởi cập nhật này.
 
 ## Lịch sử kiểm thử 06/11/2026 tại 42445dd: ghép main và Repository EF Core
 

@@ -6,12 +6,13 @@ Backend thực tế ở `backend/`, theo bốn tầng. Module đã có code ch�
 
 EF Core quản lý schema và migration (`QtkdDbContext`, `Infrastructure/Persistence/Migrations`); `QTKD.DbTool` áp migration và seed. Api không tự tạo hay migrate DB. Phần lớn module đọc/ghi bằng SQL qua Npgsql; notifications dùng EF Core LINQ. Tên file dự kiến cho module mới là gợi ý để thống nhất, người chủ trì task quyết định khi triển khai.
 
-Trên nhánh `cus-flow` sau ghép main ngày 06/11/2026 (`65d3092`), Customers theo Controller → service Application → `ICustomerRepository`/`CustomerRepository` EF Core trên `QtkdDbContext`.
+Trên nhánh `cus-flow` sau ghép main ngày 06/11/2026 (`e9deffe`), Customers theo Controller → service Application → `ICustomerRepository`/`CustomerRepository` EF Core trên `QtkdDbContext`.
 DTO/validator/service nằm trong Application; records trung lập với persistence ở Domain. Service không dùng DbContext, Npgsql hay SQL.
 CRUD, phạm vi hồ sơ, phân trang và lịch sử dùng EF LINQ; SQL khóa PostgreSQL/đồng hồ DB chỉ nằm trong repository.
-Backend SYS-CUS-03 được gỡ theo phạm vi người dùng. Bố cục frontend theo main; khách hàng đã nối API cho CRUD,
-tra cứu, chi tiết, quyền thao tác và quản lý ủy quyền kích hoạt lại. Nguồn xác minh kích hoạt lại/hồ sơ liên quan vẫn là phụ thuộc.
-Xem [test case và giới hạn đã kiểm chứng](../testing/test-cases/customers-api-ui.md).
+Backend SYS-CUS-03 đã được bổ sung lại theo yêu cầu mới. Bố cục frontend theo main; khách hàng đã nối API cho CRUD,
+tra cứu, chi tiết, rà soát tạm ngưng và quản lý ủy quyền riêng cho tạm ngưng/kích hoạt lại. Nguồn công việc/dịch vụ chưa tính phí,
+xác minh kích hoạt lại và một số hồ sơ liên quan vẫn là phụ thuộc; xác nhận chuyển trạng thái thật bị chặn khi thiếu nguồn.
+Xem [test case và giới hạn đã kiểm chứng](../testing/test-cases/customer-suspension.md).
 
 ## Nguyên tắc tổ chức
 

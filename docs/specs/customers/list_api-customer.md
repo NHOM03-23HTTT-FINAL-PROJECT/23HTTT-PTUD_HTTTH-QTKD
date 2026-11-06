@@ -1,6 +1,6 @@
 # API Khách hàng
 
-Cập nhật trên `cus-flow` ngày 06/11/2026, sau khi ghép `main` tại `65d3092`. Tiền tố: `/api/v1`. Các thao tác ghi dùng JWT, CSRF chung của backend; tạo/sửa/tạm ngưng/kích hoạt lại cần `Idempotency-Key`. Kết quả thực chạy và test case ở [báo cáo kiểm thử](../../testing/test-cases/customer-suspension.md).
+Cập nhật trên `cus-flow` ngày 06/11/2026, sau khi ghép `main` tại `e9deffe`. Tiền tố: `/api/v1`. Các thao tác ghi dùng JWT, CSRF chung của backend; tạo/sửa/tạm ngưng/kích hoạt lại cần `Idempotency-Key`. Kết quả thực chạy và test case ở [báo cáo kiểm thử](../../testing/test-cases/customer-suspension.md).
 
 Theo yêu cầu mới ngày 06/11/2026, **backend SYS-CUS-03 đã được bổ sung lại**, thay thế trạng thái đã gỡ ở commit `42445dd`. Tạm ngưng và kích hoạt lại có quyền riêng theo từng người; backend kiểm tra hồ sơ phụ trách và hiệu lực ủy quyền. [Kết quả kiểm thử và phụ thuộc thực tế](../../testing/test-cases/customer-suspension.md).
 

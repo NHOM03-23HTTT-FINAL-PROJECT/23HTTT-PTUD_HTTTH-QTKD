@@ -8,7 +8,7 @@
 
 ## Đã có trong nhánh này
 
-- Sau ghép main `65d3092`, API customer dùng Controller → service Application → Repository EF Core trên QtkdDbContext. DTO/validator nằm trong Application, records ở Domain. CRUD, phạm vi, phân trang và lịch sử dùng LINQ; SQL đặc thù khóa/đồng hồ DB nằm trong repository. Service không nhận DbContext/Npgsql/connection string. Tạo/sửa ghi cùng audit/receipt trong một transaction, kiểm tra phiên bản; MST giữ số 0 đầu và duy nhất kể cả Suspended.
+- Sau ghép main `e9deffe`, API customer dùng Controller → service Application → Repository EF Core trên QtkdDbContext; giữ đăng ký Audit mới của main. DTO/validator nằm trong Application, records ở Domain. CRUD, phạm vi, phân trang và lịch sử dùng LINQ; SQL đặc thù khóa/đồng hồ DB nằm trong repository. Service không nhận DbContext/Npgsql/connection string. Tạo/sửa ghi cùng audit/receipt trong một transaction, kiểm tra phiên bản; MST giữ số 0 đầu và duy nhất kể cả Suspended.
 - Giao diện API dùng dữ liệu thật cho các chức năng trên. Các nhóm khách hàng/dịch vụ đang là danh mục tạm của Sprint 1, chưa phải danh mục quản trị chung. Văn bản dịch vụ từ dữ liệu cũ được giữ và hiển thị riêng, không tự chuyển sang mã danh mục.
 - Khách hàng cũ có thể thiếu người tạo, ngày tạo và lịch sử; giao diện hiển thị chưa rõ thay vì tự đặt giá trị. Migration bổ sung mã mà không tăng phiên bản hồ sơ cũ.
 - Khi truy cập hồ sơ liên quan, backend kiểm tra quyền nhóm trước. Nguồn chưa tích hợp trả lỗi thay vì kết luận không có hồ sơ. Trong chế độ API, thao tác tải tệp căn cứ và báo sai lệch chưa được kết nối.

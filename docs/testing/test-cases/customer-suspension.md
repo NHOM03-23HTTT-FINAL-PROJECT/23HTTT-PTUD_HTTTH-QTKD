@@ -1,6 +1,12 @@
 # Kiểm thử backend tạm ngưng khách hàng — 06/11/2026
 
-Phạm vi: bổ sung lại SYS-CUS-03 / US-CUS-04 sau yêu cầu mới, trên nền `cus-flow` đã ghép main `65d3092` tại `42445dd`. Không sửa nghiệp vụ phân hệ khác; chỉ nối lại form customer hiện có và sửa lỗi hiển thị tại đó.
+Phạm vi: bổ sung lại SYS-CUS-03 / US-CUS-04 sau yêu cầu mới, trên nền `cus-flow` đã ghép main `65d3092` tại `42445dd`. Trước khi cập nhật PR #33, đã ghép tiếp main `e9deffe` (Audit) và chạy lại các bộ kiểm tra bên dưới. Không sửa nghiệp vụ phân hệ khác; chỉ nối lại form customer hiện có và sửa lỗi hiển thị tại đó.
+
+## Kiểm tra ghép main trước khi push
+
+Có một xung đột nội dung trong `backend/src/QTKD.Api/Program.cs`: hai nhánh cùng thêm đăng ký service sau Notifications. Đã giữ cả `ICustomerStatusSource`/`CustomerService` của customer và `AuditLogService` của main. Router, persistence và tài liệu ghép tự động; phần Audit không có thay đổi so với main. Main `e9deffe` là tổ tiên của nhánh sau merge; không còn file unmerged hoặc dấu conflict.
+
+Không thêm migration khi bổ sung lại SYS-CUS-03 hoặc khi ghép Audit. Migration/seed cho lượt kiểm thử chỉ chạy trên PostgreSQL dùng một lần ở cổng 55441; không chạy trên Supabase. Đã dừng API/UI thử và xóa container sau kiểm thử; ứng dụng chính 5173/7156 tiếp tục dùng cấu hình Supabase đã có.
 
 ## Nghiệp vụ và phần đã thực hiện
 
@@ -25,13 +31,15 @@ Vì SYS-CUS-03 E2 yêu cầu không xác nhận từ kết quả chưa đầy đ
 |---|---|
 | Customer unit: validator và service | 21/21 PASS |
 | Customer integration: 9 PostgreSQL + 3 SQLite repository | 12/12 PASS |
-| Customer adapter frontend: MST trùng và request tạm ngưng | 2/2 PASS, nằm trong frontend 27/27 PASS |
+| Customer adapter frontend: MST trùng và request tạm ngưng | 2/2 PASS, nằm trong frontend 36/36 PASS sau ghép main |
 | UI → API → PostgreSQL | 20/20 PASS |
 | Script business API/SQL customer | PASS |
 | Build backend / frontend | PASS, còn cảnh báo có sẵn của repo và bundle lớn |
-| Toàn bộ unit backend | 87/87 PASS; 21 unit customer nằm trong số này |
+| Toàn bộ unit backend | 100/100 PASS sau ghép main; 21 unit customer nằm trong số này |
 
-Tổng riêng customer **55 mục tự động**; không cộng script business hoặc CUA như bộ ca mới vì có kiểm tra trùng. Kết quả lỗi toàn repo đối chiếu main (25 integration failure ngoài customer) nằm trong báo cáo lịch sử; lần này không chạy lại toàn bộ integration ngoài customer và không tuyên bố chúng đã được sửa.
+Tổng riêng customer **55 mục tự động**; không cộng script business hoặc CUA như bộ ca mới vì có kiểm tra trùng. Kết quả 25 integration failure ngoài customer thuộc lần đối chiếu main `65d3092` trong báo cáo lịch sử; lượt ghép `e9deffe` này không chạy lại toàn bộ integration ngoài customer và không tuyên bố chúng đã được sửa.
+
+Bằng chứng chạy lại sau ghép `e9deffe` ở workspace cha, ngoài Git: `.qtkd-tools/customer-publish-20261106/`, gồm `customer-after-main_*.trx`, `all-unit-after-main_*.trx`, `build-backend.log`, `build-frontend.log`, `test-frontend.log`, `business-after-main.log`, `ui-after-main/api-ui-report.json` và `cleanup.json`.
 
 ## Test case tạm ngưng được chạy
 
