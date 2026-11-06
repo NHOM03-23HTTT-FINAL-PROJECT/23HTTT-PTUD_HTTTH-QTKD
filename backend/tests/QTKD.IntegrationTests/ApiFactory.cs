@@ -27,6 +27,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
     public IContractApprovalEngine? ApprovalEngine { get; init; }
     public IApprovalStore? ApprovalStore { get; init; }
     public INotificationRepository? NotificationRepository { get; init; }
+    public IAuditLogRepository? AuditLogRepository { get; init; }
     public IPasswordRecoveryMailSender? RecoveryMail { get; init; }
     public TimeProvider? Clock { get; init; }
     public string EnvironmentName { get; init; } = "Testing";
@@ -75,6 +76,11 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
                 services.RemoveAll<INotificationRepository>();
                 services.AddSingleton(NotificationRepository);
             }
+            if (AuditLogRepository is not null)
+            {
+                services.RemoveAll<IAuditLogRepository>();
+                services.AddSingleton(AuditLogRepository);
+            }
             if (ApprovalEngine is not null)
             {
                 services.RemoveAll<IContractApprovalEngine>();
@@ -121,7 +127,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
                 db.Roles.AddRange(Enum.GetValues<UserRole>().Select(role => new RoleDefinition { Code = role, Name = role.ToString(), DepartmentCode = role switch
                 { UserRole.SalesStaff or UserRole.SalesManager => "KD", UserRole.OperationsStaff or UserRole.OperationsManager => "KT", UserRole.Accountant => "KTOAN", UserRole.LegalStaff or UserRole.LegalManager => "PC", UserRole.BoardMember or UserRole.BoardChair => "BGD", _ => "QTHT" } }));
                 db.Permissions.AddRange(PermissionCatalog.Codes.Select(code => new Permission { Code = code, Name = code }));
-                db.Grants.AddRange(new[] { "users.manage", "roles.manage", "departments.manage" }.Select(code => new RolePermission { Role = UserRole.SystemAdmin, PermissionCode = code }));
+                db.Grants.AddRange(new[] { "users.manage", "roles.manage", "departments.manage", "audit.view" }.Select(code => new RolePermission { Role = UserRole.SystemAdmin, PermissionCode = code }));
                 db.Grants.Add(new RolePermission { Role = UserRole.SalesStaff, PermissionCode = "contracts.create" });
                 await db.SaveChangesAsync();
             }

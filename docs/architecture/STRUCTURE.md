@@ -30,7 +30,7 @@ Xem [test case và giới hạn đã kiểm chứng](../testing/test-cases/custo
 | Module (BE) | FE feature | Sprint | US / PB | Chủ trì theo kế hoạch | Hiện trạng BE |
 | --- | --- | --- | --- | --- | --- |
 | `Identity` (Auth, Users, Departments, Roles, Permissions) | `auth`, `users` | 1 | PB-02 | Minh | Có code; Minimal API trong `Program.cs`, EF Core |
-| `Audit` | `audit-logs` | 1 | PB-03 | Minh | Giữ chỗ (API tra cứu UC-CHUNG-06 đang làm ở nhánh `feat/audit-log`) |
+| `Audit` | `audit-logs` | 1 | PB-03 | Minh | Có code: API tra cứu UC-CHUNG-06 theo mẫu Controller → Service → Repository (EF Core); xem [list_api-audit.md](../specs/common/list_api-audit.md) |
 | `Catalogs` (dịch vụ, nhóm dịch vụ, đơn vị tính, thuế suất) | `catalogs` | 1 | PB-04 | Đan Anh | Giữ chỗ |
 | `Customers` | `customers` | 1 (mở rộng S2, S3) | CUS-01, 02, 04, 05, 06, 07 | Hiếu | cus-flow: Controller → service Application → Repository EF Core; DTO/validator Application, records Domain, migration EF. SYS-CUS-03 đã bổ sung lại cùng ủy quyền cá nhân; công việc/dịch vụ chưa tính phí và xác nhận kích hoạt lại còn phụ thuộc nguồn thật. |
 | `Areas` | `areas` | 1 (mở rộng S2, S3) | ARE-01, 02, 04, 12, 13 | Tuấn | Giữ chỗ |

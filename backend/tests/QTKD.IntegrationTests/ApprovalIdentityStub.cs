@@ -11,9 +11,9 @@ internal sealed class ApprovalIdentityStub(IReadOnlyDictionary<Guid, AuthUser> u
     public Task<bool> HasPermission(Guid id, string permission, CancellationToken ct) => Task.FromResult(users[id].Permissions.Contains(permission));
     public Task<AuthResult> Login(LoginRequest request, string? ip, string? device, CancellationToken ct) => throw new NotSupportedException();
     public Task<AuthResult> Refresh(string token, CancellationToken ct) => throw new NotSupportedException();
-    public Task Logout(string? token, CancellationToken ct) => throw new NotSupportedException();
+    public Task Logout(string? token, string? ip, bool audit, CancellationToken ct) => throw new NotSupportedException();
     public Task<SessionView> Session(Guid user, Guid session, bool activity, CancellationToken ct) => throw new NotSupportedException();
-    public Task<AuthResult> ChangePassword(Guid user, Guid session, PasswordRequest request, string? token, CancellationToken ct) => throw new NotSupportedException();
+    public Task<AuthResult> ChangePassword(Guid user, Guid session, PasswordRequest request, string? token, string? ip, CancellationToken ct) => throw new NotSupportedException();
     public Task<IReadOnlyList<AuthUser>> Users(CancellationToken ct) => throw new NotSupportedException();
     public Task<AuthUser> CreateUser(CreateUserRequest request, CancellationToken ct) => throw new NotSupportedException();
     public Task<AuthUser> UpdateUser(Guid actor, Guid user, UpdateUserRequest request, CancellationToken ct) => throw new NotSupportedException();

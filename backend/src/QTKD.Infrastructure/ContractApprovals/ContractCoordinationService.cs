@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Npgsql;
 using QTKD.Application.Features.ContractApprovals;
@@ -7,15 +8,17 @@ using QTKD.Application.Features.Identity;
 namespace QTKD.Infrastructure.ContractApprovals;
 
 /// <summary>Internal legal exchanges are append-only audit events, separated from public approval comments.</summary>
-public sealed class ContractCoordinationService(IApprovalDbSessions sessions, IIdentityService identity)
+public sealed class ContractCoordinationService(IApprovalDbSessions sessions, IIdentityService identity, IHttpContextAccessor? http = null)
 {
+    private const string Requested = "COORDINATION_REQUESTED";
+    private const string Replied = "COORDINATION_REPLIED";
     private static async Task<IReadOnlyList<ReviewCoordination>> Load(NpgsqlConnection c, NpgsqlTransaction? tx, Guid? document, CancellationToken ct)
     {
         await using var cmd = PostgresApprovalStore.Command(c, tx, """
             SELECT DISTINCT ON (value_after->>'Id') value_after::text FROM qtkd.audit_log
             WHERE entity_type='ContractCoordination' AND (@id::uuid IS NULL OR entity_id=@id)
-            ORDER BY value_after->>'Id', CASE WHEN action='coordination-reply' THEN 0 ELSE 1 END,acted_at DESC
-            """, ("id", document));
+            ORDER BY value_after->>'Id', CASE WHEN action IN ('coordination-reply',@replied) THEN 0 ELSE 1 END,acted_at DESC
+            """, ("id", document), ("replied", Replied)); // audit_log is append-only: older rows keep 'coordination-reply'.
         var values = new List<ReviewCoordination>();
         await using var r = await cmd.ExecuteReaderAsync(ct);
         while (await r.ReadAsync(ct)) values.Add(JsonSerializer.Deserialize<ReviewCoordination>(r.GetString(0))!);
@@ -51,7 +54,7 @@ public sealed class ContractCoordinationService(IApprovalDbSessions sessions, II
         await using (var dept = PostgresApprovalStore.Command(c, tx, "SELECT 1 FROM qtkd.department WHERE code=@dept", ("dept", request.Department)))
             if (await dept.ExecuteScalarAsync(ct) is null) throw new ReviewFailure(400, "VALIDATION");
         var value = new ReviewCoordination(Guid.NewGuid(), id, stored.Document.RoundId, request.Department, request.Content.Trim(), user.FullName, DateTime.UtcNow);
-        await Append(c, tx, actorId, value, "coordination-request", ct);
+        await Append(c, tx, actorId, value, Requested, ct);
         await session.Commit(ct); return value;
     }
     public async Task<ReviewCoordination> Reply(Guid actorId, Guid id, Guid coordinationId, string reply, CancellationToken ct)
@@ -74,19 +77,20 @@ public sealed class ContractCoordinationService(IApprovalDbSessions sessions, II
             """, ("actor", actorId), ("dept", value.Department)))
             if (await check.ExecuteScalarAsync(ct) is null) throw new ReviewFailure(403, "FORBIDDEN");
         value = value with { Reply = reply.Trim(), RepliedBy = user.FullName, RepliedAt = DateTime.UtcNow };
-        await Append(c, tx, actorId, value, "coordination-reply", ct); await session.Commit(ct); return value;
+        await Append(c, tx, actorId, value, Replied, ct); await session.Commit(ct); return value;
     }
     private static async Task Lock(NpgsqlConnection c, NpgsqlTransaction tx, Guid id, CancellationToken ct)
     {
         await using var cmd = PostgresApprovalStore.Command(c, tx, "SELECT contract_id FROM qtkd.contract WHERE contract_id=@id FOR UPDATE", ("id", id));
         if (await cmd.ExecuteScalarAsync(ct) is null) throw new ReviewFailure(404, "NOT_FOUND");
     }
-    private static async Task Append(NpgsqlConnection c, NpgsqlTransaction tx, Guid actor, ReviewCoordination value, string action, CancellationToken ct)
+    private async Task Append(NpgsqlConnection c, NpgsqlTransaction tx, Guid actor, ReviewCoordination value, string action, CancellationToken ct)
     {
         await using var cmd = PostgresApprovalStore.Command(c, tx, """
-            INSERT INTO qtkd.audit_log(log_id,entity_type,entity_id,action,actor_id,acted_at,value_after)
-            VALUES(gen_random_uuid(),'ContractCoordination',@id,@action,@actor,clock_timestamp(),@value::jsonb)
-            """, ("id", value.DocumentId), ("action", action), ("actor", actor), ("value", JsonSerializer.Serialize(value)));
+            INSERT INTO qtkd.audit_log(log_id,entity_type,entity_id,action,actor_id,acted_at,value_after,ip_address)
+            VALUES(gen_random_uuid(),'ContractCoordination',@id,@action,@actor,clock_timestamp(),@value::jsonb,@ip)
+            """, ("id", value.DocumentId), ("action", action), ("actor", actor), ("value", JsonSerializer.Serialize(value)),
+            ("ip", http?.HttpContext?.Connection.RemoteIpAddress?.ToString()));
         await cmd.ExecuteNonQueryAsync(ct);
     }
 }
