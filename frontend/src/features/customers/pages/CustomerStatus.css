@@ -231,6 +231,7 @@
 }
 
 .impact-card {
+  flex: 0 0 auto;
   gap: 0;
   padding: 0;
   overflow: hidden;
@@ -246,6 +247,7 @@
 
 .impact-table {
   width: 100%;
+  min-width: 800px;
   border-collapse: collapse;
   font-size: 13px;
 }
@@ -404,7 +406,7 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1200px) {
   .impact-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -412,6 +414,10 @@
   .step-progress__label {
     white-space: normal;
   }
+}
+
+.customer-status-confirm:disabled {
+  opacity: 0.5;
 }
 
 .customer-layout__main {

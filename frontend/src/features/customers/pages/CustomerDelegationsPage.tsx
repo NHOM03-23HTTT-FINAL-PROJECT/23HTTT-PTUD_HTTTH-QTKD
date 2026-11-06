@@ -44,6 +44,7 @@ function DelegationsContent() {
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [granteeId, setGranteeId] = useState('');
+  const [action, setAction] = useState<DelegationAction>('reactivate');
   const [expires, setExpires] = useState('');
   const [reason, setReason] = useState('');
   const [attempted, setAttempted] = useState(false);
@@ -71,7 +72,7 @@ function DelegationsContent() {
     if (inFlight.current) return;
     inFlight.current = true; setSaving(true);
     try {
-      await customerDelegationsApi.grant({ granteeId, action: 'reactivate', expiresAt: expiry?.toISOString() ?? null, reason: reason.trim() || null });
+      await customerDelegationsApi.grant({ granteeId, action, expiresAt: expiry?.toISOString() ?? null, reason: reason.trim() || null });
       setNotice('Đã giao quyền. Quyền chỉ áp dụng cho khách hàng nhân viên đang phụ trách.');
       setGranteeId(''); setExpires(''); setReason(''); setAttempted(false);
       await load();
@@ -90,9 +91,9 @@ function DelegationsContent() {
   }
 
   return <>
-    <nav className="breadcrumb" aria-label="Đường dẫn"><Link to={ROUTES.customers}>Khách hàng</Link><span className="breadcrumb__separator">/</span><span aria-current="page">Ủy quyền kích hoạt lại</span></nav>
-    <div className="page-header"><div className="page-header__title"><h1>Ủy quyền kích hoạt lại khách hàng</h1>
-      <p>Giao quyền kích hoạt lại cho từng nhân viên Kinh doanh trong phòng.</p></div>
+    <nav className="breadcrumb" aria-label="Đường dẫn"><Link to={ROUTES.customers}>Khách hàng</Link><span className="breadcrumb__separator">/</span><span aria-current="page">Ủy quyền trạng thái khách hàng</span></nav>
+    <div className="page-header"><div className="page-header__title"><h1>Ủy quyền trạng thái khách hàng</h1>
+      <p>Giao riêng quyền tạm ngưng hoặc kích hoạt lại cho từng nhân viên Kinh doanh trong phòng.</p></div>
       <div className="page-header__actions"><ButtonLink to={ROUTES.customers} variant="secondary">Về danh sách</ButtonLink></div>
     </div>
     <div className="delegation-page">
@@ -101,11 +102,12 @@ function DelegationsContent() {
       {error && <Alert tone="danger" title="Chưa hoàn tất thao tác">{error}</Alert>}
       {loadError && <Alert tone="danger" title="Không tải được thông tin" action={<Button variant="secondary" onClick={() => void load()}>Thử lại</Button>}>{loadError}</Alert>}
       <form className="customer-card delegation-form" onSubmit={(event) => void grant(event)}>
-        <div className="customer-card__heading"><h2>Giao quyền</h2><p>Quyền kích hoạt lại chỉ áp dụng cho khách do nhân viên đó đang phụ trách.</p></div>
+        <div className="customer-card__heading"><h2>Giao quyền</h2><p>Mỗi quyền chỉ áp dụng cho khách do nhân viên đó đang phụ trách.</p></div>
         <div className="customer-form__grid">
           <SelectField label="Nhân viên" required placeholder="Chọn nhân viên" value={granteeId} onChange={setGranteeId} disabled={loading || saving || Boolean(loadError)}
             options={candidates.map((candidate) => ({ value: candidate.id, label: `${candidate.name} (${candidate.username})` }))} error={attempted && !granteeId ? 'Vui lòng chọn nhân viên.' : undefined} />
-          <InputField label="Thao tác được giao" value="Kích hoạt lại khách hàng" readOnly />
+          <SelectField label="Thao tác được giao" placeholder="Chọn thao tác" value={action} onChange={value => setAction(value as DelegationAction)} disabled={saving}
+            options={Object.entries(actionLabel).map(([value, label]) => ({ value, label }))} />
           <InputField label="Hết hiệu lực lúc" type="datetime-local" value={expires} onChange={(event) => setExpires(event.target.value)} disabled={saving} hint="Không bắt buộc; dùng giờ trên thiết bị của bạn." />
         </div>
         <TextAreaField label="Ghi chú" value={reason} onChange={(event) => setReason(event.target.value)} maxLength={1000} disabled={saving} hint="Không bắt buộc." />

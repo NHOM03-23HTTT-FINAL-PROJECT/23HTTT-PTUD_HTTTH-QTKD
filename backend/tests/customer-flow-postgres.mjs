@@ -18,6 +18,7 @@ const base = apiOrigin + '/api/v1';
 const password = 'Customer.Test@2026';
 const unique = randomUUID().replaceAll('-', '').slice(0, 10);
 const names = Object.fromEntries(['staff', 'other', 'manager', 'accountant', 'outside'].map(x => [x, `cf.${unique}.${x}`]));
+let previousSalesManager;
 
 async function call(path, { token, key, body, method = 'GET' } = {}) {
   const headers = { Origin: 'http://localhost:5173', 'X-QTKD-CSRF': '1' };
@@ -43,6 +44,8 @@ try {
       [names[name], `${names[name]}@example.invalid`, hash, `Thử nghiệm ${name}`, role, dept]);
   }
   const tokens = {};
+  previousSalesManager = (await db.query("SELECT manager_id FROM qtkd.department WHERE code='KD'")).rows[0].manager_id;
+  await db.query("UPDATE qtkd.department SET manager_id=(SELECT user_id FROM qtkd.user_account WHERE username=$1) WHERE code='KD'", [names.manager]);
   for (const name of ['staff', 'other', 'manager', 'accountant']) {
     const login = await call('/auth/login', { method: 'POST', body: { identifier: names[name], password } });
     expect(login, 200); tokens[name] = login.data.accessToken;
@@ -156,15 +159,27 @@ try {
       FROM qtkd.customer c JOIN qtkd.user_account u ON u.username=$2 WHERE c.customer_code=$3 RETURNING contract_code`, [title, owner, created.code]);
     contractCodes.push(contract.rows[0].contract_code);
   }
-  // SYS-CUS-03 backend was explicitly removed; the main UI prototype is unchanged.
-  for (const token of [tokens.staff, tokens.manager]) {
-    expect(await call(`/customers/${created.code}/suspension-review`, { token }), 404);
-    expect(await call(`/customers/${created.code}/suspend`, { token, method: 'POST', key: randomUUID(),
-      body: { baseVersion: 1, reasonGroup: 'KHAC', reason: 'API removed', evidence: [], plan: [] } }), 404);
-  }
+  // Real contract review is connected; missing operations sources are explicit dependencies.
+  expect(await call(`/customers/${created.code}/suspension-review`, { token: tokens.staff }), 403, 'FORBIDDEN');
+  const suspensionReview = await call(`/customers/${created.code}/suspension-review`, { token: tokens.manager });
+  expect(suspensionReview, 200);
+  assert.equal(suspensionReview.data.items.length, 2);
+  assert(suspensionReview.data.missingSources.includes('operations_jobs'));
+  assert(suspensionReview.data.missingSources.includes('unbilled_services'));
+  const currentVersion = (await call(`/customers/${created.code}`, { token: tokens.manager })).data.version;
+  expect(await call(`/customers/${created.code}/suspend`, { token: tokens.manager, method: 'POST', key: randomUUID(),
+    body: { baseVersion: currentVersion, reasonGroup: 'KHAC', reason: 'Kiểm tra nguồn thật', evidence: [], plan: [],
+      coordinationNote: '', reviewToken: suspensionReview.data.reviewToken } }), 503, 'REVIEW_INCOMPLETE');
   const staffId = (await db.query('SELECT user_id FROM qtkd.user_account WHERE username=$1', [names.staff])).rows[0].user_id;
-  expect(await call('/customers/delegations', { method: 'POST', token: tokens.manager,
-    body: { granteeId: staffId, action: 'suspend' } }), 400, 'VALIDATION');
+  const suspendGrant = await call('/customers/delegations', { method: 'POST', token: tokens.manager,
+    body: { granteeId: staffId, action: 'suspend' } });
+  expect(suspendGrant, 200);
+  const staffReview = await call(`/customers/${created.code}/suspension-review`, { token: tokens.staff });
+  expect(staffReview, 200); assert.equal(staffReview.data.items.length, 1);
+  assert(!JSON.stringify(staffReview.data).includes('Hợp đồng ngoài quyền nhân viên'));
+  const statusPermission = await call(`/customers/${created.code}/status-permissions`, { token: tokens.staff });
+  expect(statusPermission, 200); assert.equal(statusPermission.data.canSuspend, true); assert.equal(statusPermission.data.canReactivate, false);
+  expect(await call(`/customers/delegations/${suspendGrant.data.id}/revoke`, { method: 'POST', token: tokens.manager, body: {} }), 200);
   expect(await call(`/customers/${created.code}/records/payments`, { token: tokens.staff }), 403, 'FORBIDDEN');
   expect(await call(`/customers/${created.code}/records/contracts`, { token: tokens.staff }), 503, 'SOURCE_UNAVAILABLE');
   expect(await call(`/customers/${created.code}/records/priceLists`, { token: tokens.staff }), 503, 'SOURCE_UNAVAILABLE');
@@ -240,4 +255,7 @@ try {
   console.log(`Local browser test manager: ${names.manager}`);
   console.log(`Local suspended test customer: ${legacyCode}`);
   console.log(`Local customer with review contracts: ${created.code}`);
-} finally { await db.end(); }
+} finally {
+  if (previousSalesManager !== undefined) await db.query("UPDATE qtkd.department SET manager_id=$1 WHERE code='KD'", [previousSalesManager]);
+  await db.end();
+}

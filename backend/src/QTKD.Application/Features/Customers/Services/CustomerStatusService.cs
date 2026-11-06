@@ -7,7 +7,7 @@ namespace QTKD.Application.Features.Customers;
 
 public sealed partial class CustomerService
 {
-    private sealed record StoredReview(string? ReasonGroup, StatusPlanItem[]? Plan, string? CoordinationNote);
+    private sealed record StoredReview(string? ReasonGroup, SuspensionPlanItem[]? Plan, string? CoordinationNote);
     private static string RequiredReason(string? value)
     {
         var reason = (value ?? "").Trim();
@@ -62,8 +62,9 @@ public sealed partial class CustomerService
         RequireReady(review);
         // Source checks may be slow; an expiring personal grant must be checked again.
         await RequireStatusPermission(actor, row, ct);
-        await repository.SetActive(row.Id, ct);
-        var decision = await repository.AddDecision(row.Id, actor.Id, reason, review.VerifiedBasis,
+        if (!await repository.SessionValid(actorId, sessionId, ct)) throw new CustomerFailure(401, "SESSION_ENDED");
+        await repository.SetStatus(row.Id, "Active", ct);
+        var decision = await repository.AddDecision(row.Id, actor.Id, "reactivate", reason, review.VerifiedBasis, null,
             JsonSerializer.Serialize(new { metadata?.ReasonGroup, checks = review.Checks }, Json), ct);
         var updated = await Find(actor, row.Id, ct);
         await repository.Audit(actor.Id, row.Id, "Customer", "CUSTOMER_REACTIVATED", JsonSerializer.Serialize(new

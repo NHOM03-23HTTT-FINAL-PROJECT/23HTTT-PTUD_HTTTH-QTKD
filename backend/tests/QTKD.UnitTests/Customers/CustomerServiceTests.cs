@@ -42,6 +42,8 @@ public sealed class CustomerServiceTests
     }
     private sealed class MissingSource : ICustomerStatusSource
     {
+        public Task<SuspensionSourceResult> Suspension(Guid customerId, Guid actorId, bool forConfirmation, CancellationToken ct) =>
+            Task.FromResult(new SuspensionSourceResult(false, [], ["job"], ["operations_jobs"], "missing", []));
         public Task<ReactivationSourceResult> Reactivation(Guid customerId, Guid actorId, string? reasonGroup, StatusException? exception, CancellationToken ct) =>
             Task.FromResult(new ReactivationSourceResult(false, false, ["authoritative_confirmation"], [], null));
     }
@@ -80,7 +82,7 @@ public sealed class CustomerServiceTests
         var error = await Assert.ThrowsAsync<CustomerFailure>(() => service.Reactivate(repo.Actor.Id, Guid.NewGuid(), repo.Row.Code,
             "missing-source", new(4, "Tiếp tục hợp tác", [], null), default));
         Assert.Equal((503, "REVIEW_INCOMPLETE"), (error.Status, error.Code));
-        Assert.DoesNotContain(nameof(ICustomerRepository.SetActive), repo.Calls);
+        Assert.DoesNotContain(nameof(ICustomerRepository.SetStatus), repo.Calls);
         Assert.DoesNotContain(nameof(ICustomerRepository.AddDecision), repo.Calls);
         Assert.DoesNotContain(nameof(ICustomerRepository.Audit), repo.Calls);
         Assert.False(repo.Transaction.Committed);

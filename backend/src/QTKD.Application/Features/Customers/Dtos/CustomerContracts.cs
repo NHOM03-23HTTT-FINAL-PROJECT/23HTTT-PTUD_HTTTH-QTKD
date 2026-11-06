@@ -24,11 +24,19 @@ public sealed record UpdateCustomerResult(CustomerView Customer, string[] Change
 
 public sealed record StatusEvidence(string? Name, long Size);
 public sealed record StatusPlanItem(string? Id, string? Option);
+public sealed record SuspensionReasonGroup(string Code, string Label);
+public sealed record SuspensionImpact(string Id, string Kind, string KindNote, string Code, string Title, string Detail,
+    string StatusLabel, string StatusTone, string Department, string[] Options, string PlanNote);
+public sealed record SuspensionPlanItem(string Id, string Kind, string Code, string Department, string PlanNote, string Option);
+public sealed record SuspensionReview(SuspensionImpact[] Items, string[] FailedKinds, string[] MissingSources,
+    string ReviewToken, string[] NotificationDepartments, DateTime? FailedAt = null);
+public sealed record SuspendCustomerRequest(int BaseVersion, string? ReasonGroup, string? Reason, StatusEvidence[]? Evidence,
+    StatusPlanItem[]? Plan, string? CoordinationNote, string? ReviewToken);
 public sealed record StatusException(string? DecisionNo, string? Content);
 public sealed record ReactivateCustomerRequest(int BaseVersion, string? Reason, StatusEvidence[]? Evidence, StatusException? Exception);
 public sealed record ReactivationCheck(string Id, string Label, string Status, string Detail);
 public sealed record SuspensionContext(string ReasonGroup, string Reason, StatusEvidence[] Evidence, string DecidedBy,
-    string DecidedByTitle, DateTime At, StatusPlanItem[] Plan, string CoordinationNote, object[] Notices);
+    string DecidedByTitle, DateTime At, SuspensionPlanItem[] Plan, string CoordinationNote, object[] Notices);
 public sealed record ReactivationContext(SuspensionContext Suspension, ReactivationCheck[] Checks, string? VerifiedBasis,
     bool CanReactivate, string[]? MissingSources = null);
 public sealed record StatusChangeResult(CustomerView Customer, bool Replayed);

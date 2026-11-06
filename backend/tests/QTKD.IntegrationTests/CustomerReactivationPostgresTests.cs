@@ -36,6 +36,22 @@ public sealed class CustomerReactivationPostgresTests
         public string CheckStatus { get; set; } = "met";
         public TaskCompletionSource<bool>? Started { get; set; }
         public TaskCompletionSource<bool>? Continue { get; set; }
+        public bool SuspensionComplete { get; set; }
+        public SuspensionImpact[] SuspensionItems { get; set; } = [];
+        public string Revision { get; set; } = "review-1";
+        public string[] Notifications { get; set; } = ["Kế toán"];
+        public TaskCompletionSource<bool>? SuspensionStarted { get; set; }
+        public TaskCompletionSource<bool>? SuspensionContinue { get; set; }
+        public async Task<SuspensionSourceResult> Suspension(Guid customerId, Guid actorId, bool forConfirmation, CancellationToken ct)
+        {
+            if (forConfirmation)
+            {
+                SuspensionStarted?.TrySetResult(true);
+                if (SuspensionContinue is { } continuation) await continuation.Task.WaitAsync(ct);
+            }
+            return new(SuspensionComplete, SuspensionItems, SuspensionComplete ? [] : ["job"],
+                SuspensionComplete ? [] : ["operations_jobs"], Revision, Notifications);
+        }
 
         public async Task<ReactivationSourceResult> Reactivation(Guid customerId,
             Guid actorId, string? reasonGroup, StatusException? exception, CancellationToken ct)
@@ -47,7 +63,7 @@ public sealed class CustomerReactivationPostgresTests
         }
     }
 
-    private sealed class CustomerFactory(string connection, ControlledSource source) : WebApplicationFactory<Program>
+    private sealed class CustomerFactory(string connection, ControlledSource source, bool productionSource = false) : WebApplicationFactory<Program>
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
@@ -60,6 +76,7 @@ public sealed class CustomerReactivationPostgresTests
             }));
             builder.ConfigureTestServices(services =>
             {
+                if (productionSource) return;
                 services.RemoveAll<ICustomerStatusSource>();
                 services.AddSingleton<ICustomerStatusSource>(source);
             });
@@ -70,9 +87,18 @@ public sealed class CustomerReactivationPostgresTests
         Dictionary<string, string> names, ControlledSource source) : IAsyncDisposable
     {
         public NpgsqlConnection Db => db;
+        private Guid? previousManager;
+        private bool restoreManager;
+        public async Task AssignSalesManager()
+        {
+            await using var read = new NpgsqlCommand("SELECT manager_id FROM qtkd.department WHERE code='KD'", db);
+            var value = await read.ExecuteScalarAsync(); previousManager = value is Guid id ? id : null;
+            await Execute("UPDATE qtkd.department SET manager_id=@id WHERE code='KD'", ("id", users["manager"]));
+            restoreManager = true;
+        }
         public ControlledSource Source => source;
         public Dictionary<string, Guid> Users => users;
-        public static async Task<Fixture> Create()
+        public static async Task<Fixture> Create(bool productionSource = false)
         {
             var port = int.Parse(Environment.GetEnvironmentVariable("QTKD_CUSTOMER_TEST_PORT") ?? "0");
             if (port is < 1024 or > 65535) throw new InvalidOperationException("Explicit loopback test port required.");
@@ -94,7 +120,7 @@ public sealed class CustomerReactivationPostgresTests
                 cmd.Parameters.AddWithValue("role", role); cmd.Parameters.AddWithValue("department", department);
                 users[name] = (Guid)(await cmd.ExecuteScalarAsync())!;
             }
-            var source = new ControlledSource(); return new(db, new(connection, source), users, names, source);
+            var source = new ControlledSource(); return new(db, new(connection, source, productionSource), users, names, source);
         }
 
         public async Task<HttpClient> Client(string name)
@@ -109,7 +135,7 @@ public sealed class CustomerReactivationPostgresTests
             return client;
         }
 
-        // A suspended legacy fixture is data setup, never a call to the removed SYS-CUS-03 implementation.
+        // Legacy suspension history is a fixture, separate from testing the status API.
         public async Task<string> Customer(string owner = "staff", bool suspended = true, bool decision = true)
         {
             await using var cmd = new NpgsqlCommand("""
@@ -139,7 +165,17 @@ public sealed class CustomerReactivationPostgresTests
             await using var cmd = new NpgsqlCommand(sql, db); cmd.Parameters.AddWithValue("id", id);
             return Convert.ToInt64(await cmd.ExecuteScalarAsync());
         }
-        public async ValueTask DisposeAsync() { factory.Dispose(); await db.DisposeAsync(); }
+        public async ValueTask DisposeAsync()
+        {
+            factory.Dispose();
+            if (restoreManager)
+            {
+                await using var restore = new NpgsqlCommand("UPDATE qtkd.department SET manager_id=@id WHERE code='KD'", db);
+                restore.Parameters.Add("id", NpgsqlTypes.NpgsqlDbType.Uuid).Value = (object?)previousManager ?? DBNull.Value;
+                await restore.ExecuteNonQueryAsync();
+            }
+            await db.DisposeAsync();
+        }
     }
 
     private static async Task<HttpResponseMessage> Post(HttpClient client, string path, object body, string? key = null)
@@ -194,18 +230,174 @@ public sealed class CustomerReactivationPostgresTests
     }
 
     [LocalCustomerPostgresFact]
-    public async Task Removed_suspension_endpoints_do_not_mutate_customers()
+    public async Task Suspension_requires_current_permission_reason_version_csrf_and_complete_review()
     {
-        await using var f = await Fixture.Create(); using var manager = await f.Client("manager");
+        await using var f = await Fixture.Create(); using var manager = await f.Client("manager"); using var staff = await f.Client("staff");
         var code = await f.Customer(suspended: false); var path = "/api/v1/customers/" + code;
-        Assert.Equal(HttpStatusCode.NotFound, (await manager.GetAsync(path + "/suspension-review")).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await Post(manager, path + "/suspend", new { baseVersion = 1, reason = "Removed" }, Guid.NewGuid().ToString())).StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest, (await manager.PostAsJsonAsync("/api/v1/customers/delegations", new { granteeId = f.Users["staff"], action = "suspend" })).StatusCode);
-        var permissions = await manager.GetFromJsonAsync<JsonElement>(path + "/status-permissions");
-        Assert.False(permissions.GetProperty("canSuspend").GetBoolean());
+        Assert.Equal(HttpStatusCode.Forbidden, (await staff.GetAsync(path + "/suspension-review")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await Post(staff, path + "/suspend", Suspend("any"), Guid.NewGuid().ToString())).StatusCode);
+        manager.DefaultRequestHeaders.Remove("X-QTKD-CSRF");
+        Assert.Equal("CSRF_REJECTED", await Error(await Post(manager, path + "/suspend", Suspend("any"), Guid.NewGuid().ToString())));
+        manager.DefaultRequestHeaders.Add("X-QTKD-CSRF", "1");
+        Assert.Equal("IDEMPOTENCY_KEY_REQUIRED", await Error(await Post(manager, path + "/suspend", Suspend("any"))));
+        Assert.Equal("VALIDATION", await Error(await Post(manager, path + "/suspend", Suspend("any", reason: " "), Guid.NewGuid().ToString())));
+        Assert.Equal("VALIDATION", await Error(await Post(manager, path + "/suspend", Suspend("any") with { ReasonGroup = "FAKE" }, Guid.NewGuid().ToString())));
+        Assert.Equal("EVIDENCE_UNAVAILABLE", await Error(await Post(manager, path + "/suspend",
+            Suspend("any") with { Evidence = [new("untrusted.pdf", 100)] }, Guid.NewGuid().ToString())));
+        Assert.Equal("IMMUTABLE_FIELD", await Error(await Post(manager, path + "/suspend", new { actorId = f.Users["manager"] }, Guid.NewGuid().ToString())));
+        Assert.Equal("VALIDATION", await Error(await Post(manager, path + "/suspend", Suspend("any") with { Plan = [null!] }, Guid.NewGuid().ToString())));
+        Assert.Equal("CONFLICT", await Error(await Post(manager, path + "/suspend", Suspend("any", version: 9), Guid.NewGuid().ToString())));
+        var review = await manager.GetFromJsonAsync<JsonElement>(path + "/suspension-review");
+        Assert.Contains(review.GetProperty("failedKinds").EnumerateArray(), x => x.GetString() == "job");
+        Assert.Equal("REVIEW_INCOMPLETE", await Error(await Post(manager, path + "/suspend",
+            Suspend(review.GetProperty("reviewToken").GetString()!), Guid.NewGuid().ToString())));
         var view = await manager.GetFromJsonAsync<JsonElement>(path);
         Assert.Equal("active", view.GetProperty("status").GetString()); Assert.Equal(1, view.GetProperty("version").GetInt32());
         Assert.Empty(view.GetProperty("statusDecisions").EnumerateArray());
+    }
+
+    private static SuspendCustomerRequest Suspend(string token, int version = 1, string reason = "Tạm ngưng hợp tác", StatusPlanItem[]? plan = null, string? note = null) =>
+        new(version, "KHAC", reason, [], plan ?? [], note, token);
+    private static async Task<string> ReviewToken(HttpClient client, string path) =>
+        (await client.GetFromJsonAsync<JsonElement>(path + "/suspension-review")).GetProperty("reviewToken").GetString()!;
+
+    [LocalCustomerPostgresFact]
+    public async Task Suspension_is_atomic_idempotent_concurrent_and_enqueues_only_configured_notifications()
+    {
+        await using var f = await Fixture.Create(); using var manager = await f.Client("manager");
+        f.Source.SuspensionComplete = true;
+        var code = await f.Customer(suspended: false); var path = "/api/v1/customers/" + code;
+        var request = Suspend(await ReviewToken(manager, path));
+        await f.Execute("ALTER TABLE qtkd.customer_status_outbox ADD CONSTRAINT customer_test_reject CHECK (payload->>'reason' <> 'simulate suspend failure')");
+        try
+        {
+            Assert.Equal(HttpStatusCode.Conflict, (await Post(manager, path + "/suspend", request with { Reason = "simulate suspend failure" }, Guid.NewGuid().ToString())).StatusCode);
+            var unchanged = await manager.GetFromJsonAsync<JsonElement>(path);
+            Assert.Equal("active", unchanged.GetProperty("status").GetString()); Assert.Equal(1, unchanged.GetProperty("version").GetInt32());
+            Assert.Empty(unchanged.GetProperty("statusDecisions").EnumerateArray());
+            Assert.Equal(0, await f.Count("SELECT count(*) FROM qtkd.audit_log WHERE actor_id=@id AND action='CUSTOMER_SUSPENDED'", f.Users["manager"]));
+            Assert.Equal(0, await f.Count("SELECT count(*) FROM qtkd.customer_operation WHERE actor_id=@id AND operation='suspend'", f.Users["manager"]));
+        }
+        finally { await f.Execute("ALTER TABLE qtkd.customer_status_outbox DROP CONSTRAINT customer_test_reject"); }
+        var keys = new[] { Guid.NewGuid().ToString(), Guid.NewGuid().ToString() };
+        var responses = await Task.WhenAll(keys.Select(key => Post(manager, path + "/suspend", request, key)));
+        Assert.Equal(new[] { HttpStatusCode.OK, HttpStatusCode.Conflict }, responses.Select(r => r.StatusCode).Order().ToArray());
+        var winner = Array.FindIndex(responses, r => r.StatusCode == HttpStatusCode.OK);
+        var result = await responses[winner].Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("suspended", result.GetProperty("customer").GetProperty("status").GetString());
+        Assert.Equal(2, result.GetProperty("customer").GetProperty("version").GetInt32());
+        Assert.True((await (await Post(manager, path + "/suspend", request, keys[winner])).Content.ReadFromJsonAsync<JsonElement>()).GetProperty("replayed").GetBoolean());
+        Assert.Equal("IDEMPOTENCY_KEY_REUSED", await Error(await Post(manager, path + "/suspend", request with { Reason = "Other" }, keys[winner])));
+        Assert.Equal("ALREADY_IN_STATUS", await Error(await Post(manager, path + "/suspend", request, Guid.NewGuid().ToString())));
+        Assert.Single(result.GetProperty("customer").GetProperty("statusDecisions").EnumerateArray());
+        Assert.Equal(1, await f.Count("SELECT count(*) FROM qtkd.customer_status_outbox o JOIN qtkd.customer_status_decision d USING(decision_id) WHERE d.confirmed_by=@id", f.Users["manager"]));
+        Assert.Equal(1, await f.Count("SELECT count(*) FROM qtkd.audit_log WHERE actor_id=@id AND action='CUSTOMER_SUSPENDED'", f.Users["manager"]));
+        Assert.Equal(1, await f.Count("SELECT count(*) FROM qtkd.customer_operation WHERE actor_id=@id AND operation='suspend'", f.Users["manager"]));
+        // No notification configuration is a valid completion, with no extra outbox row.
+        f.Source.Notifications = [];
+        var noNoticePath = "/api/v1/customers/" + await f.Customer(suspended: false);
+        Assert.Equal(HttpStatusCode.OK, (await Post(manager, noNoticePath + "/suspend", Suspend(await ReviewToken(manager, noNoticePath)), Guid.NewGuid().ToString())).StatusCode);
+        Assert.Equal(1, await f.Count("SELECT count(*) FROM qtkd.customer_status_outbox o JOIN qtkd.customer_status_decision d USING(decision_id) WHERE d.confirmed_by=@id", f.Users["manager"]));
+    }
+
+    [LocalCustomerPostgresFact]
+    public async Task Suspension_rechecks_impact_snapshot_and_requires_each_plan_and_coordination_basis()
+    {
+        await using var f = await Fixture.Create(); using var manager = await f.Client("manager");
+        f.Source.SuspensionComplete = true;
+        f.Source.SuspensionItems = [new("contract:fixture", "contract", "Còn hiệu lực", "HD-TEST", "Hợp đồng thử", "Không hủy",
+            "Active", "info", "Pháp chế", ["Giữ nguyên"], "Hợp đồng giữ Active")];
+        var path = "/api/v1/customers/" + await f.Customer(suspended: false);
+        var token = await ReviewToken(manager, path);
+        f.Source.Revision = "changed-after-review";
+        Assert.Equal("REVIEW_CHANGED", await Error(await Post(manager, path + "/suspend", Suspend(token), Guid.NewGuid().ToString())));
+        token = await ReviewToken(manager, path);
+        foreach (var plan in new[] { Array.Empty<StatusPlanItem>(), new[] { new StatusPlanItem("fake", "Giữ nguyên") },
+            new[] { new StatusPlanItem("contract:fixture", "Tự hủy") }, new[] { new StatusPlanItem("contract:fixture", "Giữ nguyên"), new StatusPlanItem("contract:fixture", "Giữ nguyên") } })
+            Assert.Equal("PLAN_INCOMPLETE", await Error(await Post(manager, path + "/suspend", Suspend(token, plan: plan, note: "Căn cứ thử"), Guid.NewGuid().ToString())));
+        var request = Suspend(token, plan: [new("contract:fixture", "Giữ nguyên")]);
+        Assert.Equal("PLAN_INCOMPLETE", await Error(await Post(manager, path + "/suspend", request, Guid.NewGuid().ToString())));
+        Assert.Equal(HttpStatusCode.OK, (await Post(manager, path + "/suspend", request with { CoordinationNote = "Pháp chế thống nhất theo văn bản thử" }, Guid.NewGuid().ToString())).StatusCode);
+        var context = await manager.GetFromJsonAsync<JsonElement>(path + "/reactivation-context");
+        var saved = Assert.Single(context.GetProperty("suspension").GetProperty("plan").EnumerateArray());
+        Assert.Equal("contract", saved.GetProperty("kind").GetString()); Assert.Equal("Giữ nguyên", saved.GetProperty("option").GetString());
+    }
+
+    [LocalCustomerPostgresFact]
+    public async Task Suspension_delegation_is_action_specific_owner_scoped_and_rechecked_after_slow_review()
+    {
+        await using var f = await Fixture.Create(); using var manager = await f.Client("manager"); using var staff = await f.Client("staff");
+        f.Source.SuspensionComplete = true;
+        var path = "/api/v1/customers/" + await f.Customer(suspended: false);
+        var peerPath = "/api/v1/customers/" + await f.Customer("other", suspended: false);
+        var body = new { granteeId = f.Users["staff"], action = "suspend", expiresAt = DateTimeOffset.UtcNow.AddHours(1) };
+        var grantResponse = await manager.PostAsJsonAsync("/api/v1/customers/delegations", body);
+        Assert.Equal(HttpStatusCode.OK, grantResponse.StatusCode);
+        var grant = await grantResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var id = grant.GetProperty("id").GetGuid(); Assert.Equal("suspend", grant.GetProperty("action").GetString());
+        Assert.Equal("DELEGATION_EXISTS", await Error(await manager.PostAsJsonAsync("/api/v1/customers/delegations", body)));
+        var permissions = await staff.GetFromJsonAsync<JsonElement>(path + "/status-permissions");
+        Assert.True(permissions.GetProperty("canSuspend").GetBoolean()); Assert.False(permissions.GetProperty("canReactivate").GetBoolean());
+        Assert.Equal(HttpStatusCode.Forbidden, (await staff.GetAsync(peerPath + "/suspension-review")).StatusCode);
+        var request = Suspend(await ReviewToken(staff, path));
+        f.Source.SuspensionStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        f.Source.SuspensionContinue = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        var pending = Post(staff, path + "/suspend", request, Guid.NewGuid().ToString());
+        await f.Source.SuspensionStarted.Task.WaitAsync(TimeSpan.FromSeconds(15));
+        await f.Execute("UPDATE qtkd.customer_status_delegation SET granted_at=clock_timestamp()-interval '2 minutes',expires_at=clock_timestamp()-interval '1 minute' WHERE delegation_id=@id", ("id", id));
+        f.Source.SuspensionContinue.SetResult(true);
+        Assert.Equal(HttpStatusCode.Forbidden, (await pending).StatusCode);
+        var unchanged = await manager.GetFromJsonAsync<JsonElement>(path); Assert.Equal("active", unchanged.GetProperty("status").GetString());
+        Assert.Equal(HttpStatusCode.OK, (await manager.PostAsJsonAsync("/api/v1/customers/delegations/" + id + "/revoke", new { })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await manager.PostAsJsonAsync("/api/v1/customers/delegations", new { granteeId = f.Users["staff"], action = "suspend" })).StatusCode);
+        var key = Guid.NewGuid().ToString();
+        Assert.Equal(HttpStatusCode.OK, (await Post(staff, path + "/suspend", request, key)).StatusCode);
+        var list = await manager.GetFromJsonAsync<JsonElement>("/api/v1/customers/delegations");
+        var currentId = list.EnumerateArray().Single(d => d.GetProperty("state").GetString() == "active").GetProperty("id").GetGuid();
+        await manager.PostAsJsonAsync("/api/v1/customers/delegations/" + currentId + "/revoke", new { });
+        Assert.Equal(HttpStatusCode.Forbidden, (await Post(staff, path + "/suspend", request, key)).StatusCode);
+    }
+
+    [LocalCustomerPostgresFact]
+    public async Task Production_suspension_source_reads_real_contracts_and_rounds_without_leaking_restricted_records()
+    {
+        await using var f = await Fixture.Create(productionSource: true); using var manager = await f.Client("manager"); using var staff = await f.Client("staff");
+        var code = await f.Customer(suspended: false); var path = "/api/v1/customers/" + code;
+        await f.Execute("""
+            INSERT INTO qtkd.contract(customer_id,title,contract_type,start_date,end_date,contract_value,payment_terms,content,status,owner_id,owning_department_id)
+            SELECT c.customer_id,'Visible review fixture','Logistics','2026-01-01','2027-01-01',1000,'30 ngày','Review','Approved',u.user_id,u.department_id
+            FROM qtkd.customer c JOIN qtkd.user_account u ON u.user_id=@owner WHERE c.customer_code=@code
+            """, ("code", code), ("owner", f.Users["staff"]));
+        await f.Execute("""
+            INSERT INTO qtkd.contract(customer_id,title,contract_type,start_date,end_date,contract_value,payment_terms,content,status,owner_id,owning_department_id)
+            SELECT c.customer_id,'Hidden peer contract','Logistics','2026-01-01','2027-01-01',1000,'30 ngày','Review','Approved',u.user_id,u.department_id
+            FROM qtkd.customer c JOIN qtkd.user_account u ON u.user_id=@owner WHERE c.customer_code=@code
+            """, ("code", code), ("owner", f.Users["other"]));
+        await f.Execute("""
+            INSERT INTO qtkd.approval_round(record_type,contract_id,record_version,round_no,submitted_by,result,record_snapshot)
+            SELECT 'Contract',k.contract_id,k.version,1,k.owner_id,'Running','{}'::jsonb FROM qtkd.contract k
+            JOIN qtkd.customer c USING(customer_id) WHERE c.customer_code=@code AND k.owner_id=@owner
+            """, ("code", code), ("owner", f.Users["staff"]));
+        var unassignedManager = await manager.GetFromJsonAsync<JsonElement>(path + "/suspension-review");
+        Assert.Empty(unassignedManager.GetProperty("items").EnumerateArray());
+        Assert.Contains(unassignedManager.GetProperty("missingSources").EnumerateArray(), x => x.GetString() == "restricted_contracts");
+        await f.AssignSalesManager();
+        var review = await manager.GetFromJsonAsync<JsonElement>(path + "/suspension-review");
+        Assert.Equal(3, review.GetProperty("items").GetArrayLength());
+        Assert.Contains(review.GetProperty("missingSources").EnumerateArray(), x => x.GetString() == "operations_jobs");
+        Assert.Contains(review.GetProperty("missingSources").EnumerateArray(), x => x.GetString() == "unbilled_services");
+        Assert.Empty(review.GetProperty("notificationDepartments").EnumerateArray());
+        var oldToken = review.GetProperty("reviewToken").GetString();
+        await f.Execute("UPDATE qtkd.contract SET status='Active' WHERE owner_id=@id AND title='Visible review fixture'", ("id", f.Users["staff"]));
+        Assert.NotEqual(oldToken, await ReviewToken(manager, path));
+        Assert.Equal(HttpStatusCode.OK, (await manager.PostAsJsonAsync("/api/v1/customers/delegations", new { granteeId = f.Users["staff"], action = "suspend" })).StatusCode);
+        var limitedResponse = await staff.GetAsync(path + "/suspension-review"); var limitedText = await limitedResponse.Content.ReadAsStringAsync();
+        Assert.Equal(HttpStatusCode.OK, limitedResponse.StatusCode); Assert.DoesNotContain("Hidden peer contract", limitedText);
+        var limited = JsonSerializer.Deserialize<JsonElement>(limitedText);
+        Assert.Equal(2, limited.GetProperty("items").GetArrayLength());
+        Assert.Contains(limited.GetProperty("missingSources").EnumerateArray(), x => x.GetString() == "restricted_contracts");
+        Assert.Equal("REVIEW_INCOMPLETE", await Error(await Post(manager, path + "/suspend", Suspend(await ReviewToken(manager, path)), Guid.NewGuid().ToString())));
+        var view = await manager.GetFromJsonAsync<JsonElement>(path); Assert.Equal("active", view.GetProperty("status").GetString());
     }
 
     [LocalCustomerPostgresFact]

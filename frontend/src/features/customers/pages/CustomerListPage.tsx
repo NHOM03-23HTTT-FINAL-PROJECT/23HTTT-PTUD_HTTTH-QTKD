@@ -179,7 +179,7 @@ export function CustomerListPage() {
         {(can('customers.create') || (!IS_MOCK_AUTH && user?.roles.includes('TP_KD') && can('customers.change-status'))) && (
           <div className="page-header__actions">
             {!IS_MOCK_AUTH && user?.roles.includes('TP_KD') && can('customers.change-status') &&
-              <ButtonLink to={ROUTES.customerDelegations} variant="secondary">Ủy quyền kích hoạt lại</ButtonLink>}
+              <ButtonLink to={ROUTES.customerDelegations} variant="secondary">Ủy quyền trạng thái</ButtonLink>}
             {can('customers.create') && <ButtonLink to={ROUTES.customerCreate}>+ Tạo khách hàng</ButtonLink>}
           </div>
         )}

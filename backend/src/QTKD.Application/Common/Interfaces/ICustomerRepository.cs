@@ -26,15 +26,16 @@ public interface ICustomerRepository
     Task<CustomerDecision[]> Decisions(Guid customer, CancellationToken ct);
     Task<CustomerInsert> Insert(CustomerActor actor, CustomerValues values, CancellationToken ct);
     Task Update(Guid customer, CustomerValues values, CancellationToken ct);
-    Task SetActive(Guid customer, CancellationToken ct);
-    Task<Guid> AddDecision(Guid customer, Guid actor, string reason, string? basis, string metadata, CancellationToken ct);
+    Task SetStatus(Guid customer, string status, CancellationToken ct);
+    Task<Guid> AddDecision(Guid customer, Guid actor, string action, string reason, string? basis, string? plan, string metadata, CancellationToken ct);
+    Task<CustomerSuspensionSnapshot> SuspensionSnapshot(Guid customer, Guid actor, bool forConfirmation, CancellationToken ct);
     Task AddOutbox(Guid decision, string payload, CancellationToken ct);
     Task Audit(Guid actor, Guid entity, string entityType, string action, string value, string? note, CancellationToken ct);
-    Task<bool> HasDelegation(Guid actor, Guid department, CancellationToken ct);
+    Task<bool> HasDelegation(Guid actor, Guid department, string action, CancellationToken ct);
     Task<CustomerDelegatePerson[]> Candidates(Guid department, CancellationToken ct);
     Task<bool> EligibleRecipient(Guid id, CustomerActor grantor, CancellationToken ct);
     Task<CustomerDelegation[]> Delegations(Guid department, CancellationToken ct);
     Task<CustomerDelegation?> Delegation(Guid department, Guid id, CancellationToken ct);
-    Task<Guid> Grant(CustomerActor actor, Guid grantee, DateTime? expires, string? reason, CancellationToken ct);
+    Task<Guid> Grant(CustomerActor actor, Guid grantee, string action, DateTime? expires, string? reason, CancellationToken ct);
     Task Revoke(Guid department, Guid id, Guid actor, CancellationToken ct);
 }

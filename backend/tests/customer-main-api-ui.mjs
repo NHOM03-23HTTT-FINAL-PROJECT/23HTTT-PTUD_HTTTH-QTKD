@@ -19,6 +19,7 @@ const browser = await chromium.launch({ headless: true, executablePath });
 const prefix = 'ui.' + randomUUID().slice(0, 8);
 const password = 'Customer.Test@2026';
 const results = []; const actors = {}; const contexts = []; const errors = [];
+let previousSalesManager;
 const tax = () => '7' + String(Math.floor(Math.random() * 1e9)).padStart(9, '0');
 await mkdir(output, { recursive: true });
 async function check(name, page, body) {
@@ -77,6 +78,8 @@ try {
       [username,username+'@example.invalid',hash,role,department]);
     actors[name] = { id: r.rows[0].user_id };
   }
+  previousSalesManager = (await db.query("SELECT manager_id FROM qtkd.department WHERE code='KD'")).rows[0].manager_id;
+  await db.query("UPDATE qtkd.department SET manager_id=$1 WHERE code='KD'", [actors.manager.id]);
   const staff = await login('staff'); const lead = await login('manager');
   const page = staff.page; const manager = lead.page;
   const peer = await seedCustomer(actors.other.id);
@@ -276,9 +279,9 @@ try {
   });
   await check('reactivation is connected, delegated by person, and blocked for missing real confirmation', page, async () => {
     await manager.goto(base + '/khach-hang');
-    await manager.getByRole('link', { name: 'Ủy quyền kích hoạt lại', exact: true }).click();
+    await manager.getByRole('link', { name: 'Ủy quyền trạng thái', exact: true }).click();
     await manager.getByLabel('Nhân viên', { exact: false }).selectOption(staff.id);
-    assert.equal(await manager.getByLabel('Thao tác được giao').inputValue(), 'Kích hoạt lại khách hàng');
+    assert.equal(await manager.getByLabel('Thao tác được giao').inputValue(), 'reactivate');
     await manager.getByLabel('Hết hiệu lực lúc').fill('2020-01-01T00:00');
     await manager.getByRole('button', { name: 'Giao quyền', exact: true }).click();
     await manager.getByText('Thời điểm hết hạn phải ở trong tương lai.', { exact: true }).waitFor();
@@ -306,14 +309,67 @@ try {
     page.on('request', observe);
     await page.goto(base + '/khach-hang/uy-quyen');
     await page.waitForURL(u => u.pathname === '/');
-    assert.equal(await page.getByRole('heading', { name: 'Ủy quyền kích hoạt lại khách hàng', exact: true }).count(), 0);
+    assert.equal(await page.getByRole('heading', { name: 'Ủy quyền trạng thái khách hàng', exact: true }).count(), 0);
     assert.equal(requests, 0); page.off('request', observe);
   });
-  await check('removed suspension stays unavailable and never calls a removed write endpoint', manager, async () => {
+  await check('personal suspend grant opens only the assigned customer route and revocation closes it', page, async () => {
+    await manager.goto(base + '/khach-hang/uy-quyen');
+    await manager.getByLabel('Nhân viên', { exact: false }).selectOption(staff.id);
+    await manager.getByLabel('Thao tác được giao').selectOption('suspend');
+    const granting = manager.waitForResponse(r => new URL(r.url()).pathname === '/api/v1/customers/delegations' && r.request().method() === 'POST');
+    await manager.getByRole('button', { name: 'Giao quyền', exact: true }).click();
+    const granted = await granting; assert.equal(granted.status(), 200); const grant = await granted.json();
+    await page.goto(base + '/khach-hang/' + code);
+    await page.getByRole('button', { name: 'Thao tác khác', exact: true }).click();
+    await page.getByRole('menuitem').filter({ hasText: 'Tạm ngưng khách hàng' }).click();
+    await page.getByRole('button', { name: 'Tiếp tục rà soát', exact: true }).waitFor();
+    await page.goto(base + '/khach-hang/' + peer + '/tam-ngung');
+    await page.getByText('Bạn không có quyền tạm ngưng khách hàng này', { exact: true }).waitFor();
+    const grantItem = manager.locator('.delegation-item').filter({ hasText: prefix + '.staff' }).filter({ hasText: 'Tạm ngưng khách hàng' });
+    await grantItem.getByRole('button', { name: 'Thu hồi', exact: true }).click();
+    const revoking = manager.waitForResponse(r => new URL(r.url()).pathname.endsWith('/delegations/' + grant.id + '/revoke'));
+    await manager.getByRole('alertdialog').getByRole('button', { name: 'Thu hồi quyền', exact: true }).click();
+    assert.equal((await revoking).status(), 200);
+    await page.goto(base + '/khach-hang/' + code + '/tam-ngung');
+    await page.getByText('Bạn không có quyền tạm ngưng khách hàng này', { exact: true }).waitFor();
+    assert.equal((await row(code)).status, 'Active');
+  });
+  await check('suspension opens its real review, displays known contracts and blocks missing dependencies without writing', manager, async () => {
+    await db.query(`INSERT INTO qtkd.contract(customer_id,title,contract_type,start_date,end_date,contract_value,payment_terms,content,status,owner_id,owning_department_id)
+      SELECT c.customer_id,'Hợp đồng rà soát UI','Logistics','2026-01-01','2027-01-01',1000,'30 ngày','UI review','Approved',u.user_id,u.department_id
+      FROM qtkd.customer c JOIN qtkd.user_account u ON u.user_id=$2 WHERE c.customer_code=$1`, [code, staff.id]);
     let calls = 0;
     manager.on('request', r => { if (new URL(r.url()).pathname.endsWith('/suspend')) calls++; });
     await manager.goto(base + '/khach-hang/' + code + '/tam-ngung');
-    await manager.getByText('Chức năng tạm ngưng chưa sẵn sàng', { exact: true }).waitFor();
+    await manager.getByRole('button', { name: 'Tiếp tục rà soát', exact: true }).click();
+    await manager.getByText('Chưa thể tiếp tục', { exact: true }).waitFor();
+    await manager.getByLabel('Nhóm lý do', { exact: false }).selectOption('KHAC');
+    await manager.getByLabel('Nội dung cụ thể', { exact: false }).fill('Rà soát tạm ngưng qua UI');
+    const reviewing = manager.waitForResponse(r => new URL(r.url()).pathname.endsWith('/suspension-review'));
+    await manager.getByRole('button', { name: 'Tiếp tục rà soát', exact: true }).click();
+    assert.equal((await reviewing).status(), 200);
+    await manager.getByText('Chưa tải đủ dữ liệu rà soát', { exact: true }).waitFor();
+    await manager.getByText(/Hợp đồng rà soát UI/).waitFor();
+    const assertReviewLayout = async () => {
+      const bounds = await manager.locator('.impact-card').boundingBox();
+      assert(bounds && bounds.height > 200, 'Review card must not collapse despite having DOM rows');
+      const tableVisible = await manager.locator('.impact-card').evaluate(card => {
+        const heading = card.querySelector('h2').getBoundingClientRect();
+        const bounds = card.getBoundingClientRect();
+        return heading.top >= bounds.top && heading.bottom <= bounds.bottom;
+      });
+      assert(tableVisible, 'Review heading must be within the visible card');
+    };
+    await assertReviewLayout();
+    await manager.setViewportSize({ width: 910, height: 1000 });
+    await assertReviewLayout();
+    assert.equal(await manager.locator('.impact-stats').evaluate(node => getComputedStyle(node).gridTemplateColumns.split(' ').length), 2);
+    await manager.screenshot({ path: join(output, 'suspension-narrow-review.png'), fullPage: true });
+    await manager.setViewportSize({ width: 1440, height: 1000 });
+    assert(await manager.getByRole('button', { name: 'Xác nhận tạm ngưng', exact: true }).isDisabled());
+    await manager.getByRole('button', { name: 'Tải lại kết quả rà soát', exact: true }).click();
+    await manager.getByText('Chưa tải đủ dữ liệu rà soát', { exact: true }).waitFor();
+    await manager.screenshot({ path: join(output, 'suspension-real-review.png'), fullPage: true });
     assert.equal(calls, 0); assert.equal((await row(code)).status, 'Active');
   });
   await check('new Active customer is selectable for a real contract; Suspended is excluded', page, async () => {
@@ -333,6 +389,8 @@ try {
   console.log('PASS: ' + results.length + ' customer browser checks with real API and isolated PostgreSQL');
 } finally {
   for (const context of contexts) await context.close();
-  await browser.close(); await db.end();
+  await browser.close();
+  if (previousSalesManager !== undefined) await db.query("UPDATE qtkd.department SET manager_id=$1 WHERE code='KD'", [previousSalesManager]);
+  await db.end();
   await writeFile(join(output, 'api-ui-report.json'), JSON.stringify({ source: 'local PostgreSQL via API; no controlled source provider', applicationErrors: errors, results }, null, 2));
 }

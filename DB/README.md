@@ -76,7 +76,8 @@ Model/configuration, Designer và snapshot đã được cập nhật; CHECK/tri
 Không dùng ba migration Prisma khách hàng cũ. Số bảng ứng dụng là 36; sau migrate đầy đủ là 11 applied, 0 pending.
 
 Migration không gán metadata tạo giả cho khách cũ; bảng vận hành mới không cần fixture giả.
-Lịch sử Suspend vẫn được giữ để đọc/kích hoạt lại dù backend SYS-CUS-03 đã gỡ.
+Lịch sử Suspend được giữ để đọc/kích hoạt lại. SYS-CUS-03 được bổ sung lại ngày 06/11/2026,
+dùng các bảng/cột/enum hiện có; lần bổ sung này không tạo migration hoặc sửa schema Supabase.
 Down của migration mới từ chối xóa lịch sử; thay đổi tiếp bằng migration tiến.
 Kết quả DB trống, nâng cấp từ main có dữ liệu, adopt, RLS và test nghiệp vụ ở
 [báo cáo khách hàng](../docs/testing/test-cases/customers-main-ef.md).

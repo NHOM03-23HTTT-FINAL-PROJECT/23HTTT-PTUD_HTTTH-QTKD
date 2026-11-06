@@ -1,6 +1,10 @@
 # Kiểm thử UI khách hàng qua API
 
-## Cập nhật cuối 06/11/2026: ghép main và Repository EF Core
+## Hiện tại: đã bổ sung lại SYS-CUS-03
+
+Theo yêu cầu mới sau PR #33, backend tạm ngưng đã được bổ sung lại cùng API/UI và quyền cá nhân. Bản local hiện có **55 mục customer tự động PASS**: 21 unit, 12 integration, 2 adapter frontend, 20 kịch bản browser. Chi tiết, lỗi bảng rà soát đã sửa và phần nguồn thật còn thiếu ở [báo cáo tạm ngưng](customer-suspension.md). Những ghi nhận backend SYS-CUS-03 đã gỡ bên dưới là lịch sử kiểm thử tại `42445dd`, được thay thế bởi cập nhật này.
+
+## Lịch sử kiểm thử 06/11/2026 tại 42445dd: ghép main và Repository EF Core
 
 Main được ghép tại `65d3092` (gồm bản refactor hợp đồng mới), nhánh `cus-flow`, chưa push. Xung đột Program/CORS/DI được giải quyết bằng cách giữ đăng ký Customer và Area; giữ repository hợp đồng của main. Chỉ đưa lại các kiểm tra tham chiếu khách hàng hợp lệ vào ranh giới chọn khách khi tạo/sửa hợp đồng, không khôi phục store Npgsql cũ của hợp đồng.
 

@@ -29,17 +29,21 @@ function statusError(error: unknown): never {
     if (error.status === 403) throw new StatusChangeError('FORBIDDEN');
     if (error.status === 404) throw new StatusChangeError('NOT_FOUND');
     if (error.code === 'REVIEW_INCOMPLETE') throw new StatusChangeError('REVIEW_INCOMPLETE');
+    if (error.code === 'REVIEW_CHANGED') throw new StatusChangeError('REVIEW_CHANGED');
+    if (error.code === 'PLAN_INCOMPLETE') throw new StatusChangeError('PLAN_INCOMPLETE');
     if (error.code === 'ALREADY_IN_STATUS') throw new StatusChangeError('ALREADY_IN_STATUS');
     if (error.code === 'CONDITIONS_NOT_MET') throw new StatusChangeError('CONDITIONS_NOT_MET');
     if (error.status === 409) throw new StatusChangeError('CONFLICT');
+    if (error.status === 400) throw new StatusChangeError('VALIDATION');
+    if (error.status >= 500) throw new StatusChangeError('SAVE_FAILED');
     throw new StatusChangeError('LOAD_FAILED');
   }
   throw error;
 }
 
 /*
- * Reactivation uses the server's current permissions and verified context in API mode.
- * Suspension is unavailable in API mode; the explicit prototype mode keeps its sample flow.
+ * API mode uses server permissions and review data for both status actions.
+ * Browser actor IDs are stripped; a failed API call never falls back to sample data.
  */
 export const customerStatusApi = {
   getSuspensionReasonGroups() {
@@ -58,7 +62,7 @@ export const customerStatusApi = {
   /** UC-CUS-03 bước 2: rà soát hồ sơ, công việc bị ảnh hưởng. */
   async getSuspensionReview(code: string, retry = false): Promise<SuspensionReview> {
     if (!IS_MOCK_AUTH) {
-      throw new StatusChangeError('NOT_IMPLEMENTED');
+      try { return await apiRequest(`/customers/${encodeURIComponent(code)}/suspension-review`); } catch (error) { statusError(error); }
     }
     await delay(MOCK_LOAD_MS);
     return mockGetSuspensionReview(code, retry);
@@ -66,7 +70,8 @@ export const customerStatusApi = {
 
   async suspend(request: SuspendCustomerRequest): Promise<StatusChangeResult> {
     if (!IS_MOCK_AUTH) {
-      throw new StatusChangeError('NOT_IMPLEMENTED');
+      const { userId: _userId, signedInAt: _signedInAt, idempotencyKey, code, ...body } = request;
+      try { return await apiRequest(`/customers/${encodeURIComponent(code)}/suspend`, { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body: JSON.stringify(body) }); } catch (error) { statusError(error); }
     }
     await delay(MOCK_LATENCY_MS);
     return mockSuspendCustomer(request);

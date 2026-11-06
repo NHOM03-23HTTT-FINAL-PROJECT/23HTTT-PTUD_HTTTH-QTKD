@@ -10,7 +10,7 @@ export type CustomerDelegation = {
 export const customerDelegationsApi = {
   candidates: () => apiRequest<DelegationCandidate[]>('/customers/delegations/candidates'),
   list: () => apiRequest<CustomerDelegation[]>('/customers/delegations'),
-  grant: (body: { granteeId: string; action: 'reactivate'; expiresAt: string | null; reason: string | null }) =>
+  grant: (body: { granteeId: string; action: DelegationAction; expiresAt: string | null; reason: string | null }) =>
     apiRequest<CustomerDelegation>('/customers/delegations', { method: 'POST', body: JSON.stringify(body) }),
   revoke: (id: string) => apiRequest<CustomerDelegation>(`/customers/delegations/${encodeURIComponent(id)}/revoke`,
     { method: 'POST', body: '{}' }),

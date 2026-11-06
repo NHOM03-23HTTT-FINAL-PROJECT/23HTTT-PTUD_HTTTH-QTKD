@@ -79,6 +79,18 @@ public sealed class CustomersController(CustomerService service, ICurrentActor c
     public async Task<StatusChangeResult> Reactivate(string code, ReactivateCustomerRequest request, CancellationToken ct) =>
         await service.Reactivate(await Actor(ct), Session, code, Key, request, ct);
 
+    [HttpGet("suspension-reason-groups")]
+    public SuspensionReasonGroup[] SuspensionReasons() => CustomerService.SuspensionReasons;
+
+    [HttpGet("{code}/suspension-review")]
+    public async Task<SuspensionReview> SuspensionReview(string code, CancellationToken ct) =>
+        await service.GetSuspensionReview(await Actor(ct), code, ct);
+
+    [HttpPost("{code}/suspend"), RequireCsrf]
+    public async Task<StatusChangeResult> Suspend(string code, JsonElement body, CancellationToken ct) =>
+        await service.Suspend(await Actor(ct), Session, code, Key, Parse<SuspendCustomerRequest>(body,
+            ["baseVersion", "reasonGroup", "reason", "evidence", "plan", "coordinationNote", "reviewToken"], []), ct);
+
     [HttpGet("{code}/records/{group}")]
     public async Task<object> Records(string code, string group, CancellationToken ct)
     {

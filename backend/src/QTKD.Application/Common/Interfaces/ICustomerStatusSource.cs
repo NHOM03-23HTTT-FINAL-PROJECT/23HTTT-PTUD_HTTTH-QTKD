@@ -6,9 +6,13 @@ namespace QTKD.Application.Common.Interfaces;
 // cannot supply connections, transactions or claims of authoritative approval.
 public interface ICustomerStatusSource
 {
+    Task<SuspensionSourceResult> Suspension(Guid customerId, Guid actorId, bool forConfirmation, CancellationToken ct);
     Task<ReactivationSourceResult> Reactivation(Guid customerId, Guid actorId, string? reasonGroup,
         StatusException? exception, CancellationToken ct);
 }
+
+public sealed record SuspensionSourceResult(bool Complete, SuspensionImpact[] Items, string[] FailedKinds,
+    string[] MissingSources, string Fingerprint, string[] NotificationDepartments);
 
 public sealed record ReactivationSourceResult(bool Complete, bool Allowed, string[] MissingSources,
     ReactivationCheck[] Checks, string? VerifiedBasis);

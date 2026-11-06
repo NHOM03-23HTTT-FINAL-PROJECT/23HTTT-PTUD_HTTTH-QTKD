@@ -19,7 +19,7 @@ namespace QTKD.Infrastructure.Repositories;
 /// Customer persistence through the request-scoped QtkdDbContext. SQL is limited
 /// to PostgreSQL locks and the database clock; CRUD, scope and paging use EF LINQ.
 /// </summary>
-public sealed class CustomerRepository(QtkdDbContext db, IOptionsMonitor<TokenOptions> tokens) : ICustomerRepository
+public sealed partial class CustomerRepository(QtkdDbContext db, IOptionsMonitor<TokenOptions> tokens) : ICustomerRepository
 {
     private IQueryable<DbUser> Users => db.Set<DbUser>().AsNoTracking();
     private IQueryable<Customer> Customers => db.Set<Customer>().AsNoTracking();
@@ -185,16 +185,20 @@ public sealed class CustomerRepository(QtkdDbContext db, IOptionsMonitor<TokenOp
         // The existing DB trigger owns version increments. Refresh before building history/response.
         await db.Entry(entity).ReloadAsync(ct);
     }
-    public async Task SetActive(Guid customer, CancellationToken ct)
+    public async Task SetStatus(Guid customer, string status, CancellationToken ct)
     {
         var entity = await db.Set<Customer>().SingleAsync(c => c.CustomerId == customer, ct);
-        entity.Status = ActiveStatus.Active; entity.CustomerUpdatedAt = await Now(ct); entity.FlowRevision++;
+        entity.Status = status switch { "Active" => ActiveStatus.Active, "Suspended" => ActiveStatus.Suspended,
+            _ => throw new ArgumentOutOfRangeException(nameof(status)) };
+        entity.CustomerUpdatedAt = await Now(ct); entity.FlowRevision++;
         await db.SaveChangesAsync(ct); await db.Entry(entity).ReloadAsync(ct);
     }
-    public async Task<Guid> AddDecision(Guid customer, Guid actor, string reason, string? basis, string metadata, CancellationToken ct)
+    private static CustomerDecisionType DecisionType(string action) => action switch
+    { "suspend" => CustomerDecisionType.Suspend, "reactivate" => CustomerDecisionType.Reactivate, _ => throw new ArgumentOutOfRangeException(nameof(action)) };
+    public async Task<Guid> AddDecision(Guid customer, Guid actor, string action, string reason, string? basis, string? plan, string metadata, CancellationToken ct)
     {
-        var entity = new CustomerStatusDecision { CustomerId = customer, DecisionType = CustomerDecisionType.Reactivate,
-            Reason = reason, Basis = basis, ConfirmedBy = actor, DecidedAt = await Now(ct), ReviewMetadata = metadata };
+        var entity = new CustomerStatusDecision { CustomerId = customer, DecisionType = DecisionType(action),
+            Reason = reason, Basis = basis, FollowUpPlan = plan, ConfirmedBy = actor, DecidedAt = await Now(ct), ReviewMetadata = metadata };
         db.Add(entity); await db.SaveChangesAsync(ct); return entity.DecisionId;
     }
     public async Task AddOutbox(Guid decision, string payload, CancellationToken ct)
@@ -208,11 +212,11 @@ public sealed class CustomerRepository(QtkdDbContext db, IOptionsMonitor<TokenOp
             ActedAt = await Now(ct), ValueAfter = value, Note = note });
         await db.SaveChangesAsync(ct);
     }
-    public async Task<bool> HasDelegation(Guid actor, Guid department, CancellationToken ct)
+    public async Task<bool> HasDelegation(Guid actor, Guid department, string action, CancellationToken ct)
     {
-        var now = await Now(ct);
+        var now = await Now(ct); var type = DecisionType(action);
         return await db.Set<CustomerStatusDelegation>().AnyAsync(d => d.GranteeId == actor && d.DepartmentId == department
-            && d.Action == CustomerDecisionType.Reactivate && d.RevokedAt == null && (d.ExpiresAt == null || d.ExpiresAt > now), ct);
+            && d.Action == type && d.RevokedAt == null && (d.ExpiresAt == null || d.ExpiresAt > now), ct);
     }
     public Task<CustomerDelegatePerson[]> Candidates(Guid department, CancellationToken ct) =>
         Users.Where(u => u.DepartmentId == department && u.Role == UserRole.SalesStaff && u.Status == UserStatus.Active)
@@ -226,18 +230,19 @@ public sealed class CustomerRepository(QtkdDbContext db, IOptionsMonitor<TokenOp
         join grantor in Users on d.GrantedBy equals grantor.UserId
         join revoker in Users on d.RevokedBy equals (Guid?)revoker.UserId into revokers
         from revoker in revokers.DefaultIfEmpty()
-        where d.DepartmentId == department && d.Action == CustomerDecisionType.Reactivate && (id == null || d.DelegationId == id)
+        where d.DepartmentId == department && (id == null || d.DelegationId == id)
         orderby d.GrantedAt descending, d.DelegationId
-        select new CustomerDelegation(d.DelegationId, d.GranteeId, grantee.FullName, grantee.Username, d.Reason,
+        select new CustomerDelegation(d.DelegationId, d.GranteeId, grantee.FullName, grantee.Username,
+            d.Action == CustomerDecisionType.Suspend ? "suspend" : "reactivate", d.Reason,
             grantor.FullName, d.GrantedAt, d.ExpiresAt, d.RevokedAt, revoker == null ? null : revoker.FullName,
             grantee.Status == UserStatus.Active && grantee.Role == UserRole.SalesStaff && grantee.DepartmentId == d.DepartmentId);
     public Task<CustomerDelegation[]> Delegations(Guid department, CancellationToken ct) => DelegationRows(department).ToArrayAsync(ct);
     public Task<CustomerDelegation?> Delegation(Guid department, Guid id, CancellationToken ct) =>
         DelegationRows(department, id).SingleOrDefaultAsync(ct);
-    public async Task<Guid> Grant(CustomerActor actor, Guid grantee, DateTime? expires, string? reason, CancellationToken ct)
+    public async Task<Guid> Grant(CustomerActor actor, Guid grantee, string action, DateTime? expires, string? reason, CancellationToken ct)
     {
         var d = new CustomerStatusDelegation { GranteeId = grantee, GrantedBy = actor.Id, DepartmentId = actor.DepartmentId,
-            Action = CustomerDecisionType.Reactivate, Reason = reason, GrantedAt = await Now(ct), ExpiresAt = expires };
+            Action = DecisionType(action), Reason = reason, GrantedAt = await Now(ct), ExpiresAt = expires };
         db.Add(d); await db.SaveChangesAsync(ct); return d.DelegationId;
     }
     public async Task Revoke(Guid department, Guid id, Guid actor, CancellationToken ct)

@@ -37,6 +37,8 @@ export type SuspensionReview = {
   failedKinds: ImpactKind[];
   failedAt?: string;
   missingSources?: string[] | null;
+  reviewToken?: string;
+  notificationDepartments?: Department[];
 };
 
 export type SuspensionRecord = {
@@ -100,6 +102,7 @@ export type SuspendCustomerRequest = StatusRequestBase & {
   evidence: AttachedFile[];
   plan: { id: string; option: string }[];
   coordinationNote: string;
+  reviewToken?: string;
 };
 
 export type ReactivateCustomerRequest = StatusRequestBase & {
@@ -117,6 +120,8 @@ export type StatusChangeErrorCode =
   | 'CONFLICT' // A7.1 / A7 – quyền hoặc dữ liệu đã thay đổi
   | 'CONDITIONS_NOT_MET' // A4.1 / A4.2
   | 'REVIEW_INCOMPLETE' // A4.4
+  | 'REVIEW_CHANGED'
+  | 'PLAN_INCOMPLETE'
   | 'NOT_FOUND'
   | 'FORBIDDEN'
   | 'LOAD_FAILED' // A4.4 / A2.1
