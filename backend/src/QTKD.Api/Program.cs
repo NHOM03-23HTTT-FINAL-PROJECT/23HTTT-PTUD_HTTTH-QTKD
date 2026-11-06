@@ -26,6 +26,7 @@ using QTKD.Domain.Identity;
 using QTKD.Infrastructure;
 using QTKD.Infrastructure.Identity;
 using QTKD.Infrastructure.Persistence;
+using QTKD.Infrastructure.Repositories;
 using TokenOptions = QTKD.Infrastructure.Identity.TokenOptions;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -151,8 +152,7 @@ builder.Services.AddSingleton(sp => NpgsqlDataSource.Create(
     sp.GetRequiredService<IConfiguration>().GetConnectionString("Identity")!));
 builder.Services.AddSingleton<PgDatabase>();
 builder.Services.AddScoped<ICurrentActor, CurrentActor>();
-builder.Services.AddScoped<IContractStore>(sp => new PostgresContractStore(
-    sp.GetRequiredService<PgDatabase>(),
+builder.Services.AddScoped<IContractFileStorage>(_ => new ContractFileStorage(
     Path.GetFullPath(builder.Configuration["Storage:Root"] ?? Path.Combine(builder.Environment.ContentRootPath, ".data", "uploads"))));
 builder.Services.AddScoped<ContractService>();
 builder.Services.AddQtkdPersistence(
