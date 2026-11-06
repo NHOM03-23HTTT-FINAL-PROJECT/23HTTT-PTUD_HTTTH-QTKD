@@ -81,13 +81,13 @@ public sealed class SubmissionApprovalPostgresRollbackTests
 
             var store = new RollbackStore(connection, transaction);
             var engine = new ContractApprovalEngine(store, new(), TimeProvider.System);
-            var assignment = new ApprovalAssignmentService(new RollbackSessions(connection, transaction));
+            var assignment = new ApprovalAssignmentService(new ApprovalAssignmentRepository(db));
             async Task<ReviewDocument> Read() => (await store.Read(id, ct))!;
             async Task Act(string step, string action) => await engine.Execute(WorkflowEngineTests.Command(await Read(), step, action), ct);
             async Task Assign(Guid head, string step, Guid assignee)
             {
                 var document = await Read();
-                await assignment.Assign(head, id, new(document.RoundId, document.Steps.Single(s => s.Key == step).Id, document.Version, assignee), ct);
+                await assignment.Assign(new Actor(head, "", Guid.Empty, ""), id, new(document.RoundId, document.Steps.Single(s => s.Key == step).Id, document.Version, assignee), ct);
             }
 
             // Trình: bước đầu giao TP KD; Pháp chế và BGĐ chờ phân công; lượt ghi đúng version hiện tại.
@@ -159,10 +159,5 @@ public sealed class SubmissionApprovalPostgresRollbackTests
         public Task AuditAsync(Guid contractId, string action, Guid actorId, string? beforeStatus, string afterStatus,
             JsonObject? before, JsonObject after, string? note, CancellationToken ct) =>
             inner.AuditAsync(contractId, action, actorId, beforeStatus, afterStatus, before, after, note, ct);
-    }
-
-    private sealed class RollbackSessions(NpgsqlConnection c, NpgsqlTransaction tx) : IApprovalDbSessions
-    {
-        public Task<ApprovalDbSession> Open(bool write, CancellationToken ct) => Task.FromResult(new ApprovalDbSession(c, tx, false));
     }
 }
