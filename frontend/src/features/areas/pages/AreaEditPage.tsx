@@ -13,12 +13,13 @@ import { StatusBadge } from '@/components/status-badge/StatusBadge';
 import { ROUTES } from '@/constants/routes';
 import { formatDateTime } from '@/utils/format';
 import { areasApi } from '../api/areasApi';
+import { AreaCoordinatePickerModal } from '../components/AreaCoordinatePickerModal';
 import { ParentAreaField } from '../components/ParentAreaField';
 import { ParentAreaPicker } from '../components/ParentAreaPicker';
 import { useEditAreaForm, type EditAreaAlert } from '../hooks/useEditAreaForm';
-import type { Area, AreaConflict, AreaField, AreaTypeCode, CapacityUnit } from '../types/area';
+import type { Area, AreaConflict, AreaField, AreaTypeCode } from '../types/area';
 import { AREA_FIELD_LABELS, currentVersionEntry, diffAreaDraft, toAreaDraft } from '../utils/areaChanges';
-import { AREA_TYPES, CAPACITY_UNITS, describeReferences, getAreaStatusBadge } from '../utils/areaFormat';
+import { AREA_TYPES, describeReferences, getAreaStatusBadge } from '../utils/areaFormat';
 import { levelUnder, pathUnder } from '../utils/areaHierarchy';
 import { AREA_CODE_MAX_LENGTH, AREA_NAME_MAX_LENGTH } from '../utils/areaValidation';
 import { AreaNotFound, type AreaDetailState } from './AreaDetailPage';
@@ -66,6 +67,7 @@ function EditAreaForm({ area }: { area: Area }) {
   const [leaveTarget, setLeaveTarget] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [conflictOpen, setConflictOpen] = useState(false);
+  const [mapModalOpen, setMapModalOpen] = useState(false);
   const [tree, setTree] = useState<Area[]>(() => areasApi.getTree());
 
   const form = useEditAreaForm({
@@ -119,7 +121,7 @@ function EditAreaForm({ area }: { area: Area }) {
       <nav className="breadcrumb" aria-label="Đường dẫn">
         <span>Khu vực khai thác</span>
         <span className="breadcrumb__separator">/</span>
-        <Link to={ROUTES.areas}>Danh sách khu vực</Link>
+        <Link to={ROUTES.areaLookup}>Tra cứu khu vực</Link>
         <span className="breadcrumb__separator">/</span>
         <Link to={ROUTES.areaDetail(original.code)}>{original.code}</Link>
         <span className="breadcrumb__separator">/</span>
@@ -241,12 +243,25 @@ function EditAreaForm({ area }: { area: Area }) {
             <div className="area-form__grid">
               <InputField
                 label="Tọa độ GPS"
+                placeholder="VD: 10.76215, 106.78694"
                 autoComplete="off"
                 value={values.gps}
                 changed={changed.has('gps')}
                 hint={changed.has('gps') ? `Trước: ${before('gps')}` : undefined}
                 disabled={submitting}
                 onChange={(e) => form.setField('gps', e.target.value)}
+                trailing={
+                  <button
+                    type="button"
+                    className="area-map-picker-trigger"
+                    title="Mở bản đồ để chọn tọa độ"
+                    disabled={submitting}
+                    onClick={() => setMapModalOpen(true)}
+                  >
+                    <Icon name="map-pin" size={14} />
+                    <span>Bản đồ</span>
+                  </button>
+                }
               />
               <InputField
                 label="Diện tích mặt bằng (m²)"
@@ -260,7 +275,7 @@ function EditAreaForm({ area }: { area: Area }) {
                 onChange={(e) => form.setField('areaSize', e.target.value)}
               />
               <InputField
-                label="Sức chứa thiết kế"
+                label="Sức chứa thiết kế (TEU)"
                 inputMode="decimal"
                 autoComplete="off"
                 value={values.capacity}
@@ -269,15 +284,6 @@ function EditAreaForm({ area }: { area: Area }) {
                 hint={changed.has('capacity') ? `Trước: ${initial.capacity || '—'}` : undefined}
                 disabled={submitting}
                 onChange={(e) => form.setField('capacity', e.target.value)}
-              />
-              <SelectField
-                label="Đơn vị sức chứa"
-                placeholder="Chọn đơn vị"
-                options={CAPACITY_UNITS}
-                value={values.capacityUnit}
-                changed={changed.has('capacityUnit')}
-                disabled={submitting}
-                onChange={(value) => value && form.setField('capacityUnit', value as CapacityUnit)}
               />
             </div>
             <TextAreaField
@@ -414,6 +420,15 @@ function EditAreaForm({ area }: { area: Area }) {
           </p>
         </Dialog>
       )}
+
+      <AreaCoordinatePickerModal
+        isOpen={mapModalOpen}
+        onClose={() => setMapModalOpen(false)}
+        initialCoordinates={values.gps}
+        parentCoordinates={parent?.gps}
+        parentName={parent?.name}
+        onConfirm={(coords) => form.setField('gps', coords)}
+      />
     </>
   );
 }

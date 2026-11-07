@@ -1,0 +1,169 @@
+.coordinate-picker__intro {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.coordinate-picker__instructions {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.coordinate-picker__input-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.coordinate-picker__input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.coordinate-picker__input {
+  width: 100%;
+  height: 40px;
+  padding: 0 36px 0 12px;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  background: var(--bg-surface);
+  font-size: 14px;
+  color: var(--text-primary);
+  font-family: monospace, sans-serif;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.coordinate-picker__input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.coordinate-picker__clear-btn {
+  position: absolute;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.coordinate-picker__clear-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-subtle);
+}
+
+.coordinate-picker__status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  margin: 0;
+}
+
+.coordinate-picker__status--valid {
+  color: var(--status-success, #16a34a);
+}
+
+.coordinate-picker__status--hint {
+  color: var(--text-secondary);
+}
+
+.coordinate-picker__status--info {
+  color: var(--accent);
+}
+
+.coordinate-picker__status--invalid {
+  color: var(--status-danger, #ef4444);
+}
+
+.coordinate-picker__map-wrap {
+  position: relative;
+  width: 100%;
+  height: 440px;
+  border-radius: 8px;
+  border: 1px solid var(--border-default);
+  overflow: hidden;
+  background: #f1f5f9;
+}
+
+.coordinate-picker__map {
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+.coordinate-picker__map-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  pointer-events: none;
+}
+
+/* Custom Marker Pin styling */
+.area-map-marker-pin {
+  background: transparent !important;
+  border: none !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+}
+
+.area-map-marker-pin:active {
+  cursor: grabbing;
+}
+
+/* Trigger button in form */
+.area-map-picker-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  height: 28px;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  background: var(--bg-surface);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.area-map-picker-trigger:hover:not(:disabled) {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.area-map-picker-trigger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+

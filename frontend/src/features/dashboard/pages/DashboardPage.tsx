@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/app/providers/AuthProvider';
+import { ButtonLink } from '@/components/button/Button';
 import { Alert } from '@/components/feedback/Alert';
+import { ROUTES } from '@/constants/routes';
 import { useNotifications } from '@/features/notifications/hooks/useNotifications';
 import { getDashboardBase } from '@/mocks/seed/dashboards';
 import { DashboardHeader, PendingTasksCard, StatGrid } from '../components/DashboardCards';
@@ -111,7 +113,7 @@ export function DashboardPage() {
           { count: opsData.suspendedCount, label: 'đề xuất tạm ngưng chờ xác nhận' },
         ],
         unread: opsData.incompleteCount > 0 ? 1 : 0,
-        viewAllTo: '/khu-vuc',
+        viewAllTo: ROUTES.areaLookup,
       }
     : base.pending;
 
@@ -153,7 +155,26 @@ export function DashboardPage() {
 
   return (
     <>
-      <DashboardHeader name={user.fullName} greeting={greeting} actions={base.actions} />
+      <DashboardHeader
+        name={user.fullName}
+        greeting={greeting}
+        actions={base.actions}
+        customActions={
+          workspace === 'khai-thac' ? (
+            <>
+              <div className="area-segmented" role="radiogroup" aria-label="Kiểu hiển thị">
+                <Link to={ROUTES.areaLookup} className="area-segmented__option" role="radio">
+                  Dạng bảng
+                </Link>
+                <Link to={ROUTES.areaHierarchy} className="area-segmented__option" role="radio">
+                  Sơ đồ cây
+                </Link>
+              </div>
+              <ButtonLink to={ROUTES.areaCreate}>Thêm mới khu vực</ButtonLink>
+            </>
+          ) : undefined
+        }
+      />
       {forbidden && (
         <Alert tone="warning" title="Bạn không có quyền truy cập nội dung này">
           Đường dẫn bạn mở ({forbidden}) nằm ngoài phạm vi được phân quyền. Hệ thống đã chuyển bạn về trang làm việc

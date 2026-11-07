@@ -15,14 +15,26 @@ import type {
 } from '../types/dashboard';
 import './DashboardCards.css';
 
-export function DashboardHeader({ name, greeting, actions }: { name: string; greeting: string; actions: HeaderActions }) {
+export function DashboardHeader({
+  name,
+  greeting,
+  actions,
+  customActions,
+}: {
+  name: string;
+  greeting: string;
+  actions?: HeaderActions;
+  customActions?: ReactNode;
+}) {
   return (
     <div className="dash-header">
       <div className="dash-header__greeting">
         <h1 className="dash-header__title">Xin chào, {name}</h1>
         <p className="dash-header__subtitle">{greeting}</p>
       </div>
-      {(actions.secondary || actions.primary) && (
+      {customActions ? (
+        <div className="dash-header__actions">{customActions}</div>
+      ) : actions && (actions.secondary || actions.primary) ? (
         <div className="dash-header__actions">
           {actions.secondary && (
             <ButtonLink to={actions.secondary.to} variant="secondary">
@@ -31,7 +43,7 @@ export function DashboardHeader({ name, greeting, actions }: { name: string; gre
           )}
           {actions.primary && <ButtonLink to={actions.primary.to}>{actions.primary.label}</ButtonLink>}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

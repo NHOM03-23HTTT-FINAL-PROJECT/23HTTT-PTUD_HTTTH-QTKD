@@ -1,22 +1,24 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { useSession, useUnsavedChanges } from '@/app/providers/SessionProvider';
 import { Button } from '@/components/button/Button';
 import { Alert } from '@/components/feedback/Alert';
 import { Dialog } from '@/components/feedback/Dialog';
+import { Icon } from '@/components/icon/Icon';
 import { InputField } from '@/components/form/InputField';
 import { SelectField } from '@/components/form/SelectField';
 import { TextAreaField } from '@/components/form/TextAreaField';
 import { StatusBadge } from '@/components/status-badge/StatusBadge';
 import { ROUTES } from '@/constants/routes';
 import { areasApi } from '../api/areasApi';
+import { AreaCoordinatePickerModal } from '../components/AreaCoordinatePickerModal';
 import { HIERARCHY_RULES, HierarchyChain, type ChainNode } from '../components/HierarchyChain';
 import { ParentAreaField } from '../components/ParentAreaField';
 import { ParentAreaPicker } from '../components/ParentAreaPicker';
 import { useCreateAreaForm, type CreateAreaAlert } from '../hooks/useCreateAreaForm';
-import type { Area, AreaTypeCode, CapacityUnit } from '../types/area';
-import { AREA_TYPES, CAPACITY_UNITS } from '../utils/areaFormat';
+import type { Area, AreaTypeCode } from '../types/area';
+import { AREA_TYPES } from '../utils/areaFormat';
 import { ancestryOf, levelUnder, pathUnder, PENDING_AREA_CODE } from '../utils/areaHierarchy';
 import { AREA_CODE_MAX_LENGTH, AREA_NAME_MAX_LENGTH } from '../utils/areaValidation';
 import type { AreaDetailState } from './AreaDetailPage';
@@ -43,6 +45,7 @@ export function AreaCreatePage() {
   const formRef = useRef<HTMLFormElement>(null);
   const [leaveTarget, setLeaveTarget] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [mapModalOpen, setMapModalOpen] = useState(false);
   // Đã xác nhận hoặc bỏ chọn khu vực cha trên sơ đồ → hiển thị xem trước phân cấp (02.2 / 02.3).
   const [hierarchyTouched, setHierarchyTouched] = useState(false);
   // Đọc lại sơ đồ mỗi lần mở hộp thoại để thấy khu vực vừa được tạo/điều chỉnh.
@@ -115,6 +118,8 @@ export function AreaCreatePage() {
       <nav className="breadcrumb" aria-label="Đường dẫn">
         <span>Khu vực khai thác</span>
         <span className="breadcrumb__separator">/</span>
+        <Link to={ROUTES.areaLookup}>Tra cứu khu vực</Link>
+        <span className="breadcrumb__separator">/</span>
         <span className="breadcrumb__current" aria-current="page">
           Tạo khu vực
         </span>
@@ -126,7 +131,7 @@ export function AreaCreatePage() {
           <p>Trường có dấu * là bắt buộc. Để trống Mã khu vực để hệ thống tự cấp mã.</p>
         </div>
         <div className="page-header__actions">
-          <Button variant="secondary" disabled={submitting} onClick={() => requestLeave(ROUTES.areas)}>
+          <Button variant="secondary" disabled={submitting} onClick={() => requestLeave(ROUTES.areaLookup)}>
             Hủy
           </Button>
           <Button type="submit" form={FORM_ID} disabled={submitting} className={submitting ? 'is-busy' : undefined}>
@@ -227,6 +232,18 @@ export function AreaCreatePage() {
                 value={values.gps}
                 disabled={submitting}
                 onChange={(e) => form.setField('gps', e.target.value)}
+                trailing={
+                  <button
+                    type="button"
+                    className="area-map-picker-trigger"
+                    title="Mở bản đồ để chọn tọa độ"
+                    disabled={submitting}
+                    onClick={() => setMapModalOpen(true)}
+                  >
+                    <Icon name="map-pin" size={14} />
+                    <span>Bản đồ</span>
+                  </button>
+                }
               />
               <InputField
                 label="Diện tích mặt bằng (m²)"
@@ -239,7 +256,7 @@ export function AreaCreatePage() {
                 onChange={(e) => form.setField('areaSize', e.target.value)}
               />
               <InputField
-                label="Sức chứa thiết kế"
+                label="Sức chứa thiết kế (TEU)"
                 placeholder="VD: 1.800"
                 inputMode="decimal"
                 autoComplete="off"
@@ -247,14 +264,6 @@ export function AreaCreatePage() {
                 error={errors.capacity}
                 disabled={submitting}
                 onChange={(e) => form.setField('capacity', e.target.value)}
-              />
-              <SelectField
-                label="Đơn vị sức chứa"
-                placeholder="Chọn đơn vị"
-                options={CAPACITY_UNITS}
-                value={values.capacityUnit}
-                disabled={submitting}
-                onChange={(value) => value && form.setField('capacityUnit', value as CapacityUnit)}
               />
             </div>
           </section>
@@ -355,10 +364,19 @@ export function AreaCreatePage() {
         >
           <p className="dialog__body">
             Thông tin đã nhập sẽ không được lưu. Hệ thống không tạo hồ sơ khu vực và{' '}
-            {leaveTarget === ROUTES.areas ? 'quay lại danh sách khu vực.' : 'mở hồ sơ khu vực đã chọn.'}
+            {leaveTarget === ROUTES.areas || leaveTarget === ROUTES.areaLookup ? 'quay lại tra cứu khu vực.' : 'mở hồ sơ khu vực đã chọn.'}
           </p>
         </Dialog>
       )}
+
+      <AreaCoordinatePickerModal
+        isOpen={mapModalOpen}
+        onClose={() => setMapModalOpen(false)}
+        initialCoordinates={values.gps}
+        parentCoordinates={parent?.gps}
+        parentName={parent?.name}
+        onConfirm={(coords) => form.setField('gps', coords)}
+      />
     </>
   );
 }
