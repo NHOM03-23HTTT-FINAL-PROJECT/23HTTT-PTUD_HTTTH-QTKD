@@ -12,7 +12,7 @@ export type ApiAuthResult = {
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
-  readonly detail: { remainingAttempts?: number; lockedUntil?: string };
+  readonly detail: { remainingAttempts?: number; lockedUntil?: string; detail?: unknown; traceId?: string };
 
   constructor(status: number, code: string, detail: ApiError['detail'] = {}) {
     super(code);

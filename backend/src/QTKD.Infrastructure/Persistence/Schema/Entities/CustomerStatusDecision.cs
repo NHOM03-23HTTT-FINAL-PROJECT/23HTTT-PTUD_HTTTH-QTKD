@@ -17,4 +17,5 @@ public sealed class CustomerStatusDecision
     public string? FollowUpPlan { get; set; }
     public Guid ConfirmedBy { get; set; }
     public DateTime DecidedAt { get; set; }
+    public string? ReviewMetadata { get; set; }
 }

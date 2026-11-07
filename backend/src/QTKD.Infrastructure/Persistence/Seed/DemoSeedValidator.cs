@@ -15,7 +15,11 @@ public static partial class DemoSeedValidator
 {
     /// <summary>Operational tables start empty; every other table needs at least one fixture row.</summary>
     public static readonly IReadOnlySet<string> EmptyTables =
-        new HashSet<string> { "contract_cancellation_request", "contract_delivery", "idempotency_request" };
+        new HashSet<string>
+        {
+            "contract_cancellation_request", "contract_delivery", "idempotency_request",
+            "customer_profile_data", "customer_operation", "customer_status_outbox", "customer_status_delegation"
+        };
 
     /// <summary>Throws InvalidOperationException on the first problem; returns row counts per table.</summary>
     public static IReadOnlyDictionary<string, int> Validate(DemoSeedData data, IModel model)

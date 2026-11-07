@@ -52,6 +52,190 @@ namespace QTKD.Infrastructure.Persistence.Migrations
 
             modelBuilder.HasSequence("service_code_seq");
 
+            modelBuilder.Entity("QTKD.Domain.Entities.Area", b =>
+                {
+                    b.Property<Guid>("AreaId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("area_id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<string>("AreaCode")
+                        .IsRequired()
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("area_code");
+
+                    b.Property<decimal>("AreaM2")
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("area_m2");
+
+                    b.Property<string>("AreaName")
+                        .IsRequired()
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("area_name");
+
+                    b.Property<string>("AreaType")
+                        .IsRequired()
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("area_type");
+
+                    b.Property<decimal>("Capacity")
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("capacity");
+
+                    b.Property<string>("Coordinates")
+                        .HasColumnType("text")
+                        .HasColumnName("coordinates");
+
+                    b.Property<string>("HierarchyPath")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("hierarchy_path");
+
+                    b.Property<int>("Level")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("level");
+
+                    b.Property<Guid?>("ParentAreaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parent_area_id");
+
+                    b.Property<int>("RowVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("row_version");
+
+                    b.Property<ActiveStatus>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("qtkd.active_status")
+                        .HasDefaultValue(ActiveStatus.Active)
+                        .HasColumnName("status");
+
+                    b.Property<string>("TechnicalDescription")
+                        .HasColumnType("text")
+                        .HasColumnName("technical_description");
+
+                    b.HasKey("AreaId")
+                        .HasName("area_pkey");
+
+                    b.HasIndex("AreaCode")
+                        .IsUnique()
+                        .HasDatabaseName("area_area_code_key");
+
+                    b.HasIndex("ParentAreaId")
+                        .HasDatabaseName("area_parent_area_id_idx");
+
+                    b.ToTable("area", "qtkd");
+                });
+
+            modelBuilder.Entity("QTKD.Domain.Entities.AreaAssignment", b =>
+                {
+                    b.Property<Guid>("AssignmentId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("assignment_id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<Guid>("AreaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("area_id");
+
+                    b.Property<DateTime>("FromDate")
+                        .HasColumnType("timestamp(6) with time zone")
+                        .HasColumnName("from_date");
+
+                    b.Property<DateTime?>("ToDate")
+                        .HasColumnType("timestamp(6) with time zone")
+                        .HasColumnName("to_date");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("AssignmentId")
+                        .HasName("area_assignment_pkey");
+
+                    b.HasIndex("AreaId")
+                        .HasDatabaseName("area_assignment_area_id_idx");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("area_assignment_user_id_idx");
+
+                    b.ToTable("area_assignment", "qtkd");
+                });
+
+            modelBuilder.Entity("QTKD.Domain.Entities.AreaService", b =>
+                {
+                    b.Property<Guid>("AreaId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("area_id");
+
+                    b.Property<Guid>("ServiceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("service_id");
+
+                    b.HasKey("AreaId", "ServiceId")
+                        .HasName("area_service_pkey");
+
+                    b.HasIndex("AreaId")
+                        .HasDatabaseName("area_service_area_id_idx");
+
+                    b.HasIndex("ServiceId")
+                        .HasDatabaseName("area_service_service_id_idx");
+
+                    b.ToTable("area_service", "qtkd");
+                });
+
+            modelBuilder.Entity("QTKD.Domain.Entities.Service", b =>
+                {
+                    b.Property<Guid>("ServiceId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("service_id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<bool>("IsMandatory")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_mandatory");
+
+                    b.Property<bool>("RequiresArea")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("requires_area");
+
+                    b.Property<string>("ServiceCode")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("service_code")
+                        .HasDefaultValueSql("('DV-'::text || lpad((nextval('qtkd.service_code_seq'::regclass))::text, 6, '0'::text))");
+
+                    b.Property<string>("ServiceName")
+                        .IsRequired()
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("service_name");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("unit");
+
+                    b.HasKey("ServiceId")
+                        .HasName("service_pkey");
+
+                    b.HasIndex("ServiceCode")
+                        .IsUnique()
+                        .HasDatabaseName("service_service_code_key");
+
+                    b.ToTable("service", "qtkd");
+                });
+
             modelBuilder.Entity("QTKD.Domain.Notifications.Notification", b =>
                 {
                     b.Property<Guid>("NotificationId")
@@ -262,143 +446,6 @@ namespace QTKD.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("approval_step_round_id_step_order_key");
 
                     b.ToTable("approval_step", "qtkd");
-                });
-
-            modelBuilder.Entity("QTKD.Infrastructure.Persistence.Schema.Area", b =>
-                {
-                    b.Property<Guid>("AreaId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("area_id")
-                        .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<string>("AreaCode")
-                        .IsRequired()
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("area_code");
-
-                    b.Property<decimal>("AreaM2")
-                        .HasColumnType("numeric(19,4)")
-                        .HasColumnName("area_m2");
-
-                    b.Property<string>("AreaName")
-                        .IsRequired()
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("area_name");
-
-                    b.Property<string>("AreaType")
-                        .IsRequired()
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("area_type");
-
-                    b.Property<decimal>("Capacity")
-                        .HasColumnType("numeric(19,4)")
-                        .HasColumnName("capacity");
-
-                    b.Property<string>("Coordinates")
-                        .HasColumnType("text")
-                        .HasColumnName("coordinates");
-
-                    b.Property<string>("HierarchyPath")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("hierarchy_path");
-
-                    b.Property<int>("Level")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(1)
-                        .HasColumnName("level");
-
-                    b.Property<Guid?>("ParentAreaId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("parent_area_id");
-
-                    b.Property<int>("RowVersion")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(1)
-                        .HasColumnName("row_version");
-
-                    b.Property<ActiveStatus>("Status")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("qtkd.active_status")
-                        .HasDefaultValue(ActiveStatus.Active)
-                        .HasColumnName("status");
-
-                    b.Property<string>("TechnicalDescription")
-                        .HasColumnType("text")
-                        .HasColumnName("technical_description");
-
-                    b.HasKey("AreaId")
-                        .HasName("area_pkey");
-
-                    b.HasIndex("AreaCode")
-                        .IsUnique()
-                        .HasDatabaseName("area_area_code_key");
-
-                    b.HasIndex("ParentAreaId")
-                        .HasDatabaseName("area_parent_area_id_idx");
-
-                    b.ToTable("area", "qtkd");
-                });
-
-            modelBuilder.Entity("QTKD.Infrastructure.Persistence.Schema.AreaAssignment", b =>
-                {
-                    b.Property<Guid>("AssignmentId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("assignment_id")
-                        .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<Guid>("AreaId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("area_id");
-
-                    b.Property<DateTime>("FromDate")
-                        .HasColumnType("timestamp(6) with time zone")
-                        .HasColumnName("from_date");
-
-                    b.Property<DateTime?>("ToDate")
-                        .HasColumnType("timestamp(6) with time zone")
-                        .HasColumnName("to_date");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("AssignmentId")
-                        .HasName("area_assignment_pkey");
-
-                    b.HasIndex("AreaId")
-                        .HasDatabaseName("area_assignment_area_id_idx");
-
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("area_assignment_user_id_idx");
-
-                    b.ToTable("area_assignment", "qtkd");
-                });
-
-            modelBuilder.Entity("QTKD.Infrastructure.Persistence.Schema.AreaService", b =>
-                {
-                    b.Property<Guid>("AreaId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("area_id");
-
-                    b.Property<Guid>("ServiceId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("service_id");
-
-                    b.HasKey("AreaId", "ServiceId")
-                        .HasName("area_service_pkey");
-
-                    b.HasIndex("AreaId")
-                        .HasDatabaseName("area_service_area_id_idx");
-
-                    b.HasIndex("ServiceId")
-                        .HasDatabaseName("area_service_service_id_idx");
-
-                    b.ToTable("area_service", "qtkd");
                 });
 
             modelBuilder.Entity("QTKD.Infrastructure.Persistence.Schema.Attachment", b =>
@@ -997,9 +1044,19 @@ namespace QTKD.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(250)")
                         .HasColumnName("customer_name");
 
+                    b.Property<DateTime?>("CustomerUpdatedAt")
+                        .HasColumnType("timestamp(6) with time zone")
+                        .HasColumnName("customer_updated_at");
+
                     b.Property<string>("Email")
                         .HasColumnType("character varying(254)")
                         .HasColumnName("email");
+
+                    b.Property<int>("FlowRevision")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("flow_revision");
 
                     b.Property<string>("InterestedServices")
                         .HasColumnType("text")
@@ -1048,6 +1105,79 @@ namespace QTKD.Infrastructure.Persistence.Migrations
                     b.ToTable("customer", "qtkd");
                 });
 
+            modelBuilder.Entity("QTKD.Infrastructure.Persistence.Schema.CustomerOperation", b =>
+                {
+                    b.Property<Guid>("ActorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_id");
+
+                    b.Property<string>("Operation")
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("operation");
+
+                    b.Property<string>("RequestKey")
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("request_key");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp(6) with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("customer_id");
+
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("request_hash");
+
+                    b.Property<string>("Response")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("response");
+
+                    b.HasKey("ActorId", "Operation", "RequestKey")
+                        .HasName("customer_operation_pkey");
+
+                    b.HasIndex("CustomerId")
+                        .HasDatabaseName("customer_operation_customer_id_idx");
+
+                    b.ToTable("customer_operation", "qtkd");
+                });
+
+            modelBuilder.Entity("QTKD.Infrastructure.Persistence.Schema.CustomerProfileData", b =>
+                {
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("customer_id");
+
+                    b.Property<DateTime?>("CreatedAt")
+                        .HasColumnType("timestamp(6) with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.PrimitiveCollection<string[]>("ServiceGroups")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text[]")
+                        .HasColumnName("service_groups")
+                        .HasDefaultValueSql("ARRAY[]::text[]");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp(6) with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("CustomerId")
+                        .HasName("customer_profile_data_pkey");
+
+                    b.ToTable("customer_profile_data", "qtkd");
+                });
+
             modelBuilder.Entity("QTKD.Infrastructure.Persistence.Schema.CustomerStatusDecision", b =>
                 {
                     b.Property<Guid>("DecisionId")
@@ -1087,6 +1217,10 @@ namespace QTKD.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("reason");
 
+                    b.Property<string>("ReviewMetadata")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("review_metadata");
+
                     b.HasKey("DecisionId")
                         .HasName("customer_status_decision_pkey");
 
@@ -1097,6 +1231,100 @@ namespace QTKD.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("customer_status_decision_customer_id_idx");
 
                     b.ToTable("customer_status_decision", "qtkd");
+                });
+
+            modelBuilder.Entity("QTKD.Infrastructure.Persistence.Schema.CustomerStatusDelegation", b =>
+                {
+                    b.Property<Guid>("DelegationId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("delegation_id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<CustomerDecisionType>("Action")
+                        .HasColumnType("qtkd.customer_decision_type")
+                        .HasColumnName("action");
+
+                    b.Property<Guid>("DepartmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("department_id");
+
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("timestamp(6) with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<DateTime>("GrantedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp(6) with time zone")
+                        .HasColumnName("granted_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<Guid>("GrantedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("granted_by");
+
+                    b.Property<Guid>("GranteeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("grantee_id");
+
+                    b.Property<string>("Reason")
+                        .HasColumnType("text")
+                        .HasColumnName("reason");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("timestamp(6) with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<Guid?>("RevokedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("revoked_by");
+
+                    b.HasKey("DelegationId")
+                        .HasName("customer_status_delegation_pkey");
+
+                    b.HasIndex("DepartmentId")
+                        .HasDatabaseName("customer_status_delegation_department_id_idx");
+
+                    b.HasIndex("GranteeId", "Action")
+                        .HasDatabaseName("customer_status_delegation_grantee_id_action_idx");
+
+                    b.ToTable("customer_status_delegation", "qtkd");
+                });
+
+            modelBuilder.Entity("QTKD.Infrastructure.Persistence.Schema.CustomerStatusOutbox", b =>
+                {
+                    b.Property<Guid>("DecisionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("decision_id");
+
+                    b.Property<int>("Attempts")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("attempts");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp(6) with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("payload");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Pending")
+                        .HasColumnName("status");
+
+                    b.HasKey("DecisionId")
+                        .HasName("customer_status_outbox_pkey");
+
+                    b.ToTable("customer_status_outbox", "qtkd");
                 });
 
             modelBuilder.Entity("QTKD.Infrastructure.Persistence.Schema.Department", b =>
@@ -1691,53 +1919,6 @@ namespace QTKD.Infrastructure.Persistence.Migrations
                     b.ToTable("role_permission", "qtkd");
                 });
 
-            modelBuilder.Entity("QTKD.Infrastructure.Persistence.Schema.Service", b =>
-                {
-                    b.Property<Guid>("ServiceId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("service_id")
-                        .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<bool>("IsMandatory")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("is_mandatory");
-
-                    b.Property<bool>("RequiresArea")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true)
-                        .HasColumnName("requires_area");
-
-                    b.Property<string>("ServiceCode")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("service_code")
-                        .HasDefaultValueSql("('DV-'::text || lpad((nextval('qtkd.service_code_seq'::regclass))::text, 6, '0'::text))");
-
-                    b.Property<string>("ServiceName")
-                        .IsRequired()
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("service_name");
-
-                    b.Property<string>("Unit")
-                        .IsRequired()
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("unit");
-
-                    b.HasKey("ServiceId")
-                        .HasName("service_pkey");
-
-                    b.HasIndex("ServiceCode")
-                        .IsUnique()
-                        .HasDatabaseName("service_service_code_key");
-
-                    b.ToTable("service", "qtkd");
-                });
-
             modelBuilder.Entity("QTKD.Infrastructure.Persistence.Schema.SigningSession", b =>
                 {
                     b.Property<Guid>("SigningSessionId")
@@ -2009,6 +2190,57 @@ namespace QTKD.Infrastructure.Persistence.Migrations
                     b.ToTable("volume_period", "qtkd");
                 });
 
+            modelBuilder.Entity("QTKD.Domain.Entities.Area", b =>
+                {
+                    b.HasOne("QTKD.Domain.Entities.Area", "ParentArea")
+                        .WithMany("SubAreas")
+                        .HasForeignKey("ParentAreaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("area_parent_area_id_fkey");
+
+                    b.Navigation("ParentArea");
+                });
+
+            modelBuilder.Entity("QTKD.Domain.Entities.AreaAssignment", b =>
+                {
+                    b.HasOne("QTKD.Domain.Entities.Area", "Area")
+                        .WithMany("AreaAssignments")
+                        .HasForeignKey("AreaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("area_assignment_area_id_fkey");
+
+                    b.HasOne("QTKD.Infrastructure.Persistence.Schema.UserAccount", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("area_assignment_user_id_fkey");
+
+                    b.Navigation("Area");
+                });
+
+            modelBuilder.Entity("QTKD.Domain.Entities.AreaService", b =>
+                {
+                    b.HasOne("QTKD.Domain.Entities.Area", "Area")
+                        .WithMany("AreaServices")
+                        .HasForeignKey("AreaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("area_service_area_id_fkey");
+
+                    b.HasOne("QTKD.Domain.Entities.Service", "Service")
+                        .WithMany("AreaServices")
+                        .HasForeignKey("ServiceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("area_service_service_id_fkey");
+
+                    b.Navigation("Area");
+
+                    b.Navigation("Service");
+                });
+
             modelBuilder.Entity("QTKD.Domain.Notifications.Notification", b =>
                 {
                     b.HasOne("QTKD.Infrastructure.Persistence.Schema.UserAccount", null)
@@ -2061,49 +2293,6 @@ namespace QTKD.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("approval_step_round_id_fkey");
-                });
-
-            modelBuilder.Entity("QTKD.Infrastructure.Persistence.Schema.Area", b =>
-                {
-                    b.HasOne("QTKD.Infrastructure.Persistence.Schema.Area", null)
-                        .WithMany()
-                        .HasForeignKey("ParentAreaId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("area_parent_area_id_fkey");
-                });
-
-            modelBuilder.Entity("QTKD.Infrastructure.Persistence.Schema.AreaAssignment", b =>
-                {
-                    b.HasOne("QTKD.Infrastructure.Persistence.Schema.Area", null)
-                        .WithMany()
-                        .HasForeignKey("AreaId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("area_assignment_area_id_fkey");
-
-                    b.HasOne("QTKD.Infrastructure.Persistence.Schema.UserAccount", null)
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("area_assignment_user_id_fkey");
-                });
-
-            modelBuilder.Entity("QTKD.Infrastructure.Persistence.Schema.AreaService", b =>
-                {
-                    b.HasOne("QTKD.Infrastructure.Persistence.Schema.Area", null)
-                        .WithMany()
-                        .HasForeignKey("AreaId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("area_service_area_id_fkey");
-
-                    b.HasOne("QTKD.Infrastructure.Persistence.Schema.Service", null)
-                        .WithMany()
-                        .HasForeignKey("ServiceId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("area_service_service_id_fkey");
                 });
 
             modelBuilder.Entity("QTKD.Infrastructure.Persistence.Schema.Attachment", b =>
@@ -2249,7 +2438,7 @@ namespace QTKD.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("QTKD.Infrastructure.Persistence.Schema.ContractItem", b =>
                 {
-                    b.HasOne("QTKD.Infrastructure.Persistence.Schema.Area", null)
+                    b.HasOne("QTKD.Domain.Entities.Area", null)
                         .WithMany()
                         .HasForeignKey("AreaId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -2262,7 +2451,7 @@ namespace QTKD.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("contract_item_contract_id_fkey");
 
-                    b.HasOne("QTKD.Infrastructure.Persistence.Schema.Service", null)
+                    b.HasOne("QTKD.Domain.Entities.Service", null)
                         .WithMany()
                         .HasForeignKey("ServiceId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -2280,6 +2469,39 @@ namespace QTKD.Infrastructure.Persistence.Migrations
                         .HasConstraintName("customer_account_manager_id_fkey");
                 });
 
+            modelBuilder.Entity("QTKD.Infrastructure.Persistence.Schema.CustomerOperation", b =>
+                {
+                    b.HasOne("QTKD.Infrastructure.Persistence.Schema.UserAccount", null)
+                        .WithMany()
+                        .HasForeignKey("ActorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("customer_operation_actor_id_fkey");
+
+                    b.HasOne("QTKD.Infrastructure.Persistence.Schema.Customer", null)
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("customer_operation_customer_id_fkey");
+                });
+
+            modelBuilder.Entity("QTKD.Infrastructure.Persistence.Schema.CustomerProfileData", b =>
+                {
+                    b.HasOne("QTKD.Infrastructure.Persistence.Schema.UserAccount", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("customer_profile_data_created_by_fkey");
+
+                    b.HasOne("QTKD.Infrastructure.Persistence.Schema.Customer", null)
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("customer_profile_data_customer_id_fkey");
+                });
+
             modelBuilder.Entity("QTKD.Infrastructure.Persistence.Schema.CustomerStatusDecision", b =>
                 {
                     b.HasOne("QTKD.Infrastructure.Persistence.Schema.UserAccount", null)
@@ -2295,6 +2517,46 @@ namespace QTKD.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("customer_status_decision_customer_id_fkey");
+                });
+
+            modelBuilder.Entity("QTKD.Infrastructure.Persistence.Schema.CustomerStatusDelegation", b =>
+                {
+                    b.HasOne("QTKD.Infrastructure.Persistence.Schema.Department", null)
+                        .WithMany()
+                        .HasForeignKey("DepartmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("customer_status_delegation_department_id_fkey");
+
+                    b.HasOne("QTKD.Infrastructure.Persistence.Schema.UserAccount", null)
+                        .WithMany()
+                        .HasForeignKey("GrantedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("customer_status_delegation_granted_by_fkey");
+
+                    b.HasOne("QTKD.Infrastructure.Persistence.Schema.UserAccount", null)
+                        .WithMany()
+                        .HasForeignKey("GranteeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("customer_status_delegation_grantee_id_fkey");
+
+                    b.HasOne("QTKD.Infrastructure.Persistence.Schema.UserAccount", null)
+                        .WithMany()
+                        .HasForeignKey("RevokedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("customer_status_delegation_revoked_by_fkey");
+                });
+
+            modelBuilder.Entity("QTKD.Infrastructure.Persistence.Schema.CustomerStatusOutbox", b =>
+                {
+                    b.HasOne("QTKD.Infrastructure.Persistence.Schema.CustomerStatusDecision", null)
+                        .WithMany()
+                        .HasForeignKey("DecisionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("customer_status_outbox_decision_id_fkey");
                 });
 
             modelBuilder.Entity("QTKD.Infrastructure.Persistence.Schema.Department", b =>
@@ -2406,7 +2668,7 @@ namespace QTKD.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("QTKD.Infrastructure.Persistence.Schema.PriceListLine", b =>
                 {
-                    b.HasOne("QTKD.Infrastructure.Persistence.Schema.Area", null)
+                    b.HasOne("QTKD.Domain.Entities.Area", null)
                         .WithMany()
                         .HasForeignKey("AreaId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -2420,7 +2682,7 @@ namespace QTKD.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("price_list_line_price_list_id_fkey");
 
-                    b.HasOne("QTKD.Infrastructure.Persistence.Schema.Service", null)
+                    b.HasOne("QTKD.Domain.Entities.Service", null)
                         .WithMany()
                         .HasForeignKey("ServiceId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -2521,14 +2783,14 @@ namespace QTKD.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("QTKD.Infrastructure.Persistence.Schema.VolumeLine", b =>
                 {
-                    b.HasOne("QTKD.Infrastructure.Persistence.Schema.Area", null)
+                    b.HasOne("QTKD.Domain.Entities.Area", null)
                         .WithMany()
                         .HasForeignKey("AreaId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("volume_line_area_id_fkey");
 
-                    b.HasOne("QTKD.Infrastructure.Persistence.Schema.Service", null)
+                    b.HasOne("QTKD.Domain.Entities.Service", null)
                         .WithMany()
                         .HasForeignKey("ServiceId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -2557,6 +2819,20 @@ namespace QTKD.Infrastructure.Persistence.Migrations
                         .HasForeignKey("LockedBy")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("volume_period_locked_by_fkey");
+                });
+
+            modelBuilder.Entity("QTKD.Domain.Entities.Area", b =>
+                {
+                    b.Navigation("AreaAssignments");
+
+                    b.Navigation("AreaServices");
+
+                    b.Navigation("SubAreas");
+                });
+
+            modelBuilder.Entity("QTKD.Domain.Entities.Service", b =>
+                {
+                    b.Navigation("AreaServices");
                 });
 #pragma warning restore 612, 618
         }

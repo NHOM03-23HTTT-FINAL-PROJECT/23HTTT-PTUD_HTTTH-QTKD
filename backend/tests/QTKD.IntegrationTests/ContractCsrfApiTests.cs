@@ -23,7 +23,7 @@ public class ContractCsrfApiTests
         await using (var scope = factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-            foreach (var permission in new[] { "contracts.view", "approvals.approve" })
+            foreach (var permission in new[] { "contracts.view", "approvals.approve", "customers.view" })
             {
                 if (!await db.Grants.AnyAsync(g => g.Role == UserRole.SalesStaff && g.PermissionCode == permission))
                     db.Grants.Add(new RolePermission { Role = UserRole.SalesStaff, PermissionCode = permission });

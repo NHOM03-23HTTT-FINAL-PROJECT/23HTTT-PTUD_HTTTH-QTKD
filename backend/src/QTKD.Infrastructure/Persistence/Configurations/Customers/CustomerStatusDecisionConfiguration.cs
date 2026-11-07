@@ -20,6 +20,7 @@ public sealed class CustomerStatusDecisionConfiguration : IEntityTypeConfigurati
         b.Property(x => x.CustomerId).HasColumnName("customer_id").HasColumnType("uuid");
         b.Property(x => x.DecisionType).HasColumnName("decision_type");
         b.Property(x => x.Reason).HasColumnName("reason").HasColumnType("text");
+        b.Property(x => x.ReviewMetadata).HasColumnName("review_metadata").HasColumnType("jsonb");
         b.Property(x => x.Basis).HasColumnName("basis").HasColumnType("text");
         b.Property(x => x.FollowUpPlan).HasColumnName("follow_up_plan").HasColumnType("text");
         b.Property(x => x.ConfirmedBy).HasColumnName("confirmed_by").HasColumnType("uuid");

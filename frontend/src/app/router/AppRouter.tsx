@@ -1,5 +1,6 @@
 import { BACKEND_ENABLED as CONTRACTS_API_ENABLED } from '@/features/contracts/config/backend';
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { useState } from 'react';
+import { createBrowserRouter, RouterProvider, Route, Routes } from 'react-router-dom';
 import { ACCOUNT_NAV, WORKSPACE_NAV } from '@/constants/navigation';
 import { ROUTES } from '@/constants/routes';
 import { ChangePasswordPage } from '@/features/auth/pages/ChangePasswordPage';
@@ -11,6 +12,7 @@ import { AreaLookupPage } from '@/features/areas/pages/AreaLookupPage';
 import { ForgotPasswordPage } from '@/features/auth/pages/ForgotPasswordPage';
 import { LoginPage } from '@/features/auth/pages/LoginPage';
 import { CustomerCreatePage } from '@/features/customers/pages/CustomerCreatePage';
+import { CustomerDelegationsPage } from '@/features/customers/pages/CustomerDelegationsPage';
 import { CustomerDetailPage } from '@/features/customers/pages/CustomerDetailPage';
 import { CustomerEditPage } from '@/features/customers/pages/CustomerEditPage';
 import { CustomerListPage } from '@/features/customers/pages/CustomerListPage';
@@ -67,11 +69,10 @@ const NAV_PATHS = [
 ].filter((path) => !IMPLEMENTED_PATHS.has(path));
 
 export function AppRouter() {
-  return (
-    <BrowserRouter>
-      <AppRoutes />
-    </BrowserRouter>
-  );
+  // A data router lets customer forms block PUSH, REPLACE and browser back/forward
+  // through the supported useBlocker API; the existing route tree is unchanged.
+  const [router] = useState(() => createBrowserRouter([{ path: '*', element: <AppRoutes /> }]));
+  return <RouterProvider router={router} />;
 }
 
 export function AppRoutes() {
@@ -94,7 +95,7 @@ export function AppRoutes() {
             <Route
               path={ROUTES.customers}
               element={
-                <BusinessRoute permission="customers.view" label="Danh sách khách hàng">
+                <BusinessRoute permission="customers.view" label="Danh sách khách hàng" apiReady>
                   <CustomerListPage />
                 </BusinessRoute>
               }
@@ -102,7 +103,7 @@ export function AppRoutes() {
             <Route
               path={ROUTES.customerCreate}
               element={
-                <BusinessRoute permission="customers.create" label="Tạo khách hàng">
+                <BusinessRoute permission="customers.create" label="Tạo khách hàng" apiReady>
                   <CustomerCreatePage />
                 </BusinessRoute>
               }
@@ -110,15 +111,20 @@ export function AppRoutes() {
             <Route
               path="/khach-hang/:code"
               element={
-                <BusinessRoute permission="customers.view" label="Hồ sơ khách hàng">
+                <BusinessRoute permission="customers.view" label="Hồ sơ khách hàng" apiReady>
                   <CustomerDetailPage />
                 </BusinessRoute>
               }
             />
+            <Route path={ROUTES.customerDelegations} element={
+              <BusinessRoute permission="customers.change-status" label="Ủy quyền trạng thái khách hàng" apiReady>
+                <CustomerDelegationsPage />
+              </BusinessRoute>
+            } />
             <Route
               path="/khach-hang/:code/chinh-sua"
               element={
-                <BusinessRoute permission="customers.update" label="Chỉnh sửa khách hàng">
+                <BusinessRoute permission="customers.update" label="Chỉnh sửa khách hàng" apiReady>
                   <CustomerEditPage />
                 </BusinessRoute>
               }
@@ -126,7 +132,7 @@ export function AppRoutes() {
             <Route
               path="/khach-hang/:code/tam-ngung"
               element={
-                <BusinessRoute permission="customers.change-status" label="Tạm ngưng khách hàng">
+                <BusinessRoute permission="customers.view" label="Tạm ngưng khách hàng" apiReady>
                   <CustomerSuspendPage />
                 </BusinessRoute>
               }
@@ -134,7 +140,7 @@ export function AppRoutes() {
             <Route
               path="/khach-hang/:code/kich-hoat-lai"
               element={
-                <BusinessRoute permission="customers.change-status" label="Kích hoạt lại khách hàng">
+                <BusinessRoute permission="customers.view" label="Kích hoạt lại khách hàng" apiReady>
                   <CustomerReactivatePage />
                 </BusinessRoute>
               }

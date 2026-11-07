@@ -9,9 +9,10 @@ import { InputField } from '@/components/form/InputField';
 import { MultiSelectField, SelectField } from '@/components/form/SelectField';
 import { StatusBadge } from '@/components/status-badge/StatusBadge';
 import { ROUTES } from '@/constants/routes';
-import { customersApi } from '../api/customersApi';
 import { FormSection } from '../components/FormSection';
+import { CustomerNavigationGuard } from '../components/CustomerNavigationGuard';
 import { useCreateCustomerForm, type CreateCustomerAlert } from '../hooks/useCreateCustomerForm';
+import { useCustomerCatalogs } from '../hooks/useCustomerCatalogs';
 import type { CustomerDraft } from '../types/customer';
 import type { CustomerDetailState } from './CustomerDetailPage';
 import './CustomerPages.css';
@@ -57,16 +58,19 @@ export function CustomerCreatePage() {
   const { endSession } = useSession();
   const navigate = useNavigate();
   const formRef = useRef<HTMLFormElement>(null);
+  const bypassNavigation = useRef(false);
   const [leaveTarget, setLeaveTarget] = useState<string | null>(null);
+  const { catalogs, loading: loadingCatalogs, failed: catalogsFailed } = useCustomerCatalogs();
   const options = useMemo(() => {
-    const { customerGroups, serviceGroups } = customersApi.getFormOptions();
+    const { customerGroups, serviceGroups } = catalogs;
     const toOption = ({ code, label }: { code: string; label: string }) => ({ value: code, label });
     return { customerGroups: customerGroups.map(toOption), serviceGroups: serviceGroups.map(toOption) };
-  }, []);
+  }, [catalogs]);
 
   const form = useCreateCustomerForm({
     onCreated: ({ customer, replayed }) => {
       const state: CustomerDetailState = { created: true, replayed };
+      bypassNavigation.current = true;
       // Thay mục lịch sử để "Quay lại" không mở lại biểu mẫu đã lưu.
       navigate(ROUTES.customerDetail(customer.code), { replace: true, state });
     },
@@ -76,6 +80,8 @@ export function CustomerCreatePage() {
   useUnsavedChanges(form.dirty ? `Tạo khách hàng – ${values.name.trim() || 'chưa nhập tên'}` : null);
 
   if (!user) return null;
+  if (loadingCatalogs) return <Alert tone="info" title="Đang tải danh mục khách hàng" />;
+  if (catalogsFailed) return <Alert tone="danger" title="Không tải được danh mục khách hàng">Vui lòng tải lại trang để thử lại.</Alert>;
 
   async function save() {
     const outcome = await form.submit();
@@ -222,6 +228,7 @@ export function CustomerCreatePage() {
         </aside>
       </div>
 
+      <CustomerNavigationGuard dirty={form.dirty} bypass={bypassNavigation} />
       {leaveTarget && (
         <Dialog
           title="Rời biểu mẫu tạo khách hàng?"
@@ -233,7 +240,7 @@ export function CustomerCreatePage() {
               <Button variant="secondary" onClick={() => setLeaveTarget(null)}>
                 Tiếp tục nhập
               </Button>
-              <Button variant="danger" onClick={() => navigate(leaveTarget)}>
+              <Button variant="danger" onClick={() => { bypassNavigation.current = true; navigate(leaveTarget); }}>
                 Rời biểu mẫu
               </Button>
             </>
@@ -265,6 +272,10 @@ function CreateCustomerAlertBanner({ alert, canViewExisting, retrying, onOpenExi
   );
 
   switch (alert.kind) {
+    case 'server-invalid':
+      return <Alert tone="danger" title="Dữ liệu chưa hợp lệ">Kiểm tra độ dài, thông tin liên hệ và các danh mục đã chọn.</Alert>;
+    case 'request-changed':
+      return <Alert tone="warning" title="Yêu cầu trước có thể đã được lưu">Dữ liệu đã thay đổi sau lần gửi trước. Hãy kiểm tra danh sách khách hàng trước khi mở biểu mẫu mới.</Alert>;
     case 'invalid':
       return (
         <Alert tone="danger" title="Chưa thể lưu hồ sơ">
@@ -279,31 +290,33 @@ function CreateCustomerAlertBanner({ alert, canViewExisting, retrying, onOpenExi
       );
     case 'duplicate': {
       const { existing } = alert;
+      const existingCode = existing.code;
       const suspended = existing.status === 'suspended';
       return (
         <Alert
           tone="warning"
           title="Khách hàng đã tồn tại – không tạo hồ sơ mới"
           action={
-            canViewExisting && (
-              <button type="button" className="alert__link" onClick={() => onOpenExisting(existing.code)}>
+            canViewExisting && existingCode && (
+              <button type="button" className="alert__link" onClick={() => onOpenExisting(existingCode)}>
                 Mở hồ sơ hiện có
               </button>
             )
           }
         >
-          Mã số thuế {existing.taxCode} thuộc {existing.code} · {existing.name}
+          {existing.code ? <>Mã số thuế {existing.taxCode} thuộc {existing.code} · {existing.name}
           {suspended
             ? ' (đang Tạm ngưng). Hệ thống không tạo hồ sơ trùng và không tự kích hoạt lại. Hãy dùng hồ sơ hiện có và chuyển người có thẩm quyền xử lý theo UC-CUS-04.'
-            : ' (đang Hoạt động). Hệ thống không tạo hồ sơ trùng. Hãy dùng hồ sơ hiện có.'}
+            : existing.status === 'active' ? ' (đang Hoạt động). Hệ thống không tạo hồ sơ trùng. Hãy dùng hồ sơ hiện có.'
+              : '. Hệ thống không tạo hồ sơ trùng. Hãy kiểm tra hồ sơ hiện có.'}</> : `Mã số thuế ${existing.taxCode} đã tồn tại. Hệ thống không tạo hồ sơ trùng.`}
         </Alert>
       );
     }
     case 'save-failed':
       return (
         <Alert tone="danger" title="Tạo khách hàng không thành công" action={retryAction}>
-          Không lưu được hồ sơ hoặc lịch sử tạo, giao dịch dữ liệu đã được hoàn tác. Dữ liệu trên biểu mẫu được giữ lại.
-          Nếu mất kết nối, hệ thống kiểm tra kết quả thao tác đã gửi trước khi cho thử lại.
+          Chưa xác nhận được kết quả lưu hồ sơ. Dữ liệu trên biểu mẫu được giữ lại.
+          Hãy kiểm tra kết quả và thử lại; hệ thống dùng cùng mã yêu cầu để tránh tạo trùng.
         </Alert>
       );
     case 'network':

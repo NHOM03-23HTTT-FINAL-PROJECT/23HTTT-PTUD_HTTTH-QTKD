@@ -24,4 +24,6 @@ public sealed class Customer
     public ActiveStatus Status { get; set; }
     public Guid AccountManagerId { get; set; }
     public int Version { get; set; }
+    public DateTime? CustomerUpdatedAt { get; set; }
+    public int FlowRevision { get; set; }
 }

@@ -6,6 +6,14 @@ Backend thực tế ở `backend/`, theo bốn tầng. Module đã có code ch�
 
 EF Core quản lý schema và migration (`QtkdDbContext`, `Infrastructure/Persistence/Migrations`); `QTKD.DbTool` áp migration và seed. Api không tự tạo hay migrate DB. Phần lớn module đọc/ghi bằng SQL qua Npgsql; notifications dùng EF Core LINQ. Tên file dự kiến cho module mới là gợi ý để thống nhất, người chủ trì task quyết định khi triển khai.
 
+Trên nhánh `cus-flow` sau ghép main ngày 06/11/2026 (`e9deffe`), Customers theo Controller → service Application → `ICustomerRepository`/`CustomerRepository` EF Core trên `QtkdDbContext`.
+DTO/validator/service nằm trong Application; records trung lập với persistence ở Domain. Service không dùng DbContext, Npgsql hay SQL.
+CRUD, phạm vi hồ sơ, phân trang và lịch sử dùng EF LINQ; SQL khóa PostgreSQL/đồng hồ DB chỉ nằm trong repository.
+Backend SYS-CUS-03 đã được bổ sung lại theo yêu cầu mới. Bố cục frontend theo main; khách hàng đã nối API cho CRUD,
+tra cứu, chi tiết, rà soát tạm ngưng và quản lý ủy quyền riêng cho tạm ngưng/kích hoạt lại. Nguồn công việc/dịch vụ chưa tính phí,
+xác minh kích hoạt lại và một số hồ sơ liên quan vẫn là phụ thuộc; xác nhận chuyển trạng thái thật bị chặn khi thiếu nguồn.
+Xem [test case và giới hạn đã kiểm chứng](../testing/test-cases/customer-suspension.md).
+
 ## Nguyên tắc tổ chức
 
 - **Chia theo module nghiệp vụ.** Cùng một tên module xuất hiện ở FE, BE (4 tầng), test và docs. Thêm module mới bằng cách nhân bản cấu trúc của module mẫu, không sửa module khác.
@@ -25,7 +33,7 @@ EF Core quản lý schema và migration (`QtkdDbContext`, `Infrastructure/Persis
 | `Identity` (Auth, Users, Departments, Roles, Permissions) | `auth`, `users` | 1 | PB-02 | Minh | Có code; Minimal API trong `Program.cs`, EF Core |
 | `Audit` | `audit-logs` | 1 | PB-03 | Minh | Có code: API tra cứu UC-CHUNG-06 theo mẫu Controller → Service → Repository (EF Core); xem [list_api-audit.md](../specs/common/list_api-audit.md) |
 | `Catalogs` (dịch vụ, nhóm dịch vụ, đơn vị tính, thuế suất) | `catalogs` | 1 | PB-04 | Đan Anh | Giữ chỗ |
-| `Customers` | `customers` | 1 (mở rộng S2, S3) | CUS-01, 02, 04, 05, 06, 07 | Hiếu | Giữ chỗ |
+| `Customers` | `customers` | 1 (mở rộng S2, S3) | CUS-01, 02, 04, 05, 06, 07 | Hiếu | cus-flow: Controller → service Application → Repository EF Core; DTO/validator Application, records Domain, migration EF. SYS-CUS-03 đã bổ sung lại cùng ủy quyền cá nhân; công việc/dịch vụ chưa tính phí và xác nhận kích hoạt lại còn phụ thuộc nguồn thật. |
 | `Areas` | `areas` | 1 (mở rộng S2, S3) | ARE-01, 02, 04, 12, 13 | Tuấn | Giữ chỗ |
 | `Contracts` | `contracts` | 1 (phụ lục S2, ký/chấm dứt/gia hạn S3) | CTR-01, 02, 03, 04, 05, 06, 16, 18 | Phong; CTR-04..06: Minh | Có code; Controller + Service + Store Npgsql (kiểu cũ). Đang chuyển sang mẫu mới: trình duyệt (SYS-CTR-04) đã theo Controller → `ContractService` → `IContractRepository`/`ContractRepository` (EF Core LINQ, không SQL) |
 | `Approvals` (workflow engine) | `approvals` | 1 (rút hồ sơ, chuyển người duyệt S2) | APR-01..06, 09, 10 | Lộc (BE), Đan Anh (FE tiến độ, cấu hình) | Có code: `Workflows` + `ContractApprovals`; Minimal API. Đang chuyển sang mẫu mới: phân công người duyệt (SYS-CTR-10) đã theo `ApprovalAssignmentsController` → `ApprovalAssignmentService` → `IApprovalAssignmentRepository`/`ApprovalAssignmentRepository` (EF Core; khóa dòng bằng SQL trong repository) |

@@ -135,10 +135,16 @@
 }
 
 .customer-results {
-  overflow: hidden;
+  overflow-x: auto;
   border: 1px solid var(--border-default);
   border-radius: 12px;
   background: var(--bg-surface);
+}
+
+/* Keep the customer name readable when fixed columns exceed the available
+   space. The table scrolls inside its card instead of collapsing that column. */
+.customer-results .data-table {
+  min-width: 960px;
 }
 
 .customer-results[aria-busy='true'] .data-table {

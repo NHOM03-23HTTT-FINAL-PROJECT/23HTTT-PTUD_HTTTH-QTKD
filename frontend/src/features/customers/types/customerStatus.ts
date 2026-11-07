@@ -36,6 +36,9 @@ export type SuspensionReview = {
   /** Nhóm dữ liệu không tải được (A4.4); còn nhóm lỗi thì không cho xác nhận. */
   failedKinds: ImpactKind[];
   failedAt?: string;
+  missingSources?: string[] | null;
+  reviewToken?: string;
+  notificationDepartments?: Department[];
 };
 
 export type SuspensionRecord = {
@@ -50,7 +53,7 @@ export type SuspensionRecord = {
   notices: DepartmentNotice[];
 };
 
-export type ReactivationCheckStatus = 'met' | 'unmet' | 'exception';
+export type ReactivationCheckStatus = 'met' | 'unmet' | 'exception' | 'unknown';
 
 /** Điều kiện kích hoạt lại theo nguyên nhân tạm ngưng: công nợ, vận hành, tranh chấp (frame 04.1). */
 export type ReactivationCheck = {
@@ -78,6 +81,10 @@ export type ClosedRecord = { code: string; title: string; note: string; status: 
 export type ReactivationContext = {
   suspension: SuspensionRecord;
   checks: ReactivationCheck[];
+  /** Căn cứ do nguồn có thẩm quyền xác minh; không lấy từ nội dung người dùng tự nhập. */
+  verifiedBasis?: string | null;
+  canReactivate?: boolean;
+  missingSources?: string[] | null;
 };
 
 type StatusRequestBase = {
@@ -95,6 +102,7 @@ export type SuspendCustomerRequest = StatusRequestBase & {
   evidence: AttachedFile[];
   plan: { id: string; option: string }[];
   coordinationNote: string;
+  reviewToken?: string;
 };
 
 export type ReactivateCustomerRequest = StatusRequestBase & {
@@ -106,11 +114,14 @@ export type ReactivateCustomerRequest = StatusRequestBase & {
 export type StatusChangeResult = { customer: Customer; replayed: boolean };
 
 export type StatusChangeErrorCode =
+  | 'NOT_IMPLEMENTED'
   | 'VALIDATION'
   | 'ALREADY_IN_STATUS' // A2 – đã ở trạng thái đích, không ghi lịch sử trùng
   | 'CONFLICT' // A7.1 / A7 – quyền hoặc dữ liệu đã thay đổi
   | 'CONDITIONS_NOT_MET' // A4.1 / A4.2
   | 'REVIEW_INCOMPLETE' // A4.4
+  | 'REVIEW_CHANGED'
+  | 'PLAN_INCOMPLETE'
   | 'NOT_FOUND'
   | 'FORBIDDEN'
   | 'LOAD_FAILED' // A4.4 / A2.1

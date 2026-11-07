@@ -7,12 +7,12 @@ namespace QTKD.Application.Common.Interfaces;
 // Data access for CRUD, attachments and cancellation. Submission remains in IContractRepository.
 public interface IContractManagementRepository
 {
-    Task<ContractCatalog> CatalogAsync(CancellationToken ct);
+    Task<ContractCatalog> CatalogAsync(Actor actor, CancellationToken ct);
     Task<ContractFilters> FiltersAsync(Actor actor, CancellationToken ct);
     Task<ContractPage> ListAsync(Actor actor, ContractQuery query, CancellationToken ct);
     Task<ContractRecord?> LockAsync(Actor actor, string code, CancellationToken ct);
     Task<JsonObject> TransactionAsync(Func<Task<JsonObject>> action, CancellationToken ct);
-    Task<ContractReferences> LockReferencesAsync(ContractDraft draft, CancellationToken ct);
+    Task<ContractReferences> LockReferencesAsync(Actor actor, ContractDraft draft, CancellationToken ct);
     Task<string> SaveDraftAsync(Guid? id, Actor actor, ContractDraft draft, decimal value, string customerSnapshot, CancellationToken ct);
     Task CancelAsync(Guid id, Guid actorId, string reason, CancellationToken ct);
     Task<bool> HasSignedAsync(Guid id, CancellationToken ct);

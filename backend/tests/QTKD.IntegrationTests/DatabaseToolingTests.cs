@@ -190,7 +190,7 @@ public sealed class DatabaseToolingTests
         var tables = source["tables"]!.AsObject().ToDictionary(t => t.Key, t => t.Value!.AsArray().Select(c => c!.GetValue<string>()).ToList());
         var entities = Model.GetEntityTypes().ToDictionary(e => e.GetTableName()!);
         Assert.Equal(239, tables.Values.Sum(c => c.Count));
-        Assert.Equal(["contract_cancellation_request", "contract_delivery", "idempotency_request", "permission", "role_definition", "role_permission"],
+        Assert.Equal(["contract_cancellation_request", "contract_delivery", "customer_operation", "customer_profile_data", "customer_status_delegation", "customer_status_outbox", "idempotency_request", "permission", "role_definition", "role_permission"],
             entities.Keys.Where(t => !tables.ContainsKey(t)).Order().ToArray());
         var additions = new Dictionary<string, string[]>
         {
@@ -198,7 +198,8 @@ public sealed class DatabaseToolingTests
             ["user_account"] = ["password_changed_at"],
             ["login_session"] = ["last_activity_at", "logout_token_hash", "remember", "revocation_reason"],
             ["attachment"] = ["content_type", "file_size"],
-            ["customer"] = ["customer_code"],
+            ["customer"] = ["customer_code", "customer_updated_at", "flow_revision"],
+            ["customer_status_decision"] = ["review_metadata"],
             ["service"] = ["requires_area", "service_code"],
             ["contract"] = ["cancellation_reason", "cancelled_at", "cancelled_by", "contract_code", "customer_snapshot",
                 "owning_department_id", "source_mode", "template_code", "updated_at"],
@@ -229,7 +230,15 @@ public sealed class DatabaseToolingTests
         using var db = new QtkdDbContext(QtkdPersistence.Options("Host=offline.invalid"));
         var ids = db.Database.GetMigrations().ToList();
         Assert.Equal(MigrationSql.PrismaBaseline.Select(m => m.EfId), ids.Take(MigrationSql.PrismaBaseline.Count));
-        Assert.Equal(names.Count, ids.Count);
+        var assembly = db.GetService<Microsoft.EntityFrameworkCore.Migrations.IMigrationsAssembly>();
+        var metadataNames = new[] { "_CustomerEfRepositoryAlignment", "_CustomerAreaEnumAlignment" };
+        foreach (var name in metadataNames)
+        {
+            var metadataId = Assert.Single(ids, id => id.EndsWith(name, StringComparison.Ordinal));
+            var metadata = assembly.CreateMigration(assembly.Migrations[metadataId], db.Database.ProviderName!);
+            Assert.Empty(metadata.UpOperations); Assert.Empty(metadata.DownOperations);
+        }
+        Assert.Equal(names.Count + metadataNames.Length, ids.Count);
     }
 
     [Fact]

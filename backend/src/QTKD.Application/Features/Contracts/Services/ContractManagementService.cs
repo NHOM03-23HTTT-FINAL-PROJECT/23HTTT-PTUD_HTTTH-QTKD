@@ -20,7 +20,7 @@ public partial class ContractService
     public async Task<JsonObject> Options(Actor actor, CancellationToken ct)
     {
         ViewRole(actor);
-        var catalog = await _management.CatalogAsync(ct);
+        var catalog = await _management.CatalogAsync(actor, ct);
         var byId = catalog.Areas.ToDictionary(a => a.Id);
         bool Active(ContractArea area)
         {
@@ -162,11 +162,11 @@ public partial class ContractService
         return data;
     }
 
-    private async Task<string> References(ContractDraft draft, CancellationToken ct)
+    private async Task<string> References(Actor actor, ContractDraft draft, CancellationToken ct)
     {
         if (draft.SourceMode == "template" && draft.TemplateCode != "MHD-THAM-KHAO-01")
             throw new BusinessException("VALIDATION", 422, new { fieldErrors = new { templateCode = "Mẫu hợp đồng không còn hợp lệ." } });
-        var references = await _management.LockReferencesAsync(draft, ct);
+        var references = await _management.LockReferencesAsync(actor, draft, ct);
         var customer = references.Customer;
         if (customer == null || !customer.Active)
             throw new BusinessException("CUSTOMER_INACTIVE", 409, new { fieldErrors = new { customerCode = "Khách hàng không còn ở trạng thái Hoạt động." } });
@@ -190,7 +190,7 @@ public partial class ContractService
         var value = ContractValidator.Validate(request.Draft);
         return Write(actor, "contracts:create", key, request.Draft, async () =>
         {
-            var snapshot = await References(request.Draft, ct);
+            var snapshot = await References(actor, request.Draft, ct);
             var code = await _management.SaveDraftAsync(null, actor, request.Draft, value, snapshot, ct);
             return new JsonObject { ["contract"] = await Changed(actor, code, "CONTRACT_CREATED", null, null, ct), ["replayed"] = false };
         }, ct);
@@ -203,7 +203,7 @@ public partial class ContractService
         {
             var current = await Locked(actor, code, ct);
             await Editable(actor, current, request.BaseVersion, ct);
-            var snapshot = await References(request.Draft, ct);
+            var snapshot = await References(actor, request.Draft, ct);
             await _management.SaveDraftAsync(current.Id, actor, request.Draft, value, snapshot, ct);
             return await Changed(actor, code, "CONTRACT_UPDATED", current, null, ct);
         }, ct);

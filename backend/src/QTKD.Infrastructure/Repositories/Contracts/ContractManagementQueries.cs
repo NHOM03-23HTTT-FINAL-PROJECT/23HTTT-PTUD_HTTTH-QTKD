@@ -44,9 +44,19 @@ public partial class ContractRepository
         RequiresArea = s.RequiresArea
     };
 
-    public async Task<ContractCatalog> CatalogAsync(CancellationToken ct) => new()
+    // Preserve the customer boundary when integrating main's EF contract repository.
+    private IQueryable<Customer> AvailableCustomers(Actor actor) =>
+        from c in db.Set<Customer>().AsNoTracking()
+        join owner in Users on c.AccountManagerId equals owner.UserId
+        from viewer in Users.Where(u => u.UserId == actor.Id && u.Status == QTKD.Domain.Identity.UserStatus.Active)
+        join department in db.Set<Department>() on viewer.DepartmentId equals department.DepartmentId
+        where department.Code == "KD" && owner.DepartmentId == viewer.DepartmentId && c.Status == ActiveStatus.Active
+            && db.Set<RolePermission>().Any(p => p.Role == viewer.Role && p.PermissionCode == "customers.view")
+        select c;
+
+    public async Task<ContractCatalog> CatalogAsync(Actor actor, CancellationToken ct) => new()
     {
-        Customers = await db.Set<Customer>().AsNoTracking().Where(c => c.Status == ActiveStatus.Active).Select(CustomerData).ToListAsync(ct),
+        Customers = await AvailableCustomers(actor).OrderBy(c => c.CustomerName).ThenBy(c => c.CustomerCode).Select(CustomerData).ToListAsync(ct),
         Areas = await Areas.OrderBy(a => a.HierarchyPath).Select(AreaData).ToListAsync(ct),
         Services = await Services.OrderBy(s => s.ServiceCode).Select(ServiceData).ToListAsync(ct)
     };
@@ -129,10 +139,13 @@ public partial class ContractRepository
         return await FindAsync(actor, code, ct);
     }
 
-    public async Task<ContractReferences> LockReferencesAsync(ContractDraft draft, CancellationToken ct)
+    public async Task<ContractReferences> LockReferencesAsync(Actor actor, ContractDraft draft, CancellationToken ct)
     {
-        var customers = await db.Set<Customer>().FromSqlInterpolated($"SELECT * FROM qtkd.customer WHERE customer_code = {draft.CustomerCode} FOR SHARE")
-            .AsNoTracking().Select(CustomerData).ToListAsync(ct);
+        await db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock_shared(22023)", ct);
+        var customerId = await AvailableCustomers(actor).Where(c => c.CustomerCode == draft.CustomerCode).Select(c => (Guid?)c.CustomerId).SingleOrDefaultAsync(ct);
+        var customers = customerId is { } id
+            ? await db.Set<Customer>().FromSqlInterpolated($"SELECT * FROM qtkd.customer WHERE customer_id = {id} FOR SHARE").AsNoTracking().Select(CustomerData).ToListAsync(ct)
+            : new List<ContractCustomer>();
         var result = new ContractReferences { Customer = customers.SingleOrDefault() };
         var services = new List<ContractCatalogService>();
         foreach (var item in draft.Services.OrderBy(s => s.ServiceCode, StringComparer.Ordinal))

@@ -31,6 +31,8 @@ public sealed class CustomerConfiguration : IEntityTypeConfiguration<Customer>
         b.Property(x => x.Status).HasColumnName("status").HasDefaultValue(ActiveStatus.Active);
         b.Property(x => x.AccountManagerId).HasColumnName("account_manager_id").HasColumnType("uuid");
         b.Property(x => x.Version).HasColumnName("version").HasDefaultValue(1);
+        b.Property(x => x.CustomerUpdatedAt).HasColumnName("customer_updated_at").HasColumnType("timestamp(6) with time zone");
+        b.Property(x => x.FlowRevision).HasColumnName("flow_revision").HasDefaultValue(0);
         b.HasIndex(x => x.CustomerCode).IsUnique().HasDatabaseName("customer_customer_code_key");
         b.HasIndex(x => x.TaxCode).IsUnique().HasDatabaseName("customer_tax_code_key");
         b.HasIndex(x => x.AccountManagerId).HasDatabaseName("customer_account_manager_id_idx");

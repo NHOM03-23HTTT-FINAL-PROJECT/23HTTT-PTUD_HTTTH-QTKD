@@ -59,6 +59,8 @@ async function harness(mode) {
     ...await load('features/contracts/api/approvalApi.ts'),
     ...await load('features/auth/api/authApi.ts'), ...await load('features/auth/api/passwordRecoveryApi.ts'),
     ...await load('lib/http/client.ts'), ...await load('constants/routes.ts'),
+    ...await load('features/customers/api/customersApi.ts'),
+    ...await load('features/customers/api/customerStatusApi.ts'),
     ...await load('mocks/contractsServer.ts'), ...await load('mocks/seed/users.ts'),
     renderRoute(path, user) {
       setUser(user);
@@ -91,8 +93,9 @@ const authResult = {
 };
 const routes = [
   ['/khach-hang', 'customers.view'], ['/khach-hang/tao-moi', 'customers.create'],
+  ['/khach-hang/uy-quyen', 'customers.change-status'],
   ['/khach-hang/KH-001', 'customers.view'], ['/khach-hang/KH-001/chinh-sua', 'customers.update'],
-  ['/khach-hang/KH-001/tam-ngung', 'customers.change-status'], ['/khach-hang/KH-001/kich-hoat-lai', 'customers.change-status'],
+  ['/khach-hang/KH-001/tam-ngung', 'customers.view'], ['/khach-hang/KH-001/kich-hoat-lai', 'customers.view'],
   ['/khu-vuc', 'areas.view'], ['/khu-vuc/tra-cuu', 'areas.view'], ['/khu-vuc/so-do', 'areas.view'],
   ['/khu-vuc/tao-moi', 'areas.create'], ['/khu-vuc/KV-001', 'areas.view'], ['/khu-vuc/KV-001/chinh-sua', 'areas.update'],
   ['/hop-dong', 'contracts.view'], ['/hop-dong/tao-moi', 'contracts.create'],
@@ -103,6 +106,50 @@ const routes = [
   ['/phe-duyet/tien-do', 'approvals.track'], ['/phe-duyet/phan-cong', 'approvals.assign'],
 ];
 
+test('customer duplicate API keeps scoped reference and handles a hidden duplicate without inventing a link', async t => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  const taxCode = '0123456789';
+  const cases = [
+    { code: 'KH-000123', name: 'Visible customer', taxCode, status: 'active' },
+    { code: 'KH-000124', name: 'Suspended customer', taxCode, status: 'suspended' },
+    null,
+  ];
+  let responseExisting;
+  globalThis.fetch = async path => new Response(JSON.stringify(path.endsWith('/auth/login') ? authResult
+    : { code: 'DUPLICATE_TAX_CODE', detail: { existing: responseExisting } }), { status: path.endsWith('/auth/login') ? 200 : 409 });
+  await api.loginHttp({ identifier: 'synthetic', password: 'synthetic' });
+  for (responseExisting of cases) {
+    await assert.rejects(api.customersApi.create({ userId: user.id, signedInAt: user.signedInAt,
+      idempotencyKey: 'duplicate-test', draft: { taxCode } }), error => {
+      assert.equal(error.code, 'DUPLICATE_TAX_CODE');
+      assert.deepEqual(error.existing, responseExisting ?? { taxCode });
+      return true;
+    });
+  }
+});
+
+test('suspension API sends the reviewed snapshot with CSRF and never trusts browser actor or falls back on missing sources', async t => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  api.acceptAuth(authResult);
+  const calls = [];
+  globalThis.fetch = async (path, options) => {
+    calls.push({ path, options });
+    return new Response(JSON.stringify({ code: 'REVIEW_INCOMPLETE', detail: { sources: ['operations_jobs'] } }), { status: 503 });
+  };
+  await assert.rejects(api.customerStatusApi.suspend({ userId: 'untrusted-actor', signedInAt: 'untrusted-time',
+    idempotencyKey: 'suspend-request', code: 'KH-000123', baseVersion: 4, reasonGroup: 'KHAC', reason: 'Tạm ngưng',
+    evidence: [], plan: [], coordinationNote: '', reviewToken: 'server-review-token' }), error => error.code === 'REVIEW_INCOMPLETE');
+  assert.equal(calls.length, 1);
+  assert.ok(calls[0].path.endsWith('/customers/KH-000123/suspend'));
+  const headers = new Headers(calls[0].options.headers);
+  assert.equal(headers.get('Idempotency-Key'), 'suspend-request'); assert.equal(headers.get('X-QTKD-CSRF'), '1');
+  const body = JSON.parse(calls[0].options.body);
+  assert.equal(body.reviewToken, 'server-review-token'); assert.equal(body.baseVersion, 4);
+  assert.equal(body.userId, undefined); assert.equal(body.signedInAt, undefined);
+});
+
 function ignoreStaticRedirectWarning(t) {
   const warn = console.warn;
   t.mock.method(console, 'warn', (...args) => {
@@ -112,11 +159,15 @@ function ignoreStaticRedirectWarning(t) {
   });
 }
 
-test('API identity opens approval inboxes and reviewer assignment while other mock business routes remain isolated', () => {
+test('API identity opens customer and approval routes while other mock business routes remain isolated', () => {
   api.acceptAuth(authResult);
   for (const [path, permission] of routes) {
     const html = api.renderRoute(path, { ...user, permissions: new Set([permission]) });
-    if (['/phe-duyet/cho-duyet', '/phe-duyet/cho-ra-soat', '/phe-duyet/da-ra-soat', '/phe-duyet/cho-phe-duyet'].includes(path)) {
+    if (path.startsWith('/khach-hang')) {
+      assert.ok(!html.includes('Chức năng chưa sẵn sàng'), path);
+      if (path.endsWith('/tam-ngung')) assert.ok(!html.includes('Chức năng tạm ngưng chưa sẵn sàng'), path);
+      assert.ok(!html.includes('Vận tải Hoàng Long'), 'API route must not render the prototype customer');
+    } else if (['/phe-duyet/cho-duyet', '/phe-duyet/cho-ra-soat', '/phe-duyet/da-ra-soat', '/phe-duyet/cho-phe-duyet'].includes(path)) {
       assert.ok(!html.includes('Chức năng chưa sẵn sàng'), path);
       assert.ok(html.includes('Chỉ gồm hồ sơ mà bạn là người được giao chính thức'), path);
     } else if (path === '/phe-duyet/phan-cong') {
