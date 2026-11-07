@@ -2,6 +2,7 @@
 export type NotificationKind =
   | 'General'
   | 'ReviewAssigned'
+  | 'ReviewAssignmentRequired'
   | 'AssignmentRevoked'
   | 'ReviewRequired'
   | 'ApprovalResult'

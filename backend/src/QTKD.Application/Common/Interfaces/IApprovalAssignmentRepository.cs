@@ -24,7 +24,7 @@ public interface IApprovalAssignmentRepository
     Task<AssignmentDocument?> LoadAsync(Guid contractId, CancellationToken ct);
 
     /// <summary>
-    /// Active users in one of the roles, whose role holds the permission, other than the owner.
+    /// Active users in the actual department and one of the roles, whose role holds the permission, other than the owner.
     /// With Candidate set, returns at most that user.
     /// </summary>
     Task<IReadOnlyList<AssignmentCandidate>> FindCandidatesAsync(CandidateQuery query, CancellationToken ct);
@@ -32,7 +32,7 @@ public interface IApprovalAssignmentRepository
     /// <summary>Runs the action in one transaction holding the contract row lock; 404 NOT_FOUND when the contract is missing.</summary>
     Task<T> InLockedContractAsync<T>(Guid contractId, Func<Task<T>> action, CancellationToken ct);
 
-    /// <summary>Sets assignee and status while the step has no decision; false when it changed meanwhile.</summary>
+    /// <summary>Assigns an unassigned NotStarted step once; false when it was already assigned or changed meanwhile.</summary>
     Task<bool> TryUpdateStepAsync(Guid stepId, Guid assigneeId, string status, CancellationToken ct);
 
     Task NotifyAsync(Guid recipientId, Guid contractId, string content, CancellationToken ct);
@@ -42,4 +42,4 @@ public interface IApprovalAssignmentRepository
 
 public sealed record AssignmentDocument(ReviewDocument Document, Guid OwnerId);
 
-public sealed record CandidateQuery(IReadOnlyList<string> Roles, string Permission, Guid OwnerId, Guid? Candidate = null);
+public sealed record CandidateQuery(IReadOnlyList<string> Roles, string Permission, Guid OwnerId, Guid? Candidate = null, string DepartmentCode = "");

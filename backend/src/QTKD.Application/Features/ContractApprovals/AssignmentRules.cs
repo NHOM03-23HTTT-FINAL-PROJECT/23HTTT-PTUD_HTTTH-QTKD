@@ -31,17 +31,18 @@ public static class AssignmentRules
 
     public static bool CanAssign(ReviewDocument document, ReviewStep step) =>
         document.RoundResult == "in-progress"
+        && document.Status == "under-review"
+        && document.Version == document.SubmittedVersion
         && StepKeys.Contains(step.Key)
+        && step.AssigneeId is null
         && step.Decision is null
-        && step.State is "unassigned" or "waiting";
+        && step.State == "unassigned"
+        && document.Steps.Where(s => s.Order < step.Order).All(s => s.State == "done" && s.Decision == "approve" && s.ReviewedVersion == document.SubmittedVersion);
 
     public static bool ActivatesOnAssign(ReviewDocument document, ReviewStep step)
     {
-        if (step.State != "unassigned") return false;
-        var previous = document.Steps.Where(s => s.Order < step.Order).OrderBy(s => s.Order).ToArray();
-        if (previous.Any(s => s.State != "done" || s.Decision != "approve")) return false;
-        return previous.Length == 0 || !previous[^1].RequiresHandoff;
+        return CanAssign(document, step);
     }
 
-    public static string StatusAfterAssign(bool activates) => activates ? "Reviewing" : "NotStarted";
+    public static string StatusAfterAssign(bool activates) => activates ? "Pending" : "NotStarted";
 }

@@ -29,7 +29,12 @@ public sealed class AreaConfiguration : IEntityTypeConfiguration<Area>
         b.Property(x => x.AreaM2).HasColumnName("area_m2").HasColumnType("numeric(19,4)");
         b.Property(x => x.Capacity).HasColumnName("capacity").HasColumnType("numeric(19,4)");
         b.Property(x => x.TechnicalDescription).HasColumnName("technical_description").HasColumnType("text");
-        b.Property(x => x.Status).HasColumnName("status").HasDefaultValue(ActiveStatus.Active);
+        // Use the single EF provider enum for qtkd.active_status. Mapping two CLR enums to that
+        // PostgreSQL name makes Npgsql fail while comparing migration snapshots.
+        b.Property(x => x.Status).HasColumnName("status").HasColumnType("qtkd.active_status")
+            .HasConversion(value => (QTKD.Infrastructure.Persistence.Schema.ActiveStatus)(int)value,
+                value => (ActiveStatus)(int)value)
+            .HasDefaultValue(ActiveStatus.Active);
         b.Property(x => x.RowVersion).HasColumnName("row_version").HasDefaultValue(1);
         b.HasIndex(x => x.AreaCode).IsUnique().HasDatabaseName("area_area_code_key");
         b.HasIndex(x => x.ParentAreaId).HasDatabaseName("area_parent_area_id_idx");

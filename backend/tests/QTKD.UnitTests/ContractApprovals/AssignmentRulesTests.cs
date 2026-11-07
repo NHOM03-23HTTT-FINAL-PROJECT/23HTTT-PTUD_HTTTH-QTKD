@@ -12,7 +12,7 @@ public sealed class AssignmentRulesTests
     {
         var keys = new[] { "sales", "legal", "board" };
         var steps = keys.Select((key, i) => new ReviewStep(Guid.NewGuid(), key, i + 1, states[i].Assigned ? Guid.NewGuid() : null, null,
-            states[i].State, states[i].Decision, null, null, null, RequiresHandoff: key == "legal")).ToArray();
+            states[i].State, states[i].Decision, states[i].Decision is null ? null : 1, null, null, RequiresHandoff: key == "legal")).ToArray();
         return new(Guid.NewGuid(), "Hợp đồng", "Khách hàng", "Người lập", department, 1000, "under-review", 1,
             Guid.NewGuid(), 1, 1, "in-progress", DateTime.UtcNow, steps, "", "", []);
     }
@@ -35,37 +35,29 @@ public sealed class AssignmentRulesTests
     }
 
     [Theory]
-    [InlineData("unassigned", null, true)]
-    [InlineData("waiting", null, true)]
-    [InlineData("reviewing", null, false)]
-    [InlineData("done", "approve", false)]
-    [InlineData("stopped", null, false)]
-    public void Only_steps_not_started_can_be_assigned_or_reassigned(string state, string? decision, bool allowed)
+    [InlineData("unassigned", false, true)]
+    [InlineData("unassigned", true, false)]
+    [InlineData("waiting", false, false)]
+    [InlineData("pending-accept", true, false)]
+    [InlineData("reviewing", true, false)]
+    [InlineData("done", true, false)]
+    public void Only_current_unassigned_steps_can_be_assigned_once(string state, bool assigned, bool allowed)
     {
-        var document = Document("KD", ("done", "approve", true), (state, decision, true), ("waiting", null, true));
+        var document = Document("KD", ("done", "approve", true), (state, null, assigned), ("waiting", null, false));
         Assert.Equal(allowed, AssignmentRules.CanAssign(document, document.Steps[1]));
     }
 
     [Fact]
-    public void Finished_round_cannot_be_assigned()
+    public void Later_steps_closed_rounds_and_wrong_versions_are_not_assignable()
     {
-        var document = Document("KD", ("pending-accept", null, true), ("waiting", null, true), ("waiting", null, true)) with { RoundResult = "rejected" };
+        var document = Document("KD", ("reviewing", null, true), ("unassigned", null, false), ("unassigned", null, false));
         Assert.False(AssignmentRules.CanAssign(document, document.Steps[1]));
-    }
-
-    [Fact]
-    public void Unassigned_current_step_activates_but_board_still_waits_for_legal_handoff()
-    {
-        var legal = Document("KD", ("done", "approve", true), ("unassigned", null, false), ("waiting", null, true));
-        Assert.True(AssignmentRules.ActivatesOnAssign(legal, legal.Steps[1]));
-        Assert.Equal("Reviewing", AssignmentRules.StatusAfterAssign(true));
-
+        var ready = Document("KD", ("done", "approve", true), ("unassigned", null, false), ("waiting", null, false));
+        Assert.False(AssignmentRules.CanAssign(ready with { RoundResult = "rejected" }, ready.Steps[1]));
+        Assert.False(AssignmentRules.CanAssign(ready with { Version = 2 }, ready.Steps[1]));
         var board = Document("KD", ("done", "approve", true), ("done", "approve", true), ("unassigned", null, false));
-        Assert.False(AssignmentRules.ActivatesOnAssign(board, board.Steps[2]));
-        Assert.Equal("NotStarted", AssignmentRules.StatusAfterAssign(false));
-
-        var later = Document("KD", ("reviewing", null, true), ("unassigned", null, false), ("waiting", null, true));
-        Assert.False(AssignmentRules.ActivatesOnAssign(later, later.Steps[1]));
+        Assert.True(AssignmentRules.ActivatesOnAssign(board, board.Steps[2]));
+        Assert.Equal("Pending", AssignmentRules.StatusAfterAssign(true));
     }
 
     [Theory]

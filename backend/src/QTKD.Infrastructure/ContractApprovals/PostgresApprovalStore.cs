@@ -2,12 +2,13 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Npgsql;
+using QTKD.Application.Common.Interfaces;
 using QTKD.Application.Features.ContractApprovals;
 
 namespace QTKD.Infrastructure.ContractApprovals;
 
-/// <summary>Uses Prisma-owned tables; never creates/migrates a database at application startup.</summary>
-public sealed class PostgresApprovalStore(IConfiguration configuration, IHttpContextAccessor? http = null) : IApprovalStore
+/// <summary>Uses EF Core-owned tables; never creates/migrates a database at application startup.</summary>
+public sealed class PostgresApprovalStore(IConfiguration configuration, INotificationDeliveryRepository deliveries, IHttpContextAccessor? http = null) : IApprovalStore
 {
     private async Task<NpgsqlConnection> Open(CancellationToken ct)
     {
@@ -53,14 +54,8 @@ public sealed class PostgresApprovalStore(IConfiguration configuration, IHttpCon
     }
     public async Task RetryNotifications(Guid id, CancellationToken ct)
     {
-        await using var c = await Open(ct);
-        // Delivery is the durable in-app inbox itself. External mail/signing is a separate transport.
-        // Retrying delivery never executes an approval command or changes contract/round state.
-        await using var cmd = Command(c, null, """
-            UPDATE qtkd.notification SET send_status='Sent'
-            WHERE record_type='Contract' AND record_id=@id AND send_status IN ('Pending','Failed')
-            """, ("id", id));
-        await cmd.ExecuteNonQueryAsync(ct);
+        // Same publication path as the worker, scoped to this authorized contract.
+        while (await deliveries.PublishPendingAsync(100, id, ct) == 100) { }
     }
     internal static NpgsqlCommand Command(NpgsqlConnection c, NpgsqlTransaction? tx, string sql, params (string Name, object? Value)[] parameters)
     {
@@ -105,7 +100,8 @@ public sealed class PostgresApprovalStore(IConfiguration configuration, IHttpCon
             if (order < 1 || order > configured.Length) throw new ReviewFailure(409, "WORKFLOW_SNAPSHOT_MISSING");
             var key = configured[order - 1] switch { "SalesManager" or "sales" => "sales", "LegalStaff" or "legal" => "legal", "BoardMember" or "board" => "board", _ => throw new ReviewFailure(409, "WORKFLOW_CONFIGURATION_INVALID") };
             var completed = r.GetString(4) == "Completed";
-            var state = r.GetString(4) switch { "Pending" => key == "sales" ? "pending-accept" : "reviewing", "Reviewing" => "reviewing", "Completed" => "done", "Skipped" => "stopped", _ => r.IsDBNull(2) ? "unassigned" : "waiting" };
+            var previousApproved = steps.All(s => s.State == "done" && s.Decision == "approve" && s.ReviewedVersion == doc.SubmittedVersion);
+            var state = ApprovalStageState.Project(r.GetString(4), !r.IsDBNull(2), previousApproved, doc.RoundResult == "in-progress");
             var decision = r.IsDBNull(5) ? null : r.GetString(5) switch { "Approve" => "approve", "RequestRevision" => "revision", _ => "reject" };
             steps.Add(new(r.GetGuid(0), key, order, r.IsDBNull(2) ? null : r.GetGuid(2), r.IsDBNull(3) ? null : r.GetString(3), state,
                 decision, completed ? doc.SubmittedVersion : null, r.IsDBNull(6) ? null : r.GetString(6), r.IsDBNull(7) ? null : r.GetDateTime(7), key == "legal"));
@@ -115,13 +111,14 @@ public sealed class PostgresApprovalStore(IConfiguration configuration, IHttpCon
         await using (var r = await attachmentsCommand.ExecuteReaderAsync(ct)) while (await r.ReadAsync(ct)) attachments.Add(new(r.GetString(0), r.GetString(1)));
         await using var pendingCommand = Command(c, tx, "SELECT EXISTS(SELECT 1 FROM qtkd.notification WHERE record_type='Contract' AND record_id=@id AND send_status IN ('Pending','Failed'))", ("id", id));
         var notificationPending = (bool)(await pendingCommand.ExecuteScalarAsync(ct))!;
-        var pending = steps.Any(s => s.State == "unassigned") ? "Bước kế tiếp đang chờ phân công."
-            : doc.RoundResult == "in-progress" && steps.Any(s => s.Key == "legal" && s.Decision == "approve") && steps.Any(s => s.Key == "board" && s.State == "waiting")
-                ? "Chờ Pháp chế trình hồ sơ lên Ban Giám đốc." : notificationPending ? "Thông báo đang chờ gửi; kết quả duyệt đã được lưu." : null;
+        var pending = string.Join(" ", new[] {
+            doc.RoundResult == "in-progress" && steps.Any(s => s.State == "unassigned") ? "Bước hiện tại đang chờ trưởng bộ phận phân công." : null,
+            notificationPending ? "Thông báo đang chờ gửi; kết quả duyệt đã được lưu." : null,
+        }.Where(part => part is not null));
         var services = new List<ReviewService>();
         await using var serviceCommand = Command(c, tx, "SELECT s.service_name,i.area_name_snapshot,s.unit FROM qtkd.contract_item i JOIN qtkd.service s USING(service_id) WHERE i.contract_id=@id", ("id", id));
         await using (var r = await serviceCommand.ExecuteReaderAsync(ct)) while (await r.ReadAsync(ct)) services.Add(new(r.GetString(0), r.GetString(1), r.GetString(2)));
-        return new(doc with { Steps = steps, Attachments = attachments, PendingTask = pending, Services = services }, owner);
+        return new(doc with { Steps = steps, Attachments = attachments, PendingTask = pending.Length == 0 ? null : pending, Services = services }, owner);
     }
     private static string Status(string value) => value switch { "Submitted" => "submitted", "UnderReview" => "under-review", "RevisionRequested" => "revision-requested", "Approved" => "approved", "Rejected" => "rejected", "Cancelled" => "cancelled", _ => "draft" };
     private static string Result(string value) => value switch { "Running" => "in-progress", "Completed" => "completed", "RevisionRequested" => "revision", "Rejected" => "rejected", _ => "withdrawn" };
@@ -131,6 +128,20 @@ public sealed class PostgresApprovalTransaction(NpgsqlConnection connection, Npg
 {
     public ReviewDocument Document => document;
     public Guid OwnerId => ownerId;
+    public async Task<IReadOnlyList<Guid>> AssignmentManagers(string step, CancellationToken ct)
+    {
+        await using var command = PostgresApprovalStore.Command(connection, transaction, """
+            SELECT DISTINCT u.user_id FROM qtkd.department d JOIN qtkd.user_account u ON u.user_id=d.manager_id
+            JOIN qtkd.role_permission p ON p.role=u.role AND p.permission_code='approvals.assign'
+            WHERE d.code=@department AND u.status='Active' AND NOT u.must_change_password
+              AND u.role::text = ANY(@roles)
+            """, ("department", step == "legal" ? "PC" : "BGD"),
+            ("roles", step == "legal" ? new[] { "LegalManager" } : new[] { "BoardChair" }));
+        var recipients = new List<Guid>();
+        await using var reader = await command.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct)) recipients.Add(reader.GetGuid(0));
+        return recipients;
+    }
     public async Task AssertActor(ReviewActor actor, CancellationToken ct)
     {
         await using var cmd = PostgresApprovalStore.Command(connection, transaction, """
@@ -195,7 +206,8 @@ public sealed class PostgresApprovalTransaction(NpgsqlConnection connection, Npg
         // Audit action names are UPPER_SNAKE_CASE; command.Action stays the API verb.
         var action = command.Action switch
         {
-            "accept" => "REVIEW_ACCEPTED", "handoff" => "REVIEW_HANDED_OFF", "approve" => "REVIEW_APPROVED",
+            "accept" => "REVIEW_ACCEPTED", "handoff" => "REVIEW_HANDED_OFF",
+            "approve" when command.Expected.Step == "legal" => "REVIEW_APPROVED_AND_FORWARDED", "approve" => "REVIEW_APPROVED",
             "revision" => "REVIEW_REVISION_REQUESTED", "reject" => "REVIEW_REJECTED", var other => other,
         };
         await using var audit = PostgresApprovalStore.Command(connection, transaction, """

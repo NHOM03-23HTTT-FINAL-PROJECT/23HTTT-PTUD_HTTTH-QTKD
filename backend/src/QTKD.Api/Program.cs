@@ -11,6 +11,7 @@ using Npgsql.NameTranslation;
 using Npgsql;
 using Microsoft.AspNetCore.Http.Features;
 using QTKD.Api.Authentication;
+using QTKD.Api.BackgroundServices;
 using QTKD.Application.Common.Interfaces;
 using QTKD.Application.Features.Contracts;
 using QTKD.Application.Features.Notifications;
@@ -160,6 +161,10 @@ builder.Services.AddQtkdPersistence(
     sp => sp.GetRequiredService<IConfiguration>().GetConnectionString("Identity") ?? throw new InvalidOperationException("ConnectionStrings:Identity is required."),
     enumNames);
 builder.Services.AddScoped<NotificationService>();
+builder.Services.AddOptions<NotificationDeliveryOptions>().BindConfiguration("Notifications:Delivery")
+    .Validate(o => o.BatchSize is >= 1 and <= 1000 && o.PollSeconds is >= 1 and <= 300,
+        "Notification delivery batch size or polling interval is invalid.").ValidateOnStart();
+builder.Services.AddHostedService<NotificationDeliveryWorker>();
 builder.Services.AddScoped<AuditLogService>();
 builder.Services.AddAreaInfrastructure(builder.Configuration);
 
@@ -182,6 +187,11 @@ app.Use(async (context, next) =>
         app.Logger.LogError(error, "DB_ERROR: Postgres driver error");
         context.Response.StatusCode = 500;
         await context.Response.WriteAsJsonAsync(new { code = "SYSTEM_ERROR", traceId = context.TraceIdentifier });
+    }
+    catch (ReviewFailure error)
+    {
+        context.Response.StatusCode = error.Status;
+        await context.Response.WriteAsJsonAsync(new { code = error.Code, traceId = context.TraceIdentifier });
     }
     catch (IdentityFailure error)
     {

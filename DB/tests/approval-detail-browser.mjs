@@ -102,25 +102,30 @@ export async function approvalDetailBrowserCheck({ repo, apiPort, browserPort, a
     assert.equal(decisionRequests[0].key, decisionRequests[1].key, 'Retry of the same action must reuse its idempotency key');
     await manager.getByText(/Bước Pháp chế đang chờ phân công người xử lý/).waitFor();
 
-    async function assign(contract, step, actor) {
-      const snapshot = await call(`/approvals/contracts/${contract.id}?step=sales`, actors.manager.token);
-      assert.equal(snapshot.status, 200, JSON.stringify(snapshot.body));
-      const result = await call(`/approvals/contracts/${contract.id}/assignment`, actor.token, 'POST', {
-        roundId: snapshot.body.roundId, stepId: snapshot.body.steps.find(s => s.key === step).id,
-        viewedVersion: snapshot.body.version, assigneeId: actor.user.userId,
-      });
-      assert.equal(result.status, 200, JSON.stringify(result.body));
-    }
-    const legal = await pageFor(actors.legal);
+    const legalHead = await pageFor(actors.legal);
+    await legalHead.goto(`${origin}/phe-duyet/phan-cong`);
+    const assignmentRow = legalHead.getByRole('row').filter({ hasText: submitted.title });
+    await assignmentRow.getByRole('button', { name: 'Phân công', exact: true }).click();
+    await legalHead.getByRole('alertdialog').getByLabel('Người duyệt').selectOption(actors.legalReviewer.user.userId);
+    await legalHead.getByRole('alertdialog').getByRole('button', { name: 'Phân công', exact: true }).click();
+    await legalHead.getByText('Đã phân công', { exact: true }).waitFor();
+    await legalHead.waitForLoadState('networkidle');
+    assert.equal(await assignmentRow.count(), 0, 'Assigned rows disappear; there is no reassignment control');
+    assert.equal(await legalHead.getByRole('button', { name: 'Đổi người', exact: true }).count(), 0);
+    const assigned = await call(`/approvals/contracts/${submitted.id}?step=sales`, actors.manager.token);
+    const again = await call(`/approvals/contracts/${submitted.id}/assignment`, actors.legal.token, 'POST', {
+      roundId: assigned.body.roundId, stepId: assigned.body.steps[1].id, viewedVersion: assigned.body.version, assigneeId: actors.legal.user.userId,
+    });
+    assert.equal(again.status, 409, 'Even the department head cannot reassign a pending step');
+    const premature = await call(`/approvals/contracts/${submitted.id}/assignment`, actors.board.token, 'POST', {
+      roundId: assigned.body.roundId, stepId: assigned.body.steps[2].id, viewedVersion: assigned.body.version, assigneeId: actors.board.user.userId,
+    });
+    assert.equal(premature.status, 409, 'The director cannot assign before legal approval');
+    const legal = await pageFor(actors.legalReviewer);
     await legal.goto(`${origin}/phe-duyet/cho-ra-soat`);
     await legal.getByRole('heading', { name: 'Hợp đồng chờ rà soát pháp lý', exact: true }).waitFor();
     await legal.waitForLoadState('networkidle');
-    assert.equal(await checkInboxBadge(legal, 'legal', actors.legal), 0, 'A legal manager without actionable assignments must not see the prototype badge of 3');
-    await assign(submitted, 'legal', actors.legal);
-    // Changes made in another session are discovered when returning focus to the page.
-    await legal.evaluate(() => window.dispatchEvent(new Event('focus')));
-    await checkInboxBadge(legal, 'legal', actors.legal);
-    await legal.goto(`${origin}/phe-duyet/cho-ra-soat`);
+    await checkInboxBadge(legal, 'legal', actors.legalReviewer);
     // Failed count requests hide the last value; recovery on focus restores the BE count.
     await legal.waitForLoadState('networkidle');
     await legal.route('**/api/v1/approvals/inbox?*', route => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ code: 'TEMPORARY' }) }));
@@ -130,9 +135,10 @@ export async function approvalDetailBrowserCheck({ repo, apiPort, browserPort, a
     assert.equal(await legal.locator('.sidebar__badge').count(), 0, 'An unavailable API must not leave a misleading count');
     await legal.unroute('**/api/v1/approvals/inbox?*');
     await legal.evaluate(() => window.dispatchEvent(new Event('focus')));
-    await checkInboxBadge(legal, 'legal', actors.legal);
+    await checkInboxBadge(legal, 'legal', actors.legalReviewer);
     const row = legal.getByRole('row').filter({ hasText: submitted.title });
     await row.getByRole('link', { name: 'Rà soát', exact: true }).click();
+    await legal.getByRole('button', { name: 'Tiếp nhận rà soát', exact: true }).click();
     await legal.getByLabel('Kết luận rà soát pháp lý').waitFor();
     await legal.getByRole('button', { name: 'Yêu cầu phối hợp', exact: true }).click();
     await legal.getByRole('alertdialog').getByLabel('Nội dung cần xác minh / tài liệu liên quan').waitFor();
@@ -140,20 +146,22 @@ export async function approvalDetailBrowserCheck({ repo, apiPort, browserPort, a
     assert.equal(new URL(legal.url()).pathname, `/hop-dong/${submitted.code}`, 'Inbox actions must enter the same human-readable contract detail route');
     await legal.screenshot({ path: join(screenshotRoot, '03-legal-review.png'), fullPage: true });
     await legal.getByLabel('Kết luận rà soát pháp lý').fill('Đạt yêu cầu pháp lý; đã rà soát các điều khoản.');
-    await legal.getByRole('button', { name: 'Chấp thuận', exact: true }).click();
+    await legal.getByRole('button', { name: 'Chấp thuận và trình Ban Giám đốc', exact: true }).click();
     await legal.getByRole('alertdialog').getByRole('button', { name: 'Xác nhận quyết định' }).click();
-    await legal.getByRole('button', { name: 'Trình hồ sơ lên Ban Giám đốc', exact: true }).waitFor();
+    await legal.getByText(/Đã chấp thuận và trình hồ sơ lên Ban Giám đốc/).waitFor();
     await legal.waitForLoadState('networkidle');
-    await checkInboxBadge(legal, 'legal', actors.legal);
-    await assign(submitted, 'board', actors.board);
+    await checkInboxBadge(legal, 'legal', actors.legalReviewer);
+    assert.equal(await legal.getByRole('button', { name: 'Trình hồ sơ lên Ban Giám đốc', exact: true }).count(), 0);
+    const forwarded = await call(`/approvals/contracts/${submitted.id}?step=sales`, actors.manager.token);
+    assert.equal(forwarded.body.steps[2].state, 'unassigned');
     const board = await pageFor(actors.board);
+    await board.goto(`${origin}/phe-duyet/phan-cong`);
+    await board.getByRole('row').filter({ hasText: submitted.title }).getByRole('button', { name: 'Phân công', exact: true }).click();
+    await board.getByRole('alertdialog').getByRole('button', { name: 'Tự nhận', exact: true }).click();
+    await board.getByText('Đã phân công', { exact: true }).waitFor();
     await detail(board, submitted);
-    await board.getByText(/Hồ sơ chưa được bàn giao đến Ban Giám đốc/).waitFor();
     assert.equal(await board.getByRole('button', { name: 'Phê duyệt', exact: true }).count(), 0);
-    await legal.getByRole('button', { name: 'Trình hồ sơ lên Ban Giám đốc', exact: true }).click();
-    await legal.getByText(/Đã ghi nhận việc trình Ban Giám đốc/).waitFor();
-    await legal.waitForLoadState('networkidle');
-    await detail(board, submitted);
+    await board.getByRole('button', { name: 'Tiếp nhận rà soát', exact: true }).click();
     await board.getByLabel('Ý kiến phê duyệt').waitFor();
     await checkInboxBadge(board, 'board', actors.board);
     await board.screenshot({ path: join(screenshotRoot, '04-board-review.png'), fullPage: true });
@@ -166,6 +174,15 @@ export async function approvalDetailBrowserCheck({ repo, apiPort, browserPort, a
     assert.equal(await board.getByRole('button', { name: 'Phê duyệt', exact: true }).count(), 0);
     const final = await call(`/contracts/${submitted.code}`, actors.manager.token);
     assert.equal(final.body.status, 'approved'); assert.equal(final.body.rounds.at(-1).result, 'completed');
+    await board.getByRole('button', { name: 'Gửi lại thông báo', exact: true }).waitFor();
+    // Publication outside this tab (worker/manual retry) must clear the pending warning without a page reload.
+    const deliveries = await call(`/approvals/contracts/${submitted.id}/pending-task/retry?step=board`, actors.board.token, 'POST', {}, 'browser-delivery-retry');
+    assert.equal(deliveries.status, 200, JSON.stringify(deliveries.body));
+    assert.equal(deliveries.body.document.pendingTask, null);
+    await board.getByRole('button', { name: 'Gửi lại thông báo', exact: true }).waitFor({ state: 'hidden' });
+    assert.equal(await board.getByText(/Thông báo đang chờ gửi/).count(), 0);
+    const afterPublication = await call(`/contracts/${submitted.code}`, actors.manager.token);
+    assert.deepEqual(afterPublication.body.rounds, final.body.rounds, 'Delivery refresh must not replay or change approvals');
     await board.screenshot({ path: join(screenshotRoot, '05-approved-detail.png'), fullPage: true });
     await manager.goto(`${origin}/phe-duyet/ho-so/${submitted.id}?step=sales`);
     await manager.waitForURL(`**/hop-dong/${submitted.code}`);
@@ -194,7 +211,7 @@ export async function approvalDetailBrowserCheck({ repo, apiPort, browserPort, a
     assert(await narrow.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'Review detail should not overflow at 1024px');
     await narrow.screenshot({ path: join(screenshotRoot, '07-tablet-detail.png'), fullPage: true });
     assert.deepEqual(errors, [], 'Browser must report no uncaught component errors');
-    console.log('PASS browser approval detail: real sidebar counts, empty/unassigned inbox, focus refresh, API failure recovery, role CTAs, required comments, confirmation, stable retries, real three-level workflow, revision/reject, legacy links and narrow layout');
+    console.log('PASS browser approval detail: real sidebar counts, empty/unassigned inbox, focus refresh, API failure recovery, role CTAs, required comments, confirmation, stable retries, immutable assignment, combined legal forwarding, real three-level workflow, revision/reject, legacy links and narrow layout');
   } catch (error) {
     console.error('Approval browser errors:', errors);
     if (browser) {

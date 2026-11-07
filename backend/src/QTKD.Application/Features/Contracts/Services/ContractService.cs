@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json.Nodes;
 using QTKD.Application.Common.Interfaces;
 using QTKD.Domain.Contracts;
+using QTKD.Application.Features.ContractApprovals;
 
 namespace QTKD.Application.Features.Contracts;
 
@@ -289,14 +290,9 @@ public partial class ContractService
                     ["assigneeName"] = s.AssigneeName,
                     ["assignedAt"] = Time(s.AssignedAt),
                     ["acceptedAt"] = Time(s.AcceptedAt),
-                    ["state"] = s.Status switch
-                    {
-                        "NotStarted" => s.AssigneeId is null ? "unassigned" : "waiting",
-                        "Pending" => "pending-accept",
-                        "Reviewing" => "reviewing",
-                        "Completed" => s.Decision == "Approve" ? "done" : "stopped",
-                        _ => "skipped"
-                    },
+                    ["state"] = ApprovalStageState.Project(s.Status, s.AssigneeId is not null,
+                        r.Steps.Where(previous => previous.Order < s.Order).All(previous => previous.Status == "Completed" && previous.Decision == "Approve"),
+                        r.Result == "Running"),
                     ["decision"] = s.Decision switch
                     {
                         "Approve" => "approve",
@@ -335,6 +331,7 @@ public partial class ContractService
             {
                 "REVIEW_ACCEPTED" => "accept",
                 "REVIEW_APPROVED" => "approve",
+                "REVIEW_APPROVED_AND_FORWARDED" => "approve",
                 "REVIEW_HANDED_OFF" => key == "sales" ? "handoff-legal" : "handoff-board",
                 "REVIEW_REVISION_REQUESTED" => "request-revision",
                 "REVIEW_REJECTED" => "reject",
@@ -344,6 +341,8 @@ public partial class ContractService
             if (action is not null)
             {
                 rows.Add((e.At, key, e.ActorName, action, e.From, e.To, e.Note));
+                if (e.Action == "REVIEW_APPROVED_AND_FORWARDED")
+                    rows.Add((e.At, key, e.ActorName, "handoff-board", e.From, e.To, null));
             }
         }
 

@@ -22,7 +22,7 @@ export function approvalError(error: unknown): string {
   return 'Không thể xử lý yêu cầu. Hãy tải lại để kiểm tra kết quả trước khi gửi lại.';
 }
 
-export type ApprovalView = { kind: 'info' | 'accept' | 'decide' | 'handoff' | 'stale'; message: string };
+export type ApprovalView = { kind: 'info' | 'accept' | 'decide' | 'stale'; message: string };
 /** Display guards only. The BE revalidates the snapshot and authority inside the workflow transaction. */
 export function approvalView(contract: Contract, user: Pick<CurrentUser, 'id' | 'roles' | 'permissions'>, doc?: ReviewDocument | null): ApprovalView {
   const role = approvalStepFor(user);
@@ -35,7 +35,9 @@ export function approvalView(contract: Contract, user: Pick<CurrentUser, 'id' | 
   const active = round.steps.find(s => ['pending-accept', 'reviewing', 'unassigned'].includes(s.state));
   if (own?.assigneeId !== user.id) {
     if (own?.state === 'done' || own?.state === 'stopped') return { kind: 'info', message: `Bước ${STEP_LABELS[role]} đã có kết quả.${active ? ` Hồ sơ đang ở bước ${STEP_LABELS[active.key]}.` : ''}` };
-    if (!own?.assigneeId) return { kind: 'info', message: `Bước ${STEP_LABELS[role]} đang chờ phân công người xử lý. Trưởng bộ phận thực hiện tại Phân công người duyệt.` };
+    if (!own?.assigneeId) return { kind: 'info', message: own?.state === 'waiting'
+      ? `Chưa đến lượt ${STEP_LABELS[role]}. Trưởng bộ phận chỉ phân công khi các bước trước đã chấp thuận.`
+      : `Bước ${STEP_LABELS[role]} đang chờ phân công người xử lý. Trưởng bộ phận thực hiện tại Phân công người duyệt.` };
     return { kind: 'info', message: `Bước ${STEP_LABELS[role]} được giao cho ${own.assigneeName ?? 'người khác'}. Bạn chỉ xem được hồ sơ, không thể quyết định thay.` };
   }
   if (!doc) return { kind: 'info', message: 'Đang kiểm tra lượt duyệt và quyền xử lý…' };
@@ -47,14 +49,11 @@ export function approvalView(contract: Contract, user: Pick<CurrentUser, 'id' | 
   const previous = doc.steps.filter(s => s.order < step.order);
   if (previous.some(s => s.state !== 'done' || s.decision !== 'approve' || s.reviewedVersion !== doc.submittedVersion))
     return { kind: 'info', message: `Chưa đến lượt ${STEP_LABELS[role]}. Các bước trước phải chấp thuận trên cùng phiên bản và bàn giao hợp lệ.` };
-  if (step.state === 'done' && step.decision === 'approve' && step.requiresHandoff
-    && doc.steps.some(s => s.order > step.order && ['waiting', 'unassigned'].includes(s.state)))
-    return { kind: 'handoff', message: 'Kết luận Pháp chế đã được lưu. Trình hồ sơ lên Ban Giám đốc để tiếp tục cùng lượt duyệt.' };
-  if (step.state === 'pending-accept' && role === 'sales' && doc.status === 'submitted')
-    return { kind: 'accept', message: 'Hồ sơ đã trình và được giao cho bạn. Tiếp nhận để bắt đầu rà soát nội dung kinh doanh.' };
+  if (step.state === 'pending-accept' && (role === 'sales' ? doc.status === 'submitted' : doc.status === 'under-review'))
+    return { kind: 'accept', message: 'Hồ sơ đã đến lượt và được giao cho bạn. Tiếp nhận để bắt đầu xem xét nội dung.' };
   if (step.state === 'reviewing' && doc.status === 'under-review') return { kind: 'decide', message: 'Kiểm tra nội dung và tài liệu của đúng phiên bản đang trình trước khi ghi nhận quyết định.' };
   if (step.state === 'done') {
-    const next = doc.steps.find(s => s.order > step.order && ['reviewing', 'unassigned', 'waiting'].includes(s.state));
+    const next = doc.steps.find(s => s.order > step.order && ['pending-accept', 'reviewing', 'unassigned', 'waiting'].includes(s.state));
     return { kind: 'info', message: `Kết quả của bạn đã được lưu.${next ? ` Bước ${STEP_LABELS[next.key]} ${next.state === 'unassigned' ? 'đang chờ phân công người xử lý' : 'sẽ tiếp tục theo quy trình'}.` : ''}` };
   }
   return { kind: 'info', message: `Hồ sơ chưa được bàn giao đến ${STEP_LABELS[role]}. Bước trước cần hoàn tất việc chuyển hồ sơ trước khi bạn xử lý.` };

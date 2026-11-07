@@ -16,7 +16,7 @@ public sealed class ApprovalAssignmentServiceTests
     {
         repository.Assigners.Add(legalHead.Id);
         repository.Managed[legalHead.Id] = ["PC"];
-        repository.Document = AssignmentRulesTests.Document("KD", ("pending-accept", null, true), ("unassigned", null, false), ("unassigned", null, false));
+        repository.Document = AssignmentRulesTests.Document("KD", ("done", "approve", true), ("unassigned", null, false), ("waiting", null, false));
     }
 
     private AssignReviewRequest Request(string step, Guid assignee) =>
@@ -61,23 +61,41 @@ public sealed class ApprovalAssignmentServiceTests
     }
 
     [Fact]
-    public async Task Reassigning_notifies_new_and_previous_assignee_and_resending_the_same_person_writes_nothing()
+    public async Task Assign_once_then_reject_same_or_different_person_without_duplicate_notifications()
     {
-        var first = Guid.NewGuid();
-        var second = Guid.NewGuid();
+        var first = Guid.NewGuid(); var second = Guid.NewGuid();
         repository.Candidates.AddRange([first, second]);
-
         await Service().Assign(legalHead, repository.Document.Id, Request("legal", first), default);
-        Assert.Equal((first, "NotStarted"), (repository.Updates.Single().Assignee, repository.Updates.Single().Status));
-        repository.SetAssignee("legal", first, "waiting");
+        Assert.Equal((first, "Pending"), (repository.Updates.Single().Assignee, repository.Updates.Single().Status));
+        repository.SetAssignee("legal", first, "pending-accept");
+        foreach (var target in new[] { first, second })
+            Assert.Equal("ASSIGNMENT_IMMUTABLE", (await Assert.ThrowsAsync<BusinessException>(() => Service().Assign(legalHead, repository.Document.Id, Request("legal", target), default))).Code);
+        Assert.Equal([first], repository.Notified);
+        Assert.Equal(["APPROVER_ASSIGNED"], repository.Audits);
+    }
 
-        await Service().Assign(legalHead, repository.Document.Id, Request("legal", second), default);
-        Assert.Equal([first, second, first], repository.Notified);
-        Assert.Equal(["APPROVER_ASSIGNED", "APPROVER_REASSIGNED"], repository.Audits);
-        repository.SetAssignee("legal", second, "waiting");
+    [Fact]
+    public async Task Future_steps_are_hidden_and_cannot_be_assigned_or_list_candidates()
+    {
+        repository.Document = repository.Document with { Steps = repository.Document.Steps.Select(s => s.Key == "sales" ? s with { State = "reviewing", Decision = null } : s).ToArray() };
+        Assert.Empty(await Service().Board(legalHead, default));
+        Assert.Equal("ASSIGNMENT_IMMUTABLE", (await Assert.ThrowsAsync<BusinessException>(() => Service().Candidates(legalHead, repository.Document.Id, "legal", default))).Code);
+        Assert.Equal("ASSIGNMENT_IMMUTABLE", (await Assert.ThrowsAsync<BusinessException>(() => Service().Assign(legalHead, repository.Document.Id, Request("legal", Guid.NewGuid()), default))).Code);
+        Assert.Empty(repository.Updates);
+    }
 
-        await Service().Assign(legalHead, repository.Document.Id, Request("legal", second), default);
-        Assert.Equal(2, repository.Updates.Count);
+    [Fact]
+    public async Task Concurrent_assignments_have_one_winner_and_one_notification()
+    {
+        var people = new[] { Guid.NewGuid(), Guid.NewGuid() };
+        repository.Candidates.AddRange(people);
+        var results = await Task.WhenAll(people.Select(async person =>
+        {
+            try { await Service().Assign(legalHead, repository.Document.Id, Request("legal", person), default); return true; }
+            catch (BusinessException e) when (e.Code == "ASSIGNMENT_IMMUTABLE") { return false; }
+        }));
+        Assert.Single(results, success => success);
+        Assert.Single(repository.Updates); Assert.Single(repository.Notified); Assert.Single(repository.Audits);
     }
 
     [Fact]
@@ -96,6 +114,7 @@ public sealed class ApprovalAssignmentServiceTests
 
     private sealed class FakeRepository : IApprovalAssignmentRepository
     {
+        private readonly SemaphoreSlim mutex = new(1, 1);
         public HashSet<Guid> Assigners { get; } = [];
         public Dictionary<Guid, HashSet<string>> Managed { get; } = [];
         public List<Guid> Candidates { get; } = [];
@@ -130,11 +149,18 @@ public sealed class ApprovalAssignmentServiceTests
                 .Select(c => new AssignmentCandidate(c, "Người duyệt", "Nhân viên", "Pháp chế"))
                 .ToList());
 
-        public Task<T> InLockedContractAsync<T>(Guid contractId, Func<Task<T>> action, CancellationToken ct) => action();
+        public async Task<T> InLockedContractAsync<T>(Guid contractId, Func<Task<T>> action, CancellationToken ct)
+        {
+            await mutex.WaitAsync(ct);
+            try { await Task.Yield(); return await action(); }
+            finally { mutex.Release(); }
+        }
 
         public Task<bool> TryUpdateStepAsync(Guid stepId, Guid assigneeId, string status, CancellationToken ct)
         {
+            if (Document.Steps.Single(s => s.Id == stepId).AssigneeId is not null) return Task.FromResult(false);
             Updates.Add((stepId, assigneeId, status));
+            Document = Document with { Steps = Document.Steps.Select(s => s.Id == stepId ? s with { AssigneeId = assigneeId, State = "pending-accept" } : s).ToArray() };
             return Task.FromResult(true);
         }
 

@@ -48,6 +48,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         builder.UseEnvironment(EnvironmentName);
         builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
         { ["Jwt:SigningKey"] = Key, ["Jwt:Issuer"] = "qtkd-api", ["Jwt:Audience"] = "qtkd-web", ["ConnectionStrings:Identity"] = "test-context-replaced-by-factory" }));
+        builder.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
+        { ["Notifications:Delivery:Enabled"] = "false" }));
         builder.ConfigureTestServices(services =>
         {
             if (Clock is not null)

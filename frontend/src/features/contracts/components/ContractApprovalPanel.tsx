@@ -17,7 +17,7 @@ import { LegalCoordinationPanel } from '../pages/LegalCoordinationPanel';
 
 const DECISIONS: ApprovalDecision[] = ['approve', 'revision', 'reject'];
 const label = (decision: ApprovalDecision, step: string) => decision === 'revision' ? 'Yêu cầu chỉnh sửa'
-  : decision === 'reject' ? 'Từ chối' : step === 'board' ? 'Phê duyệt' : 'Chấp thuận';
+  : decision === 'reject' ? 'Từ chối' : step === 'board' ? 'Phê duyệt' : step === 'legal' ? 'Chấp thuận và trình Ban Giám đốc' : 'Chấp thuận';
 
 /** One real workflow panel embedded in the canonical contract detail page (SYS-CTR-07/08/09). */
 export function ContractApprovalPanel({ contract, user, onRefresh }: {
@@ -56,6 +56,23 @@ export function ContractApprovalPanel({ contract, user, onRefresh }: {
       .finally(() => { if (!abort.signal.aborted) setLoading(false); });
     return () => abort.abort();
   }, [contract.id, contract.version, round?.id, round?.no, round?.result, assigned, step, user.id, reload]);
+  const notificationPending = Boolean(doc?.pendingTask?.toLowerCase().includes('thông báo'));
+  useEffect(() => {
+    if (!notificationPending || !contract.id || !step || !assigned || busy) return;
+    const abort = new AbortController();
+    let timer: ReturnType<typeof setTimeout>;
+    const checkDelivery = async () => {
+      try {
+        if (!inFlight.current) {
+          const next = await approvalApi.read(contract.id!, step, abort.signal);
+          if (!abort.signal.aborted && !inFlight.current) setDoc(next);
+        }
+      } catch { /* Retain the truthful pending state and manual retry if the API is unavailable. */ }
+      if (!abort.signal.aborted) timer = setTimeout(() => void checkDelivery(), 5000);
+    };
+    timer = setTimeout(() => void checkDelivery(), 5000);
+    return () => { abort.abort(); clearTimeout(timer); };
+  }, [notificationPending, contract.id, step, assigned, target, busy]);
   const view = approvalView(contract, user, doc);
   if (!step) return null;
   const own = doc?.steps.find(s => s.key === step && s.assigneeId === user.id);
@@ -68,7 +85,7 @@ export function ContractApprovalPanel({ contract, user, onRefresh }: {
     catch (e) { setError(approvalError(e)); }
     finally { setLoading(false); }
   }
-  async function act(action: 'accept' | 'decide' | 'handoff' | 'retry') {
+  async function act(action: 'accept' | 'decide' | 'retry') {
     if (!doc || !own || !step || inFlight.current || blocked || view.kind === 'stale') return;
     if (action === 'decide' && !comment.trim()) { setConfirm(false); setCommentError('Nhập ý kiến/kết luận hoặc lý do bắt buộc.'); return; }
     const expected: ReviewRequest = { roundId: doc.roundId, stepId: own.id, viewedVersion: contract.version, step };
@@ -80,18 +97,16 @@ export function ContractApprovalPanel({ contract, user, onRefresh }: {
     inFlight.current = true; setBusy(true); setError(''); setNotice('');
     try {
       const result = action === 'accept' ? await approvalApi.accept(doc.id, expected, key)
-        : action === 'handoff' ? await approvalApi.handoff(doc.id, expected, key)
         : action === 'retry' ? await approvalApi.retry(doc.id, step, key) : await approvalApi.decide(doc.id, body, key);
       if (!mounted.current || currentTarget.current !== requestedTarget) return;
       setDoc(result.document); setConfirm(false);
       if (action === 'decide') setComment('');
       keys.current.delete(signature);
       const saved = action === 'accept' ? 'Đã tiếp nhận rà soát. Hồ sơ chuyển sang Đang rà soát.'
-        : action === 'handoff' ? 'Đã ghi nhận việc trình Ban Giám đốc. Kết luận Pháp chế được giữ nguyên.'
         : action === 'retry' ? 'Đã xử lý lại thông báo. Kết quả duyệt đã lưu được giữ nguyên.'
         : decision === 'revision' ? 'Đã yêu cầu chỉnh sửa. Lượt duyệt dừng lại; hồ sơ phải được trình lại từ Trưởng phòng Kinh doanh.'
         : decision === 'reject' ? 'Đã từ chối hồ sơ và kết thúc lượt duyệt.'
-        : step === 'legal' ? 'Đã lưu kết luận Pháp chế. Tiếp tục trình hồ sơ lên Ban Giám đốc.'
+        : step === 'legal' ? 'Đã chấp thuận và trình hồ sơ lên Ban Giám đốc. Kết luận Pháp chế đã được lưu; bước Phê duyệt chờ Giám đốc phân công nếu chưa có người nhận.'
         : step === 'board' ? 'Phê duyệt thành công. Hợp đồng chuyển sang Đã duyệt; phiên bản được duyệt bị khóa chỉnh sửa.'
         : 'Đã chấp thuận tại Trưởng phòng Kinh doanh. Hồ sơ tiếp tục ở bước Pháp chế; nếu chưa có người nhận thì cần phân công.';
       setNotice(saved);
@@ -117,7 +132,6 @@ export function ContractApprovalPanel({ contract, user, onRefresh }: {
     {doc && doc.pendingTask?.toLowerCase().includes('thông báo') &&
       <div className="review-panel__actions"><Button variant="secondary" disabled={actionDisabled} onClick={() => void act('retry')}>Gửi lại thông báo</Button></div>}
     {doc && view.kind === 'accept' && <div className="review-panel__actions"><Button disabled={actionDisabled} onClick={() => void act('accept')}>Tiếp nhận rà soát</Button></div>}
-    {doc && view.kind === 'handoff' && <div className="review-panel__actions"><Button disabled={actionDisabled} onClick={() => void act('handoff')}>Trình hồ sơ lên Ban Giám đốc</Button></div>}
     {doc && view.kind === 'decide' && <>
       {doc.steps.some(s => s.order < (own?.order ?? 0)) && <div className="review-panel__previous">{doc.steps.filter(s => s.order < (own?.order ?? 0)).map(s =>
         <div key={s.id}><strong>{STEP_LABELS[s.key]} · {s.assigneeName}</strong><span>{s.comment ?? 'Đã chấp thuận'}{s.decidedAt ? ` · ${formatDateTime(s.decidedAt)}` : ''}</span></div>)}</div>}
@@ -137,7 +151,7 @@ export function ContractApprovalPanel({ contract, user, onRefresh }: {
       initialFocus="first" onClose={() => { if (!busy) setConfirm(false); }} actions={<><Button variant="secondary" disabled={busy} onClick={() => setConfirm(false)}>Quay lại</Button>
         <Button variant={decision === 'reject' ? 'danger' : 'primary'} disabled={busy} onClick={() => void act('decide')}>{busy ? 'Đang ghi nhận…' : 'Xác nhận quyết định'}</Button></>}>
       <div className="dialog__body"><p>{contract.code} · Lượt {round?.no} · Phiên bản {contract.version}</p><p className="approval-confirm-comment">{comment.trim()}</p>
-        <p>{decision === 'approve' ? step === 'board' ? 'Quyết định hợp lệ tại bước cuối sẽ chuyển hợp đồng sang Đã duyệt.' : 'Kết quả được lưu trên đúng lượt và phiên bản đang rà soát.'
+        <p>{decision === 'approve' ? step === 'board' ? 'Quyết định hợp lệ tại bước cuối sẽ chuyển hợp đồng sang Đã duyệt.' : step === 'legal' ? 'Lưu kết luận và trình hồ sơ lên Ban Giám đốc trong cùng lần xác nhận. Hồ sơ vẫn Đang rà soát cho đến khi người được giao tại Ban Giám đốc phê duyệt.' : 'Kết quả được lưu trên đúng lượt và phiên bản đang rà soát.'
           : decision === 'revision' ? 'Lượt hiện tại dừng lại. Hồ sơ sau chỉnh sửa phải được trình lại từ Trưởng phòng Kinh doanh.' : 'Lượt duyệt kết thúc và hồ sơ không chuyển sang bước tiếp theo.'}</p></div>
     </Dialog>}
   </section>;

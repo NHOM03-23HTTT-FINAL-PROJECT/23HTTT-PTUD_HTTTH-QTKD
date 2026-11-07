@@ -263,16 +263,18 @@ test('detail review exposes sales acceptance only for the assigned reviewer on t
   assert.equal(api.approvalView(contract, { ...actor, id: 'different-manager' }, doc).kind, 'info');
 });
 
-test('legal and board controls wait for predecessors, assignment and the explicit handoff', () => {
+test('legal approval has no separate handoff and assigned board reviewers must accept first', () => {
   const f = reviewFixture('NV_PC');
   assert.equal(api.approvalView(f.contract, f.actor, f.doc).kind, 'info');
   f.doc.status = 'under-review'; f.doc.steps[0] = { ...f.doc.steps[0], state: 'done', decision: 'approve', reviewedVersion: 3 };
   f.doc.steps[1].state = 'reviewing';
   assert.equal(api.approvalView(f.contract, f.actor, f.doc).kind, 'decide');
   f.doc.steps[1] = { ...f.doc.steps[1], state: 'done', decision: 'approve', reviewedVersion: 3 };
-  assert.equal(api.approvalView(f.contract, f.actor, f.doc).kind, 'handoff');
+  assert.equal(api.approvalView(f.contract, f.actor, f.doc).kind, 'info');
   const board = { ...f.actor, id: 'GD', roles: ['GD'] };
   assert.equal(api.approvalView(f.contract, board, f.doc).kind, 'info');
+  f.doc.steps[2].state = 'pending-accept';
+  assert.equal(api.approvalView(f.contract, board, f.doc).kind, 'accept');
   f.doc.steps[2].state = 'reviewing';
   assert.equal(api.approvalView(f.contract, board, f.doc).kind, 'decide');
   f.doc.steps[0].reviewedVersion = 2;
@@ -282,6 +284,8 @@ test('legal and board controls wait for predecessors, assignment and the explici
 test('unassigned, concluded and new manager roles produce explicit read-only states', () => {
   const f = reviewFixture('NV_PC');
   f.contract.rounds[0].steps[1].assigneeId = null;
+  assert.match(api.approvalView(f.contract, f.actor, f.doc).message, /Chưa đến lượt/);
+  f.contract.rounds[0].steps[1].state = 'unassigned';
   assert.match(api.approvalView(f.contract, f.actor, f.doc).message, /chờ phân công/);
   f.contract.rounds[0].result = 'revision';
   assert.match(api.approvalView(f.contract, f.actor, f.doc).message, /đã kết thúc/);
