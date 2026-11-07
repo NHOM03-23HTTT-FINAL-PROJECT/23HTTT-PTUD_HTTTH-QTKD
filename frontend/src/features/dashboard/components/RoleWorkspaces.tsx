@@ -103,7 +103,7 @@ export function OperationsWorkspace({
   return (
     <div className="dash-main">
       <div className="dash-main__primary">
-        <TableCard title="Khu vực cập nhật gần đây" subtitle="Tạo mới hoặc chỉnh sửa thông số trong 7 ngày qua" viewAllTo="/khu-vuc">
+        <TableCard title="Khu vực cập nhật gần đây" subtitle="Tạo mới hoặc chỉnh sửa thông số trong 7 ngày qua" viewAllTo={ROUTES.areaLookup}>
           <DataTable columns={AREA_COLUMNS} rows={currentAreas} rowKey={(r) => r.code} />
         </TableCard>
       </div>

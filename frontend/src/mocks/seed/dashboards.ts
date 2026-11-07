@@ -98,7 +98,7 @@ export const OPERATIONS_DASHBOARD: OperationsDashboard = {
   greeting: 'Danh mục mặt bằng hiện có 36 khu vực trên 3 cấp phân cấp.',
   actions: {
     secondary: { label: 'Sơ đồ phân cấp', to: '/khu-vuc/so-do' },
-    primary: { label: '+ Tạo khu vực', to: '/khu-vuc/tao-moi' },
+    primary: { label: 'Thêm mới khu vực', to: '/khu-vuc/tao-moi' },
   },
   pending: {
     items: [
@@ -107,7 +107,7 @@ export const OPERATIONS_DASHBOARD: OperationsDashboard = {
       { count: 1, label: 'đề xuất tạm ngưng chờ xác nhận' },
     ],
     unread: 2,
-    viewAllTo: '/khu-vuc',
+    viewAllTo: '/khu-vuc/tra-cuu',
   },
   stats: [
     { label: 'Tổng khu vực', value: '36', hint: '34 Active · 2 tạm ngưng', icon: 'map-pin' },

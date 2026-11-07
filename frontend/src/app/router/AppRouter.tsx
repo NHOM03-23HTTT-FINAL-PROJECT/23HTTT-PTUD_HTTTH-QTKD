@@ -1,6 +1,6 @@
 import { BACKEND_ENABLED as CONTRACTS_API_ENABLED } from '@/features/contracts/config/backend';
 import { useState } from 'react';
-import { createBrowserRouter, RouterProvider, Route, Routes } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Route, Routes, Navigate } from 'react-router-dom';
 import { ACCOUNT_NAV, WORKSPACE_NAV } from '@/constants/navigation';
 import { ROUTES } from '@/constants/routes';
 import { ChangePasswordPage } from '@/features/auth/pages/ChangePasswordPage';
@@ -147,11 +147,7 @@ export function AppRoutes() {
             />
             <Route
               path={ROUTES.areas}
-              element={
-                <BusinessRoute permission="areas.view" label="Danh sách khu vực">
-                  <AreaLookupPage key="list" variant="list" />
-                </BusinessRoute>
-              }
+              element={<Navigate to={ROUTES.areaLookup} replace />}
             />
             <Route
               path={ROUTES.areaLookup}

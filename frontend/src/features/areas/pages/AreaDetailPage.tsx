@@ -102,16 +102,12 @@ export function AreaDetailPage() {
 
 /** 13.10 · Không hiển thị tên hay chi tiết hồ sơ khi AreaId không hợp lệ hoặc đã bị gỡ. */
 export function AreaNotFound() {
-  const { can } = useAuth();
-  // Phòng Khai thác (có quyền tạo/cập nhật) dùng Danh sách khu vực; các phòng khác dùng Tra cứu khu vực.
-  const operations = can('areas.update');
-  const listPath = operations ? ROUTES.areas : ROUTES.areaLookup;
   return (
     <>
       <nav className="breadcrumb" aria-label="Đường dẫn">
         <span>Khu vực khai thác</span>
         <span className="breadcrumb__separator">/</span>
-        <Link to={listPath}>{operations ? 'Danh sách khu vực' : 'Tra cứu khu vực'}</Link>
+        <Link to={ROUTES.areaLookup}>Tra cứu khu vực</Link>
         <span className="breadcrumb__separator">/</span>
         <span className="breadcrumb__current" aria-current="page">
           Không tìm thấy hồ sơ
@@ -123,7 +119,7 @@ export function AreaNotFound() {
         </span>
         <h3>Hồ sơ khu vực không tồn tại hoặc đã bị gỡ bỏ khỏi hệ thống</h3>
         <p>Đường dẫn có thể đã cũ hoặc khu vực đã bị xóa mềm. Vui lòng quay lại danh sách để tìm khu vực khác.</p>
-        <ButtonLink to={listPath}>Quay lại danh sách khu vực</ButtonLink>
+        <ButtonLink to={ROUTES.areaLookup}>Quay lại tra cứu khu vực</ButtonLink>
       </section>
     </>
   );
@@ -156,7 +152,7 @@ function AreaProfile({ area, onUpdateArea }: { area: Area; onUpdateArea?: (next:
   const parent = chain.length > 1 ? chain[chain.length - 2] : null;
   const children = childrenOf(tree, area.code);
   const neighbor = parent ? childrenOf(tree, parent.code).find((a) => a.code !== area.code) : undefined;
-  const listPath = canUpdate ? ROUTES.areas : ROUTES.areaLookup;
+  const listPath = ROUTES.areaLookup;
   const changedFields = new Set<AreaField>(state?.updated?.changes.map((c) => c.field) ?? []);
   if (state?.hierarchy) changedFields.add('parentCode');
 
@@ -208,7 +204,7 @@ function AreaProfile({ area, onUpdateArea }: { area: Area; onUpdateArea?: (next:
       <nav className="breadcrumb" aria-label="Đường dẫn">
         <span>Khu vực khai thác</span>
         <span className="breadcrumb__separator">/</span>
-        <Link to={listPath}>{canUpdate ? 'Danh sách khu vực' : 'Tra cứu khu vực'}</Link>
+        <Link to={listPath}>Tra cứu khu vực</Link>
         <span className="breadcrumb__separator">/</span>
         <span className="breadcrumb__current" aria-current="page">
           {area.code}
@@ -232,7 +228,7 @@ function AreaProfile({ area, onUpdateArea }: { area: Area; onUpdateArea?: (next:
             Xuất file lý lịch
           </Button>
           <ButtonLink to={listPath} variant="secondary">
-            Về danh sách
+            Về tra cứu
           </ButtonLink>
           {canUpdate && (
             <AreaActionsMenu

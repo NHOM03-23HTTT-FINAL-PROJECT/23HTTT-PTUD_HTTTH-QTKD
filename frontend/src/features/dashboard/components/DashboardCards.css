@@ -67,7 +67,48 @@
 
 .dash-header__actions {
   display: flex;
-  gap: 10px;
+  align-items: center;
+  gap: 12px;
+}
+
+.area-segmented {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  background: var(--bg-subtle);
+}
+
+.area-segmented__option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-decoration: none;
+  cursor: pointer;
+  line-height: 1.4;
+  transition: all 0.15s ease;
+}
+
+.area-segmented__option:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.area-segmented__option--active {
+  border-color: var(--border-default);
+  background: var(--bg-surface);
+  font-weight: 600;
+  color: var(--text-primary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 /* ---------- Hồ sơ chờ tôi xử lý ---------- */
