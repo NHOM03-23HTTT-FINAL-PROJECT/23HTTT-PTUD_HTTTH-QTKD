@@ -8,6 +8,7 @@ import type { NotificationItem, NotificationKind, NotificationRecordType } from 
 export const KIND_LABELS: Record<NotificationKind, string> = {
   General: 'Thông báo chung',
   ReviewAssigned: 'Được phân công',
+  ReviewAssignmentRequired: 'Hồ sơ chờ phân công',
   AssignmentRevoked: 'Thay đổi phân công',
   ReviewRequired: 'Hồ sơ cần xử lý',
   ApprovalResult: 'Kết quả duyệt',
@@ -45,6 +46,7 @@ export function notificationTarget(
   mock: boolean,
 ): { path: string; verify?: () => Promise<unknown> } | null {
   if (item.recordType !== 'Contract' || item.kind === 'AssignmentRevoked') return null;
+  if (item.kind === 'ReviewAssignmentRequired') return user.permissions.has('approvals.assign') ? { path: ROUTES.approvalAssignments } : null;
   if (mock) return user.permissions.has('contracts.view') ? { path: ROUTES.contractDetail(item.recordId) } : null;
   const step = approvalStep(user);
   if (!step) return null;

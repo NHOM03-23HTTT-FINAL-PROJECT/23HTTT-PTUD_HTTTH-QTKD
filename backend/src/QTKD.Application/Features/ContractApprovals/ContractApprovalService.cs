@@ -73,7 +73,7 @@ public sealed class ContractApprovalService(IContractApprovalEngine engine, IIde
         if (step.State is "done" or "stopped" or "skipped") throw new ReviewFailure(409, "STEP_DONE");
         if (accept)
         {
-            if (step.Key != "sales" || d.Status != "submitted" || step.State != "pending-accept")
+            if (step.State != "pending-accept" || (step.Key == "sales" ? d.Status != "submitted" : d.Status != "under-review"))
                 throw new ReviewFailure(409, "STEP_NOT_READY");
         }
         else if (d.Status != "under-review" || step.State != "reviewing") throw new ReviewFailure(409, "STEP_NOT_READY");

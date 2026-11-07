@@ -96,7 +96,8 @@ public partial class ContractService
                 status = ContractRules.ToClientStatus(c.Status),
                 c.OwnerName,
                 updatedAt = Time(c.UpdatedAt),
-                c.AreaCodes
+                c.AreaCodes,
+                c.StepLabel
             })
         });
     }

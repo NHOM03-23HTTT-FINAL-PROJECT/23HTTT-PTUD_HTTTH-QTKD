@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json.Nodes;
 using QTKD.Application.Common.Interfaces;
 using QTKD.Domain.Contracts;
+using QTKD.Application.Features.ContractApprovals;
 
 namespace QTKD.Application.Features.Contracts;
 
@@ -176,7 +177,7 @@ public partial class ContractService
                 ["size"] = f.Size,
                 ["downloadUrl"] = $"/api/v1/contracts/{c.Code}/attachments/{f.Id}"
             })),
-            ["rounds"] = Array(c.Rounds.Select(r => Round(r, actor))),
+            ["rounds"] = Array(c.Rounds.Select((r, i) => Round(r, i > 0 ? c.Rounds[i - 1].Result : null, actor))),
             ["cancellationRequests"] = Array(c.CancellationRequests.Select(r => new JsonObject
             {
                 ["id"] = r.Id.ToString(),
@@ -238,10 +239,25 @@ public partial class ContractService
         return data;
     }
 
-    private static JsonObject Round(ApprovalRoundRecord r, Actor actor)
+    private static JsonObject Round(ApprovalRoundRecord r, string? previousResult, Actor actor)
     {
         var snapshot = JsonNode.Parse(r.Snapshot);
         var stages = snapshot?["workflow"]?["stages"] as JsonArray;
+        var seesLegal = actor.Role is "LegalStaff" or "LegalManager";
+
+        // Stage of the step in the submitted workflow; rounds without one fall back to the assignee's role.
+        string StepKey(ApprovalStepRecord s)
+        {
+            var stage = s.Order >= 1 && stages is not null && s.Order <= stages.Count ? stages[s.Order - 1] : null;
+            var stageKey = (stage is JsonObject o ? Text(o["key"]) : null) ?? Text(stage) ?? s.AssigneeRole;
+            return stageKey switch
+            {
+                "SalesManager" or "sales" => "sales",
+                "LegalStaff" or "legal" => "legal",
+                _ => "board"
+            };
+        }
+
         return new JsonObject
         {
             ["id"] = r.Id.ToString(),
@@ -259,36 +275,24 @@ public partial class ContractService
                 "RevisionRequested" => "revision",
                 _ => r.Result.ToLowerInvariant()
             },
-            ["log"] = new JsonArray(),
+            ["log"] = Log(r, previousResult, s => StepKey(s), seesLegal),
             ["coordinations"] = new JsonArray(),
             ["steps"] = Array(r.Steps.Select(s =>
             {
-                // Stage of the step in the submitted workflow; rounds without one fall back to the assignee's role.
-                var stage = s.Order >= 1 && stages is not null && s.Order <= stages.Count ? stages[s.Order - 1] : null;
-                var stageKey = (stage is JsonObject o ? Text(o["key"]) : null) ?? Text(stage) ?? s.AssigneeRole;
-                var legal = stageKey is "LegalStaff" or "legal";
+                var key = StepKey(s);
+                var legal = key == "legal";
                 return new JsonObject
                 {
                     ["id"] = s.Id.ToString(),
-                    ["key"] = stageKey switch
-                    {
-                        "SalesManager" or "sales" => "sales",
-                        "LegalStaff" or "legal" => "legal",
-                        _ => "board"
-                    },
+                    ["key"] = key,
                     ["label"] = s.Label,
                     ["assigneeId"] = s.AssigneeId?.ToString(),
                     ["assigneeName"] = s.AssigneeName,
                     ["assignedAt"] = Time(s.AssignedAt),
                     ["acceptedAt"] = Time(s.AcceptedAt),
-                    ["state"] = s.Status switch
-                    {
-                        "NotStarted" => s.AssigneeId is null ? "unassigned" : "waiting",
-                        "Pending" => "pending-accept",
-                        "Reviewing" => "reviewing",
-                        "Completed" => s.Decision == "Approve" ? "done" : "stopped",
-                        _ => "skipped"
-                    },
+                    ["state"] = ApprovalStageState.Project(s.Status, s.AssigneeId is not null,
+                        r.Steps.Where(previous => previous.Order < s.Order).All(previous => previous.Status == "Completed" && previous.Decision == "Approve"),
+                        r.Result == "Running"),
                     ["decision"] = s.Decision switch
                     {
                         "Approve" => "approve",
@@ -300,9 +304,98 @@ public partial class ContractService
                     ["decidedAt"] = Time(s.DecidedAt),
                     ["reviewedVersion"] = s.Decision is null ? null : r.RecordVersion,
                     // Legal comments are only shown to the legal department.
-                    ["comment"] = legal && actor.Role is not ("LegalStaff" or "LegalManager") ? null : s.Comment
+                    ["comment"] = legal && !seesLegal ? null : s.Comment
                 };
             }))
+        };
+    }
+
+    /// <summary>
+    /// SYS-CTR-11 bước 9: the round's submission followed by its audited approval and assignment actions, oldest first.
+    /// A step accepted or decided without an audit row (e.g. demo seed data) is logged from the step itself.
+    /// Rows without statuses carry the status the contract had at that point.
+    /// </summary>
+    private static JsonArray Log(ApprovalRoundRecord r, string? previousResult, Func<ApprovalStepRecord, string> stepKey, bool seesLegal)
+    {
+        var keys = r.Steps.ToDictionary(s => s.Id, stepKey);
+        var rows = new List<(DateTime At, string Key, string? Actor, string Action, string? From, string? To, string? Note)>();
+
+        foreach (var e in r.Log)
+        {
+            if (e.StepId is not Guid id || !keys.TryGetValue(id, out var key))
+            {
+                continue;
+            }
+
+            var action = e.Action switch
+            {
+                "REVIEW_ACCEPTED" => "accept",
+                "REVIEW_APPROVED" => "approve",
+                "REVIEW_APPROVED_AND_FORWARDED" => "approve",
+                "REVIEW_HANDED_OFF" => key == "sales" ? "handoff-legal" : "handoff-board",
+                "REVIEW_REVISION_REQUESTED" => "request-revision",
+                "REVIEW_REJECTED" => "reject",
+                "APPROVER_ASSIGNED" or "APPROVER_REASSIGNED" => "assign",
+                _ => null
+            };
+            if (action is not null)
+            {
+                rows.Add((e.At, key, e.ActorName, action, e.From, e.To, e.Note));
+                if (e.Action == "REVIEW_APPROVED_AND_FORWARDED")
+                    rows.Add((e.At, key, e.ActorName, "handoff-board", e.From, e.To, null));
+            }
+        }
+
+        foreach (var s in r.Steps)
+        {
+            var key = keys[s.Id];
+            bool Audited(params string[] actions) => rows.Any(x => x.Key == key && actions.Contains(x.Action));
+            if (s.AcceptedAt is DateTime accepted && !Audited("accept"))
+            {
+                rows.Add((accepted, key, s.AssigneeName, "accept", null, "under-review", null));
+            }
+
+            if (s.DecidedAt is DateTime decided && s.Decision is { } decision && !Audited("approve", "request-revision", "reject"))
+            {
+                var (action, to) = decision switch
+                {
+                    "RequestRevision" => ("request-revision", "revision-requested"),
+                    "Reject" => ("reject", "rejected"),
+                    _ => ("approve", key == "board" ? "approved" : "under-review")
+                };
+                rows.Add((decided, key, s.DecidedByName ?? s.AssigneeName, action, null, to, s.Comment));
+            }
+        }
+
+        var status = "submitted";
+        var log = new List<JsonNode>
+        {
+            Entry(r.SubmittedAt, "sales", r.SubmittedByName, "submit",
+                previousResult == "RevisionRequested" ? "revision-requested" : "draft", status, null, false)
+        };
+        string[] order = ["assign", "accept", "approve", "request-revision", "reject", "handoff-legal", "handoff-board"];
+        foreach (var e in rows.OrderBy(x => x.At).ThenBy(x => System.Array.IndexOf(order, x.Action)))
+        {
+            var from = e.From ?? status;
+            status = e.To ?? status;
+            // Legal opinions are internal to the legal department (A9).
+            var legal = e.Key == "legal";
+            log.Add(Entry(e.At, e.Key, e.Actor ?? "", e.Action, from, status, legal && !seesLegal ? null : e.Note, legal));
+        }
+
+        return new JsonArray(log.ToArray());
+
+        JsonObject Entry(DateTime at, string key, string actorName, string action, string from, string to, string? note, bool @internal) => new()
+        {
+            ["at"] = Time(at),
+            ["stepKey"] = key,
+            ["actorName"] = actorName,
+            ["action"] = action,
+            ["from"] = from,
+            ["to"] = to,
+            ["note"] = note,
+            ["version"] = r.RecordVersion,
+            ["internal"] = @internal
         };
     }
 

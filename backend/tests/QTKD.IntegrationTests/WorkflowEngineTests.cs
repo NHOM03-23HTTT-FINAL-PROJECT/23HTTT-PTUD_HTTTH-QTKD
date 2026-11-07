@@ -22,23 +22,24 @@ public sealed class WorkflowEngineTests
     }
     private static ContractApprovalEngine Engine(MemoryApprovalStore store) => new(store, new(), TimeProvider.System);
     [Fact]
-    public async Task Three_level_flow_requires_accept_and_explicit_legal_handoff_before_final_approval()
+    public async Task Three_level_flow_accepts_each_assigned_step_and_forwards_legal_approval_atomically()
     {
         var store = new MemoryApprovalStore(Submitted()); var engine = Engine(store);
         await engine.Execute(Command(store.Document, "sales", "accept"), default);
         Assert.Equal("under-review", store.Document.Status);
         await engine.Execute(Command(store.Document, "sales", "approve"), default);
-        Assert.Equal("reviewing", store.Document.Steps[1].State);
+        Assert.Equal("pending-accept", store.Document.Steps[1].State);
         Assert.Equal("under-review", store.Document.Status);
+        await engine.Execute(Command(store.Document, "legal", "accept"), default);
         await engine.Execute(Command(store.Document, "legal", "approve"), default);
-        Assert.Equal("waiting", store.Document.Steps[2].State);
+        Assert.Equal("pending-accept", store.Document.Steps[2].State);
         var error = await Assert.ThrowsAsync<ReviewFailure>(() => engine.Execute(Command(store.Document, "board", "approve"), default));
         Assert.Equal("STEP_NOT_READY", error.Code);
-        await engine.Execute(Command(store.Document, "legal", "handoff"), default);
+        await engine.Execute(Command(store.Document, "board", "accept"), default);
         await engine.Execute(Command(store.Document, "board", "approve"), default);
         Assert.Equal("approved", store.Document.Status); Assert.Equal("completed", store.Document.RoundResult);
         Assert.All(store.Document.Steps, s => { Assert.Equal("approve", s.Decision); Assert.Equal(3, s.ReviewedVersion); Assert.NotNull(s.DecidedAt); });
-        Assert.Equal(5, store.Audit.Count); Assert.NotEmpty(store.Messages);
+        Assert.Equal(6, store.Audit.Count); Assert.NotEmpty(store.Messages);
     }
     [Theory]
     [InlineData("sales", "revision", "revision-requested")]
@@ -54,9 +55,11 @@ public sealed class WorkflowEngineTests
         if (step != "sales") await engine.Execute(Command(store.Document, "sales", "approve"), default);
         if (step == "board")
         {
-            await engine.Execute(Command(store.Document, "legal", "approve"), default);
-            await engine.Execute(Command(store.Document, "legal", "handoff"), default);
+            await engine.Execute(Command(store.Document, "legal", "accept"), default);
+        await engine.Execute(Command(store.Document, "legal", "approve"), default);
+            await engine.Execute(Command(store.Document, "board", "accept"), default);
         }
+        if (step == "legal") await engine.Execute(Command(store.Document, "legal", "accept"), default);
         await engine.Execute(Command(store.Document, step, action), default);
         Assert.Equal(expected, store.Document.Status);
         Assert.DoesNotContain(store.Document.Steps, s => s.State == "reviewing");
@@ -98,8 +101,8 @@ public sealed class WorkflowEngineTests
         var store = new MemoryApprovalStore(initial); var engine = Engine(store);
         await engine.Execute(Command(store.Document, "sales", "accept"), default);
         await engine.Execute(Command(store.Document, "sales", "approve"), default);
+        await engine.Execute(Command(store.Document, "legal", "accept"), default);
         await engine.Execute(Command(store.Document, "legal", "approve"), default);
-        await engine.Execute(Command(store.Document, "legal", "handoff"), default);
         Assert.Equal("approve", store.Document.Steps[1].Decision); Assert.Equal("unassigned", store.Document.Steps[2].State);
         Assert.Equal("under-review", store.Document.Status); Assert.Equal("in-progress", store.Document.RoundResult);
     }
@@ -107,16 +110,38 @@ public sealed class WorkflowEngineTests
     public async Task Notification_retry_failure_does_not_undo_approved_contract_or_repeat_decisions()
     {
         var store = new MemoryApprovalStore(Submitted()); var engine = Engine(store);
-        foreach (var (step, action) in new[] { ("sales", "accept"), ("sales", "approve"), ("legal", "approve"), ("legal", "handoff"), ("board", "approve") })
+        foreach (var (step, action) in new[] { ("sales", "accept"), ("sales", "approve"), ("legal", "accept"), ("legal", "approve"), ("board", "accept"), ("board", "approve") })
             await engine.Execute(Command(store.Document, step, action), default);
         var actor = Command(store.Document, "board", "approve").Actor;
         store.FailDelivery = true;
         await Assert.ThrowsAsync<IOException>(() => engine.RetryPending(store.Document.Id, actor, "retry", default));
-        Assert.Equal("approved", store.Document.Status); Assert.Equal(5, store.Audit.Count); Assert.NotEmpty(store.Messages);
+        Assert.Equal("approved", store.Document.Status); Assert.Equal(6, store.Audit.Count); Assert.NotEmpty(store.Messages);
         store.FailDelivery = false;
         await engine.RetryPending(store.Document.Id, actor, "retry", default);
-        Assert.Equal("approved", store.Document.Status); Assert.Equal(5, store.Audit.Count); Assert.Empty(store.Messages);
+        Assert.Equal("approved", store.Document.Status); Assert.Equal(6, store.Audit.Count); Assert.Empty(store.Messages);
     }
+    [Fact]
+    public async Task Combined_legal_approval_failure_leaves_conclusion_next_step_and_messages_unchanged()
+    {
+        var store = new MemoryApprovalStore(Submitted()); var engine = Engine(store);
+        foreach (var (step, action) in new[] { ("sales", "accept"), ("sales", "approve"), ("legal", "accept") })
+            await engine.Execute(Command(store.Document, step, action), default);
+        var before = store.Document; var count = store.Messages.Count; store.FailSave = true;
+        await Assert.ThrowsAsync<IOException>(() => engine.Execute(Command(store.Document, "legal", "approve"), default));
+        Assert.Equal(before, store.Document); Assert.Equal(count, store.Messages.Count); Assert.Equal(3, store.Audit.Count);
+        store.FailSave = false;
+        var command = Command(store.Document, "legal", "approve", "combined");
+        await engine.Execute(command, default); await engine.Execute(command, default);
+        Assert.Equal("pending-accept", store.Document.Steps[2].State); Assert.Equal(4, store.Audit.Count);
+    }
+
+    [Theory]
+    [InlineData(false, false, "waiting")]
+    [InlineData(false, true, "unassigned")]
+    [InlineData(true, true, "pending-accept")]
+    public void Legacy_notstarted_steps_are_projected_without_a_manual_handoff(bool assigned, bool previousDone, string expected)
+        => Assert.Equal(expected, ApprovalStageState.Project("NotStarted", assigned, previousDone, true));
+
     [Fact]
     public void Generic_workflow_is_not_fixed_to_three_contract_roles()
     {
@@ -132,6 +157,7 @@ public sealed class WorkflowEngineTests
         await engine.Execute(Command(store.Document, "sales", "accept"), default);
         await engine.Execute(Command(store.Document, "sales", "approve"), default);
         var oldCommand = Command(store.Document, "legal", "approve");
+        await engine.Execute(Command(store.Document, "legal", "accept"), default);
         await engine.Execute(Command(store.Document, "legal", "revision"), default);
         var oldAudit = store.Audit.ToArray();
         // The contract submission module supplies the next pinned round; this module does not edit contracts or submit them.

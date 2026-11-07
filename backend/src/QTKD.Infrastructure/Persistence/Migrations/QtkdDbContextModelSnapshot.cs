@@ -4,8 +4,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
-using QTKD.Domain.Enums;
-using ActiveStatus = QTKD.Domain.Enums.ActiveStatus;
 using QTKD.Domain.Identity;
 using QTKD.Domain.Notifications;
 using QTKD.Infrastructure.Persistence;

@@ -90,6 +90,9 @@ public partial class ContractRepository
             source = source.Where(c => c.ContractType == query.ContractType);
         if (!string.IsNullOrEmpty(query.AreaCode))
             source = source.Where(c => Items.Any(i => i.ContractId == c.ContractId && Areas.Any(a => a.AreaId == i.AreaId && a.AreaCode == query.AreaCode)));
+        // "Theo dõi tiến độ" (SYS-CTR-11 A10): only records submitted at least once.
+        if (query.View == "tracking")
+            source = source.Where(c => Rounds.Any(r => r.ContractId == c.ContractId));
 
         var total = await source.CountAsync(ct);
         var page = await (from c in source
@@ -108,7 +111,13 @@ public partial class ContractRepository
                               EffectiveTo = c.EndDate,
                               Status = c.Status.ToString(),
                               OwnerName = owner.FullName,
-                              UpdatedAt = c.UpdatedAt
+                              UpdatedAt = c.UpdatedAt,
+                              StepLabel = (from r in Rounds
+                                           where r.ContractId == c.ContractId && r.Result == ApprovalResult.Running
+                                           from s in Steps
+                                           where s.RoundId == r.RoundId && s.StepStatus != ApprovalStepStatus.Completed
+                                           orderby s.StepOrder
+                                           select s.StepName).FirstOrDefault()
                           }).Skip((query.Page - 1) * query.Size).Take(query.Size).ToListAsync(ct);
         var ids = page.Select(c => c.Id).ToArray();
         var areas = await (from i in Items

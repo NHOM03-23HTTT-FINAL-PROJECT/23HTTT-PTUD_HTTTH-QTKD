@@ -236,7 +236,7 @@ export function AppRoutes() {
             <Route
               path="/hop-dong/:code/tien-do"
               element={
-                <BusinessRoute permission="contracts.view" label="Tiến độ và lịch sử phê duyệt">
+                <BusinessRoute permission="contracts.view" label="Tiến độ và lịch sử phê duyệt" apiReady={CONTRACTS_API_ENABLED}>
                   <ContractProgressPage />
                 </BusinessRoute>
               }
@@ -276,7 +276,7 @@ export function AppRoutes() {
             <Route
               path={ROUTES.approvalTracking}
               element={
-                <BusinessRoute permission="approvals.track" label="Theo dõi tiến độ">
+                <BusinessRoute permission="approvals.track" label="Theo dõi tiến độ" apiReady={CONTRACTS_API_ENABLED}>
                   <ContractListPage key="tracking" variant="tracking" />
                 </BusinessRoute>
               }

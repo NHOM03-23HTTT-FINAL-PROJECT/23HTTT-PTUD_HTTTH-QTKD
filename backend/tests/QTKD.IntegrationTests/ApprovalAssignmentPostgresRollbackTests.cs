@@ -14,7 +14,7 @@ namespace QTKD.IntegrationTests;
 public sealed class ApprovalAssignmentPostgresRollbackTests
 {
     [ApprovalPostgresRollbackFact]
-    public async Task Department_heads_assign_and_reassign_only_legal_and_board_steps_then_rollback()
+    public async Task Department_heads_assign_current_legal_and_board_steps_once_then_rollback()
     {
         await using var db = new QtkdDbContext(QtkdPersistence.Options(Environment.GetEnvironmentVariable("QTKD_APPROVAL_ROLLBACK_CONNECTION")!));
         await db.Database.OpenConnectionAsync();
@@ -70,33 +70,39 @@ public sealed class ApprovalAssignmentPostgresRollbackTests
             AssignReviewRequest Request(string step, Guid assignee) =>
                 new(document.RoundId, document.Steps.Single(s => s.Key == step).Id, document.Version, assignee);
 
-            Assert.DoesNotContain(await service.Board(As(salesHead), ct), item => item.Document.Id == id);
+            // Newer shared DBs revoke approvals.assign from SalesManager; older baselines return an empty board.
+            try { Assert.DoesNotContain(await service.Board(As(salesHead), ct), item => item.Document.Id == id); }
+            catch (BusinessException error) when (error.Code == "FORBIDDEN") { }
+            Assert.DoesNotContain(await service.Board(As(legalHead), ct), item => item.Document.Id == id);
+            var premature = await Assert.ThrowsAsync<BusinessException>(() => service.Assign(As(legalHead), id, Request("legal", legalStaff), ct));
+            Assert.Equal("ASSIGNMENT_IMMUTABLE", premature.Code);
+            await Exec("UPDATE qtkd.approval_step SET step_status='Completed',decision='Approve',comment='Rollback test approval',decided_by=@m,decided_at=now(),accepted_at=now() WHERE step_id=@s",
+                ("m", salesHead), ("s", document.Steps[0].Id));
+            await Exec("UPDATE qtkd.contract SET status='UnderReview' WHERE contract_id=@id", ("id", id));
+            document = (await PostgresApprovalStore.Load(connection, transaction, id, ct))!.Document;
             Assert.Equal(["legal"], (await service.Board(As(legalHead), ct)).Single(item => item.Document.Id == id).ManagedSteps);
-            Assert.Equal(["board"], (await service.Board(As(boardHead), ct)).Single(item => item.Document.Id == id).ManagedSteps);
             Assert.DoesNotContain(await service.Candidates(As(legalHead), id, "legal", ct), c => c.Id == owner);
-
             var foreign = await Assert.ThrowsAsync<BusinessException>(() => service.Assign(As(legalHead), id, Request("sales", legalStaff), ct));
             Assert.Equal("FORBIDDEN", foreign.Code);
             var drafter = await Assert.ThrowsAsync<BusinessException>(() => service.Assign(As(legalHead), id, Request("legal", owner), ct));
             Assert.Equal("INVALID_ASSIGNEE", drafter.Code);
-
             document = await service.Assign(As(legalHead), id, Request("legal", legalStaff), ct);
-            Assert.Equal(("waiting", legalStaff), (document.Steps[1].State, document.Steps[1].AssigneeId!.Value));
-            document = await service.Assign(As(legalHead), id, Request("legal", legalHead), ct);
-            Assert.Equal(legalHead, document.Steps[1].AssigneeId);
+            Assert.Equal(("pending-accept", legalStaff), (document.Steps[1].State, document.Steps[1].AssigneeId!.Value));
+            foreach (var person in new[] { legalStaff, legalHead })
+                Assert.Equal("ASSIGNMENT_IMMUTABLE", (await Assert.ThrowsAsync<BusinessException>(() => service.Assign(As(legalHead), id, Request("legal", person), ct))).Code);
+            await transaction.SaveAsync("assignment_once");
+            var immutable = await Assert.ThrowsAsync<PostgresException>(() => Exec(
+                "UPDATE qtkd.approval_step SET assignee_id=@person WHERE step_id=@step", ("person", legalHead), ("step", document.Steps[1].Id)));
+            Assert.Equal("23514", immutable.SqlState);
+            await transaction.RollbackAsync("assignment_once");
+            await Exec("UPDATE qtkd.approval_step SET step_status='Completed',decision='Approve',comment='Rollback test approval',decided_by=@m,decided_at=now(),accepted_at=now() WHERE step_id=@s",
+                ("m", legalStaff), ("s", document.Steps[1].Id));
             document = await service.Assign(As(boardHead), id, Request("board", boardHead), ct);
-            Assert.Equal(("waiting", boardHead), (document.Steps[2].State, document.Steps[2].AssigneeId!.Value));
-
-            await Exec("UPDATE qtkd.approval_step SET step_status='Completed',decision='Approve',decided_by=@m,decided_at=now(),accepted_at=now() WHERE step_id=@s",
-                ("m", salesHead), ("s", document.Steps[0].Id));
-            await Exec("UPDATE qtkd.approval_step SET step_status='Reviewing',accepted_at=now() WHERE step_id=@s", ("s", document.Steps[1].Id));
-            document = (await PostgresApprovalStore.Load(connection, transaction, id, ct))!.Document;
-            var started = await Assert.ThrowsAsync<BusinessException>(() => service.Assign(As(legalHead), id, Request("legal", legalStaff), ct));
-            Assert.Equal("ASSIGNMENT_IMMUTABLE", started.Code);
+            Assert.Equal(("pending-accept", boardHead), (document.Steps[2].State, document.Steps[2].AssigneeId!.Value));
 
             await using var notifications = PostgresApprovalStore.Command(connection, transaction,
                 "SELECT count(*) FROM qtkd.notification WHERE record_id=@id", ("id", id));
-            Assert.Equal(4L, await notifications.ExecuteScalarAsync());
+            Assert.Equal(2L, await notifications.ExecuteScalarAsync());
         }
         finally { await efTransaction.RollbackAsync(); }
         await using var cleanup = new NpgsqlCommand("SELECT count(*) FROM qtkd.user_account WHERE username LIKE @prefix", connection);

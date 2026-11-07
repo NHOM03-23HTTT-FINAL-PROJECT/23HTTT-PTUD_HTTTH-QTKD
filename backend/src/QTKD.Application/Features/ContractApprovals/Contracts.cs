@@ -52,6 +52,7 @@ public interface IApprovalTransaction
     ReviewDocument Document { get; }
     Guid OwnerId { get; }
     Task AssertActor(ReviewActor actor, CancellationToken ct);
+    Task<IReadOnlyList<Guid>> AssignmentManagers(string step, CancellationToken ct) => Task.FromResult<IReadOnlyList<Guid>>([]);
     Task<ApprovalReceipt?> Receipt(Guid actorId, string key, CancellationToken ct);
     Task Save(ReviewCommand command, ReviewDocument next, string fingerprint, IReadOnlyList<ApprovalMessage> messages, CancellationToken ct);
 }

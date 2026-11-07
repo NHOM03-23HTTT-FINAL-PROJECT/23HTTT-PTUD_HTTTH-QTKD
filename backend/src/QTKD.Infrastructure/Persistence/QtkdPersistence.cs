@@ -14,6 +14,10 @@ namespace QTKD.Infrastructure.Persistence;
 
 public static class QtkdPersistence
 {
+    // Npgsql includes the translator instance in EF's internal service-provider cache key.
+    // Share this stateless instance across API hosts, tooling and model checks.
+    public static INpgsqlNameTranslator EnumNames { get; } = new NpgsqlNullNameTranslator();
+
     /// <summary>
     /// Registers QtkdDbContext and the repositories built on it. Pass the app's single enum name translator: a new
     /// instance per scope makes EF build a new internal service provider on every request.
@@ -26,6 +30,7 @@ public static class QtkdPersistence
             options.UseNpgsql(connectionString(sp), pg => Configure(pg, enumNames)));
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<ICustomerRepository, CustomerRepository>();
+        services.AddScoped<INotificationDeliveryRepository, NotificationDeliveryRepository>();
         services.AddScoped<ContractRepository>();
         services.AddScoped<IContractRepository>(sp => sp.GetRequiredService<ContractRepository>());
         services.AddScoped<IContractManagementRepository>(sp => sp.GetRequiredService<ContractRepository>());
@@ -45,7 +50,7 @@ public static class QtkdPersistence
         pg.MapEnum<RecordType>("record_type", s, enumNames);
         pg.MapEnum<DocumentRecordType>("document_record_type", s, enumNames);
         pg.MapEnum<SendStatus>("send_status", s, enumNames);
-        pg.MapEnum<QTKD.Domain.Enums.ActiveStatus>("active_status", s, enumNames);
+        pg.MapEnum<QTKD.Infrastructure.Persistence.Schema.ActiveStatus>("active_status", s, enumNames);
         pg.MapEnum<CustomerDecisionType>("customer_decision_type", s, enumNames);
         pg.MapEnum<ContractDocumentType>("contract_document_type", s, enumNames);
         pg.MapEnum<ContractStatus>("contract_status", s, enumNames);
@@ -64,7 +69,7 @@ public static class QtkdPersistence
     /// <summary>Options for tools outside the API host (design time, QTKD.DbTool).</summary>
     public static DbContextOptions<QtkdDbContext> Options(string connectionString) =>
         new DbContextOptionsBuilder<QtkdDbContext>()
-            .UseNpgsql(connectionString, pg => Configure(pg, new NpgsqlNullNameTranslator()))
+            .UseNpgsql(connectionString, pg => Configure(pg, EnumNames))
             .Options;
 }
 

@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -12,6 +13,10 @@ using Npgsql;
 using QTKD.Application.Features.Customers;
 using QTKD.Application.Common.Interfaces;
 using QTKD.Infrastructure.Customers;
+using QTKD.Infrastructure.Persistence;
+using Customer = QTKD.Infrastructure.Persistence.Schema.Customer;
+using CustomerStatus = QTKD.Infrastructure.Persistence.Schema.ActiveStatus;
+using AreaStatus = QTKD.Domain.Enums.ActiveStatus;
 using Xunit;
 
 namespace QTKD.IntegrationTests;
@@ -188,6 +193,40 @@ public sealed class CustomerReactivationPostgresTests
         (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString();
     private static object Reactivate(int version = 1, string reason = "Tiếp tục hợp tác") =>
         new { baseVersion = version, reason, evidence = Array.Empty<object>() };
+
+    [LocalCustomerPostgresFact]
+    public async Task Customer_and_area_statuses_round_trip_through_the_same_postgres_enum()
+    {
+        await using var fixture = await Fixture.Create();
+        var code = await fixture.Customer(suspended: false);
+        var connection = new NpgsqlConnectionStringBuilder(fixture.Db.ConnectionString)
+        {
+            Password = "qtkd-test-only"
+        };
+        await using var db = new QtkdDbContext(QtkdPersistence.Options(connection.ConnectionString));
+        await using var transaction = await db.Database.BeginTransactionAsync();
+        var areaId = await db.Areas.Where(area => area.Level == 3).Select(area => area.AreaId).FirstAsync();
+
+        foreach (var suspended in new[] { true, false })
+        {
+            var customerStatus = suspended ? CustomerStatus.Suspended : CustomerStatus.Active;
+            var areaStatus = suspended ? AreaStatus.Suspended : AreaStatus.Active;
+            var customer = await db.Set<Customer>().SingleAsync(item => item.CustomerCode == code);
+            var area = await db.Areas.SingleAsync(item => item.AreaId == areaId);
+            customer.Status = customerStatus;
+            area.Status = areaStatus;
+            await db.SaveChangesAsync();
+            db.ChangeTracker.Clear();
+
+            Assert.Equal(customerStatus, (await db.Set<Customer>().SingleAsync(item =>
+                item.CustomerCode == code && item.Status == customerStatus)).Status);
+            Assert.Equal(areaStatus, (await db.Areas.SingleAsync(item =>
+                item.AreaId == areaId && item.Status == areaStatus)).Status);
+            db.ChangeTracker.Clear();
+        }
+
+        await transaction.RollbackAsync();
+    }
 
     [LocalCustomerPostgresFact]
     public async Task Duplicate_tax_returns_reference_only_inside_scope_and_does_not_write_history()
@@ -405,7 +444,9 @@ public sealed class CustomerReactivationPostgresTests
     {
         await using var f = await Fixture.Create(); using var manager = await f.Client("manager"); using var staff = await f.Client("staff");
         var code = await f.Customer(); var path = "/api/v1/customers/" + code;
-        Assert.Equal(HttpStatusCode.Forbidden, (await Post(staff, path + "/reactivate", Reactivate(), Guid.NewGuid().ToString())).StatusCode);
+        using var forbidden = await Post(staff, path + "/reactivate", Reactivate(), Guid.NewGuid().ToString());
+        Assert.True(forbidden.StatusCode == HttpStatusCode.Forbidden,
+            $"Expected Forbidden, got {forbidden.StatusCode}: {await forbidden.Content.ReadAsStringAsync()}");
         manager.DefaultRequestHeaders.Remove("X-QTKD-CSRF");
         Assert.Equal("CSRF_REJECTED", await Error(await Post(manager, path + "/reactivate", Reactivate(), Guid.NewGuid().ToString())));
         manager.DefaultRequestHeaders.Add("X-QTKD-CSRF", "1");

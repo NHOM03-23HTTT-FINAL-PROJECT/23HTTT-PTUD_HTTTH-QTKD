@@ -57,7 +57,7 @@ Tiền tố `/api/v1/approvals`, cần đăng nhập. `{id}` là `contract_id` (
 | GET | `/contracts/{id}?step=` | CTR-07/08/09 | `read` | Hồ sơ kèm lượt duyệt hiện tại; chỉ người được giao trong phạm vi |
 | POST | `/contracts/{id}/accept` | CTR-07 b5–6 | `accept` | `{roundId, stepId, viewedVersion, step}`; Submitted → Under Review |
 | POST | `/contracts/{id}/decisions` | CTR-07/08/09 | `decide` | `{roundId, stepId, viewedVersion, step, decision: approve \| revision \| reject, comment}`; `comment` bắt buộc, tối đa 4000 ký tự |
-| POST | `/contracts/{id}/handoff` | CTR-08 → 09 | `handoff` | `{roundId, stepId, viewedVersion, step}`; Pháp chế trình hồ sơ lên Ban Giám đốc sau khi chấp thuận |
+| POST | `/contracts/{id}/handoff` | CTR-08 → 09 | `handoff` | `{roundId, stepId, viewedVersion, step}`; API tương thích cũ; UI mới dùng quyết định approve ở bước legal để lưu kết luận và chuyển bước nguyên tử, không gọi handoff riêng |
 | GET | `/assignments` | CTR-10 | `assignments` | Quyền `approvals.assign` (vai trò SalesManager, LegalManager, BoardChair); hồ sơ đang trong lượt duyệt có bước người gọi phụ trách → `[{document, managedSteps}]` |
 | GET | `/contracts/{id}/candidates?step=` | CTR-10 b4 | `candidates` | Quyền `approvals.assign`; người còn hoạt động, đúng vai trò và quyền duyệt của bước, không gồm người lập; bước `sales` phải cùng phòng hồ sơ |
 | POST | `/contracts/{id}/assignment` | CTR-10, CTR-08 A4 | `assign` | Quyền `approvals.assign`, người gọi là trưởng (`department.manager_id`) phòng phụ trách bước; `{roundId, stepId, viewedVersion, assigneeId}` → `ReviewDocument`. Gán hoặc đổi người khi bước chưa bắt đầu; kích hoạt bước nếu đã tới lượt (trừ bước chờ bàn giao) |

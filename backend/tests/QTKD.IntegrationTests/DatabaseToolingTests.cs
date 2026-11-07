@@ -16,6 +16,16 @@ namespace QTKD.IntegrationTests;
 // No connection is opened. PostgreSQL execution is covered by DB/tests/dbtool-pglite.mjs and ef-schema-parity.mjs.
 public sealed class DatabaseToolingTests
 {
+    [Fact]
+    public void Migration_snapshot_and_area_enum_query_share_one_postgres_enum_mapping()
+    {
+        using var db = new QtkdDbContext(QtkdPersistence.Options("Host=offline.invalid"));
+        Assert.False(db.Database.HasPendingModelChanges());
+        var query = db.Areas.Where(area => area.Status == QTKD.Domain.Enums.ActiveStatus.Active).ToQueryString();
+        Assert.Contains("'Active'", query);
+        Assert.Contains("active_status", query);
+    }
+
     private static readonly IModel Model = DesignModel();
     private static readonly string Repo = FindRepo();
 
@@ -220,11 +230,15 @@ public sealed class DatabaseToolingTests
         using var db = new QtkdDbContext(QtkdPersistence.Options("Host=offline.invalid"));
         var ids = db.Database.GetMigrations().ToList();
         Assert.Equal(MigrationSql.PrismaBaseline.Select(m => m.EfId), ids.Take(MigrationSql.PrismaBaseline.Count));
-        var metadataId = Assert.Single(ids, id => id.EndsWith("_CustomerEfRepositoryAlignment", StringComparison.Ordinal));
         var assembly = db.GetService<Microsoft.EntityFrameworkCore.Migrations.IMigrationsAssembly>();
-        var metadata = assembly.CreateMigration(assembly.Migrations[metadataId], db.Database.ProviderName!);
-        Assert.Empty(metadata.UpOperations); Assert.Empty(metadata.DownOperations);
-        Assert.Equal(names.Count + 1, ids.Count);
+        var metadataNames = new[] { "_CustomerEfRepositoryAlignment", "_CustomerAreaEnumAlignment" };
+        foreach (var name in metadataNames)
+        {
+            var metadataId = Assert.Single(ids, id => id.EndsWith(name, StringComparison.Ordinal));
+            var metadata = assembly.CreateMigration(assembly.Migrations[metadataId], db.Database.ProviderName!);
+            Assert.Empty(metadata.UpOperations); Assert.Empty(metadata.DownOperations);
+        }
+        Assert.Equal(names.Count + metadataNames.Length, ids.Count);
     }
 
     [Fact]

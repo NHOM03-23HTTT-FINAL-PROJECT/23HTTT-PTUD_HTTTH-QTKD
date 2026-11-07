@@ -72,18 +72,18 @@ public sealed class ApprovalPostgresRollbackTests
             var document = (await store.Read(id, ct))!;
             Assert.Equal(3, document.Steps.Count);
             ReviewCommand? last = null;
-            foreach (var (step, action) in new[] { ("sales", "accept"), ("sales", "approve"), ("legal", "approve"), ("legal", "handoff"), ("board", "approve") })
+            foreach (var (step, action) in new[] { ("sales", "accept"), ("sales", "approve"), ("legal", "accept"), ("legal", "approve"), ("board", "accept"), ("board", "approve") })
             {
                 document = (await store.Read(id, ct))!;
                 last = WorkflowEngineTests.Command(document, step, action);
                 await engine.Execute(last, ct);
-                if (step == "sales" && action == "approve")
+                if (step == "legal" && action == "accept")
                 {
                     var current = (await store.Read(id, ct))!;
                     var expected = WorkflowEngineTests.Command(current, "legal", "approve").Expected;
                     var asked = await coordination.Request(users[2], id, new(expected, "KT", "Verify operational terms"), ct);
-                    Assert.Single(await coordination.List(users[4], null, ct));
-                    Assert.Empty(await coordination.List(users[3], null, ct));
+                    Assert.Single(await coordination.List(users[4], null, ct), item => item.DocumentId == id);
+                    Assert.DoesNotContain(await coordination.List(users[3], null, ct), item => item.DocumentId == id);
                     var forbidden = await Assert.ThrowsAsync<ReviewFailure>(() => coordination.Reply(users[2], id, asked.Id, "Wrong department", ct));
                     Assert.Equal(403, forbidden.Status);
                     await coordination.Reply(users[4], id, asked.Id, "Operational terms confirmed", ct);
@@ -94,7 +94,7 @@ public sealed class ApprovalPostgresRollbackTests
                 if (step == "legal" && action == "approve")
                 {
                     var waiting = (await store.Read(id, ct))!;
-                    Assert.Equal("waiting", waiting.Steps[2].State); Assert.Equal("under-review", waiting.Status);
+                    Assert.Equal("pending-accept", waiting.Steps[2].State); Assert.Equal("under-review", waiting.Status);
                 }
             }
             var approved = (await store.Read(id, ct))!;
@@ -103,7 +103,7 @@ public sealed class ApprovalPostgresRollbackTests
             await engine.Execute(last!, ct); // real SQL receipt replay after source is already Approved
             await using var auditCount = PostgresApprovalStore.Command(connection, transaction,
                 "SELECT count(*) FROM qtkd.audit_log WHERE entity_id=@id AND entity_type='ContractApproval'", ("id", id));
-            Assert.Equal(5L, await auditCount.ExecuteScalarAsync());
+            Assert.Equal(6L, await auditCount.ExecuteScalarAsync());
             await using var messages = PostgresApprovalStore.Command(connection, transaction,
                 "SELECT count(*) FROM qtkd.notification WHERE record_id=@id AND send_status='Pending'", ("id", id));
             Assert.True((long)(await messages.ExecuteScalarAsync())! > 0);
@@ -136,7 +136,8 @@ public sealed class ApprovalPostgresRollbackTests
                 }
                 await Act("sales", "accept");
                 if (stopAt != "sales") await Act("sales", "approve");
-                if (stopAt == "board") { await Act("legal", "approve"); await Act("legal", "handoff"); }
+                if (stopAt == "board") { await Act("legal", "accept"); await Act("legal", "approve"); await Act("board", "accept"); }
+                if (stopAt == "legal") await Act("legal", "accept");
                 await Act(stopAt, action);
                 var stopped = (await branchStore.Read(branch, ct))!;
                 Assert.Equal(action == "revision" ? "revision-requested" : "rejected", stopped.Status);
