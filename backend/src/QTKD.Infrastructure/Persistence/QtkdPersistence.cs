@@ -25,6 +25,7 @@ public static class QtkdPersistence
         services.AddDbContext<QtkdDbContext>((sp, options) =>
             options.UseNpgsql(connectionString(sp), pg => Configure(pg, enumNames)));
         services.AddScoped<INotificationRepository, NotificationRepository>();
+        services.AddScoped<INotificationDeliveryRepository, NotificationDeliveryRepository>();
         services.AddScoped<ContractRepository>();
         services.AddScoped<IContractRepository>(sp => sp.GetRequiredService<ContractRepository>());
         services.AddScoped<IContractManagementRepository>(sp => sp.GetRequiredService<ContractRepository>());
@@ -45,7 +46,6 @@ public static class QtkdPersistence
         pg.MapEnum<DocumentRecordType>("document_record_type", s, enumNames);
         pg.MapEnum<SendStatus>("send_status", s, enumNames);
         pg.MapEnum<ActiveStatus>("active_status", s, enumNames);
-        pg.MapEnum<QTKD.Domain.Enums.ActiveStatus>("active_status", s, enumNames);
         pg.MapEnum<CustomerDecisionType>("customer_decision_type", s, enumNames);
         pg.MapEnum<ContractDocumentType>("contract_document_type", s, enumNames);
         pg.MapEnum<ContractStatus>("contract_status", s, enumNames);

@@ -1,6 +1,6 @@
 namespace QTKD.Application.Features.Workflows;
 
-public sealed record WorkflowTask(Guid Id, int Order, Guid? AssigneeId, string State, string? Decision, bool RequiresHandoff);
+public sealed record WorkflowTask(Guid Id, int Order, Guid? AssigneeId, string State, string? Decision, bool RequiresHandoff, bool RequiresAcceptance = false);
 public sealed record WorkflowState(string Result, IReadOnlyList<WorkflowTask> Tasks);
 
 /// <summary>Generic ordered workflow. Keys, roles, document statuses and number of steps belong to adapters.</summary>
@@ -43,5 +43,5 @@ public sealed class WorkflowEngine
         if (!task.RequiresHandoff) tasks[index + 1] = Activate(tasks[index + 1]);
         return state with { Tasks = tasks };
     }
-    private static WorkflowTask Activate(WorkflowTask task) => task with { State = task.AssigneeId is null ? "unassigned" : "reviewing" };
+    private static WorkflowTask Activate(WorkflowTask task) => task with { State = task.AssigneeId is null ? "unassigned" : task.RequiresAcceptance ? "pending-accept" : "reviewing" };
 }

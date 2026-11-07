@@ -12,7 +12,7 @@ public sealed class NotificationRepository(QtkdDbContext db) : INotificationRepo
     public async Task<(IReadOnlyList<NotificationRecord> Items, int Total, int Unread)> ListAsync(
         Guid recipient, NotificationQuery query, CancellationToken ct)
     {
-        var mine = db.Notifications.AsNoTracking().Where(n => n.RecipientId == recipient);
+        var mine = Delivered(recipient).AsNoTracking();
         var filtered = query.UnreadOnly ? mine.Where(n => !n.IsRead) : mine;
 
         var total = await filtered.CountAsync(ct);
@@ -27,19 +27,22 @@ public sealed class NotificationRepository(QtkdDbContext db) : INotificationRepo
     }
 
     public Task<int> CountUnreadAsync(Guid recipient, CancellationToken ct) =>
-        db.Notifications.CountAsync(n => n.RecipientId == recipient && !n.IsRead, ct);
+        Delivered(recipient).CountAsync(n => !n.IsRead, ct);
 
     public async Task<NotificationRecord?> MarkReadAsync(Guid recipient, Guid id, CancellationToken ct)
     {
         // The recipient is part of the predicate: another user's notification behaves as missing.
-        var target = db.Notifications.Where(n => n.NotificationId == id && n.RecipientId == recipient);
+        var target = Delivered(recipient).Where(n => n.NotificationId == id);
         if (await target.ExecuteUpdateAsync(s => s.SetProperty(n => n.IsRead, true), ct) == 0) return null;
         return await WithTitle(target.AsNoTracking()).SingleOrDefaultAsync(ct);
     }
 
     public Task<int> MarkAllReadAsync(Guid recipient, CancellationToken ct) =>
-        db.Notifications.Where(n => n.RecipientId == recipient && !n.IsRead)
+        Delivered(recipient).Where(n => !n.IsRead)
             .ExecuteUpdateAsync(s => s.SetProperty(n => n.IsRead, true), ct);
+
+    private IQueryable<Notification> Delivered(Guid recipient) =>
+        db.Notifications.Where(n => n.RecipientId == recipient && n.SendStatus == SendStatus.Sent);
 
     // RecordTitle is a list label only. Only contracts have one today; other record types return null.
     private IQueryable<NotificationRecord> WithTitle(IQueryable<Notification> source) => source.Select(n => new NotificationRecord(

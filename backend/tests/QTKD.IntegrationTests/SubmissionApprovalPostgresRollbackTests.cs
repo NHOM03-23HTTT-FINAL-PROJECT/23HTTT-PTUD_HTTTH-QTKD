@@ -22,6 +22,9 @@ public sealed class SubmissionApprovalPostgresRollbackTests
     {
         // The connection comes from QtkdDbContext so EF's PostgreSQL enum mapping applies to the contract repository.
         await using var db = new QtkdDbContext(QtkdPersistence.Options(Environment.GetEnvironmentVariable("QTKD_APPROVAL_ROLLBACK_CONNECTION")!));
+        var activeArea = await db.Areas.AsNoTracking().Where(area => area.Status == QTKD.Domain.Enums.ActiveStatus.Active)
+            .Select(area => new { area.AreaId, area.Status }).FirstAsync();
+        Assert.Equal(QTKD.Domain.Enums.ActiveStatus.Active, activeArea.Status);
         await db.Database.OpenConnectionAsync();
         await using var efTransaction = await db.Database.BeginTransactionAsync();
         var connection = (NpgsqlConnection)db.Database.GetDbConnection();
@@ -93,7 +96,7 @@ public sealed class SubmissionApprovalPostgresRollbackTests
             // Trình: bước đầu giao TP KD; Pháp chế và BGĐ chờ phân công; lượt ghi đúng version hiện tại.
             var document = await Read();
             Assert.Equal(("submitted", 1), (document.Status, document.RoundNo));
-            Assert.Equal(["pending-accept", "unassigned", "unassigned"], document.Steps.Select(s => s.State));
+            Assert.Equal(["pending-accept", "waiting", "waiting"], document.Steps.Select(s => s.State));
             Assert.Equal(salesHead, document.Steps[0].AssigneeId);
             Assert.Equal(document.Version, document.SubmittedVersion);
             Assert.Equal(1L, await Scalar("SELECT count(*) FROM qtkd.notification WHERE record_id=@id AND recipient_id=@m", ("id", id), ("m", salesHead)));
@@ -107,24 +110,38 @@ public sealed class SubmissionApprovalPostgresRollbackTests
             await Submit();
             document = await Read();
             Assert.Equal(("submitted", 2), (document.Status, document.RoundNo));
-            Assert.Equal(["pending-accept", "unassigned", "unassigned"], document.Steps.Select(s => s.State));
+            Assert.Equal(["pending-accept", "waiting", "waiting"], document.Steps.Select(s => s.State));
 
             await Act("sales", "accept");
             await Act("sales", "approve");
-            Assert.Equal(["done", "unassigned", "unassigned"], (await Read()).Steps.Select(s => s.State));
+            Assert.Equal(["done", "unassigned", "waiting"], (await Read()).Steps.Select(s => s.State));
 
             await Assign(legalHead, "legal", legalStaff);
-            Assert.Equal("reviewing", (await Read()).Steps[1].State);
-            await Assign(boardHead, "board", boardMember);
+            Assert.Equal("pending-accept", (await Read()).Steps[1].State);
+            await Act("legal", "accept");
             await Act("legal", "approve");
-            Assert.Equal(["done", "done", "waiting"], (await Read()).Steps.Select(s => s.State));
-            await Act("legal", "handoff");
+            Assert.Equal(["done", "done", "unassigned"], (await Read()).Steps.Select(s => s.State));
+            await Assign(boardHead, "board", boardMember);
+            await Act("board", "accept");
             await Act("board", "approve");
 
             var approved = await Read();
             Assert.Equal(("approved", "completed"), (approved.Status, approved.RoundResult));
             Assert.All(approved.Steps, s => Assert.Equal(("done", "approve"), (s.State, s.Decision)));
             Assert.Equal(approved.SubmittedVersion, approved.Version);
+            // The same EF publication used by background delivery/manual retry operates on real PostgreSQL enums.
+            // It changes only inbox delivery state, preserving approval history and the approved contract version.
+            var delivery = new NotificationDeliveryRepository(db);
+            var notificationCount = await Scalar("SELECT count(*) FROM qtkd.notification WHERE record_id=@id", ("id", id));
+            var auditCount = await Scalar("SELECT count(*) FROM qtkd.audit_log WHERE entity_id=@id", ("id", id));
+            Assert.True(await delivery.PublishPendingAsync(1000, id, ct) > 0);
+            Assert.Equal(0, await delivery.PublishPendingAsync(1000, id, ct));
+            Assert.Equal(notificationCount, await Scalar("SELECT count(*) FROM qtkd.notification WHERE record_id=@id AND send_status='Sent'", ("id", id)));
+            Assert.Equal(auditCount, await Scalar("SELECT count(*) FROM qtkd.audit_log WHERE entity_id=@id", ("id", id)));
+            var afterDelivery = await Read();
+            Assert.Equal((approved.Status, approved.Version, approved.RoundResult), (afterDelivery.Status, afterDelivery.Version, afterDelivery.RoundResult));
+            Assert.Equal(approved.Steps, afterDelivery.Steps);
+            Assert.Null(afterDelivery.PendingTask);
         }
         finally { await efTransaction.RollbackAsync(); }
         await using var cleanup = new NpgsqlCommand("SELECT count(*) FROM qtkd.user_account WHERE username LIKE @prefix", connection);

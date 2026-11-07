@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useAuth } from '@/app/providers/AuthProvider';
 import { Button } from '@/components/button/Button';
 import { DataTable, type Column } from '@/components/data-table/DataTable';
 import { Alert } from '@/components/feedback/Alert';
@@ -25,16 +26,18 @@ const STEP_STATES: Record<string, { label: string; tone: BadgeTone }> = {
   stopped: { label: 'Không thực hiện', tone: 'neutral' },
 };
 
-/** Khớp AssignmentRules.CanAssign ở BE: lượt còn chạy và bước chưa bắt đầu. */
+/** Khớp AssignmentRules.CanAssign: chỉ giao lần đầu khi đã tới bước, trên cùng phiên bản. */
 function canAssign(document: ReviewDocument, step: ReviewStep) {
-  return document.roundResult === 'in-progress' && step.decision === null && ['unassigned', 'waiting', 'pending-accept'].includes(step.state);
+  return document.roundResult === 'in-progress' && document.status === 'under-review'
+    && document.version === document.submittedVersion && !step.assigneeId && step.decision === null && step.state === 'unassigned'
+    && document.steps.filter(s => s.order < step.order).every(s => s.state === 'done' && s.decision === 'approve' && s.reviewedVersion === document.submittedVersion);
 }
 
 function errorMessage(error: unknown): string {
   if (!(error instanceof ApiError)) return 'Chưa nhận được kết quả. Tải lại danh sách để kiểm tra trước khi thử lại.';
   switch (error.code) {
     case 'FORBIDDEN': return 'Bạn không phải trưởng bộ phận phụ trách bước này hoặc không còn quyền phân công.';
-    case 'ASSIGNMENT_IMMUTABLE': return 'Bước đã bắt đầu rà soát nên không đổi được người duyệt.';
+    case 'ASSIGNMENT_IMMUTABLE': return 'Bước chưa đến lượt hoặc đã có người được giao. Không thể phân công trước lượt hoặc đổi người; hãy tải lại danh sách.';
     case 'INVALID_ASSIGNEE': return 'Người được chọn không còn hợp lệ (không hoạt động, sai vai trò, hoặc là người lập hồ sơ).';
     case 'STEP_DONE': case 'VERSION_MISMATCH': return 'Hồ sơ hoặc lượt duyệt vừa thay đổi. Tải lại danh sách rồi phân công lại.';
     case 'NOT_FOUND': return 'Không tìm thấy hồ sơ hoặc bước duyệt.';
@@ -47,13 +50,12 @@ type Target = { document: ReviewDocument; step: ReviewStep };
 /**
  * SYS-CTR-10 · Phân công người duyệt cho từng hồ sơ.
  * Trưởng bộ phận phân công bước của bộ phận mình: TP Kinh doanh → Rà soát kinh doanh, trưởng Pháp chế → Rà soát pháp lý,
- * trưởng BGĐ → Phê duyệt. Đổi người được khi bước chưa bắt đầu.
+ * trưởng BGĐ → Phê duyệt. Chỉ phân công khi đến lượt; người được giao không thay đổi.
  */
 export function ApprovalAssignmentPage() {
   const [items, setItems] = useState<AssignmentItem[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
-  const [onlyPending, setOnlyPending] = useState(true);
   const [target, setTarget] = useState<Target | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -69,8 +71,7 @@ export function ApprovalAssignmentPage() {
     return () => { active = false; };
   }, [retry]);
 
-  const rows = useMemo(() => (items ?? []).filter((item) => !onlyPending
-    || item.document.steps.some((step) => item.managedSteps.includes(step.key) && step.state === 'unassigned')), [items, onlyPending]);
+  const rows = (items ?? []).filter(item => item.document.steps.some(step => item.managedSteps.includes(step.key) && canAssign(item.document, step)));
 
   function replaceDocument(document: ReviewDocument) {
     setItems((current) => current?.map((item) => (item.document.id === document.id ? { ...item, document } : item)) ?? null);
@@ -93,8 +94,8 @@ export function ApprovalAssignmentPage() {
                 <span className="contract-list__stack"><strong>{STEP_NAMES[step.key]}</strong><small>{step.assigneeName ?? 'Chưa có người duyệt'}</small></span>
                 <StatusBadge label={state.label} tone={state.tone} />
                 {canAssign(document, step) && (
-                  <Button variant={step.assigneeId ? 'secondary' : 'primary'} onClick={() => { setNotice(null); setTarget({ document, step }); }}>
-                    {step.assigneeId ? 'Đổi người' : 'Phân công'}
+                  <Button onClick={() => { setNotice(null); setTarget({ document, step }); }}>
+                    Phân công
                   </Button>
                 )}
               </li>
@@ -111,7 +112,7 @@ export function ApprovalAssignmentPage() {
       <div className="page-header">
         <div className="page-header__title">
           <h1>Phân công người duyệt</h1>
-          <p>Phân công người duyệt cho bước của bộ phận bạn phụ trách trên từng hồ sơ. Đổi người được khi bước chưa bắt đầu rà soát.</p>
+          <p>Chỉ hồ sơ đã đến bước của bộ phận bạn và đang chờ phân công. Mỗi bước được giao một lần, có thể tự nhận; người được giao không thay đổi.</p>
         </div>
       </div>
 
@@ -122,11 +123,11 @@ export function ApprovalAssignmentPage() {
         <section className="contract-results">
           <div className="contract-results__header">
             <h2>{items ? `${rows.length} hồ sơ` : 'Đang tải…'}</h2>
-            <label className="contract-switch"><input type="checkbox" checked={onlyPending} onChange={(event) => setOnlyPending(event.target.checked)} /><span>Chỉ hồ sơ còn bước chưa phân công</span></label>
+            <Button variant="secondary" onClick={() => setRetry(n => n + 1)}>Tải lại</Button>
           </div>
           {loadError && <div className="contract-results__message"><Alert tone="danger" title={loadError} action={<button type="button" className="alert__link" onClick={() => setRetry((n) => n + 1)}>Tải lại</button>}>Chỉ trưởng bộ phận phụ trách bước duyệt mới thấy hồ sơ tại đây.</Alert></div>}
           {items && !loadError && rows.length === 0 && (
-            <div className="contract-results__message"><Alert tone="info" title="Không có hồ sơ cần phân công">{onlyPending ? 'Mọi bước của bộ phận bạn đã có người duyệt.' : 'Không có hồ sơ đang trong lượt duyệt thuộc bộ phận bạn phụ trách.'}</Alert></div>
+            <div className="contract-results__message"><Alert tone="info" title="Không có hồ sơ cần phân công">Hồ sơ chưa đến lượt, đã có người được giao hoặc lượt duyệt đã kết thúc.</Alert></div>
           )}
           {items && !loadError && rows.length > 0 && <DataTable columns={columns} rows={rows} rowKey={(item) => item.document.id} />}
         </section>
@@ -148,11 +149,13 @@ export function ApprovalAssignmentPage() {
 }
 
 function AssignDialog({ target, onClose, onAssigned }: { target: Target; onClose: () => void; onAssigned: (document: ReviewDocument, name: string) => void }) {
+  const { user } = useAuth();
   const { document, step } = target;
   const [candidates, setCandidates] = useState<AssignmentCandidate[] | null>(null);
   const [assigneeId, setAssigneeId] = useState(step.assigneeId ?? '');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const inFlight = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -162,27 +165,31 @@ function AssignDialog({ target, onClose, onAssigned }: { target: Target; onClose
     return () => { active = false; };
   }, [document.id, step.key]);
 
-  async function confirm() {
-    if (!assigneeId || busy) return;
+  async function confirm(selected = assigneeId) {
+    if (!selected || inFlight.current) return;
+    inFlight.current = true;
     setBusy(true);
     setError(null);
     try {
-      const updated = await approvalApi.assign(document.id, { roundId: document.roundId, stepId: step.id, viewedVersion: document.version, assigneeId });
-      onAssigned(updated, candidates?.find((person) => person.id === assigneeId)?.name ?? 'Người được chọn');
+      const updated = await approvalApi.assign(document.id, { roundId: document.roundId, stepId: step.id, viewedVersion: document.version, assigneeId: selected });
+      onAssigned(updated, candidates?.find((person) => person.id === selected)?.name ?? 'Người được chọn');
     } catch (err) {
       setError(errorMessage(err));
     } finally {
       setBusy(false);
+      inFlight.current = false;
     }
   }
 
-  const unchanged = assigneeId === (step.assigneeId ?? '');
+  const canSelfAssign = user && candidates?.some(person => person.id === user.id);
   return (
     <Dialog
-      title={`${step.assigneeId ? 'Đổi người' : 'Phân công'} · ${STEP_NAMES[step.key]}`}
+      title={`Phân công · ${STEP_NAMES[step.key]}`}
       icon="users" tone="info" width={520} initialFocus="first"
       onClose={busy ? () => undefined : onClose}
-      actions={<><Button variant="secondary" disabled={busy} onClick={onClose}>Hủy</Button><Button disabled={busy || !assigneeId || unchanged} onClick={() => void confirm()}>{busy ? 'Đang lưu…' : 'Xác nhận'}</Button></>}
+      actions={<><Button variant="secondary" disabled={busy} onClick={onClose}>Hủy</Button>
+        {canSelfAssign && <Button variant="secondary" disabled={busy} onClick={() => void confirm(user.id)}>Tự nhận</Button>}
+        <Button disabled={busy || !assigneeId} onClick={() => void confirm()}>{busy ? 'Đang lưu…' : 'Phân công'}</Button></>}
     >
       <div className="dialog__body contract-dialog-summary">
         <dl>
@@ -198,7 +205,7 @@ function AssignDialog({ target, onClose, onAssigned }: { target: Target; onClose
             options={candidates.map((person) => ({ value: person.id, label: `${person.name} · ${person.title}` }))}
             onChange={setAssigneeId} />
         )}
-        <p>Người lập hồ sơ không được duyệt. Người được phân công nhận thông báo; người bị thay cũng được báo.</p>
+        <p>Người lập hồ sơ không được duyệt. Sau khi phân công, người được giao không thay đổi và nhận thông báo để tiếp nhận hồ sơ.</p>
       </div>
     </Dialog>
   );

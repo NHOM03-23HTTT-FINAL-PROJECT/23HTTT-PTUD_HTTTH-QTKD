@@ -52,13 +52,14 @@ public sealed class ContractApprovalFlowApiTests
         Assert.Equal(HttpStatusCode.OK, (await Act(sales, "sales", "accept")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await Act(sales, "sales", "approve")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await Act(sales, "legal", "approve")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await Act(legal, "legal", "accept")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await Act(legal, "legal", "approve")).StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, (await Act(board, "board", "approve")).StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await Act(legal, "legal", "handoff")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await Act(board, "board", "accept")).StatusCode);
         var final = await Act(board, "board", "approve"); final.EnsureSuccessStatusCode();
         var result = await final.Content.ReadFromJsonAsync<ReviewOutcome>();
         Assert.Equal("approved", result!.Document.Status); Assert.Equal("completed", result.Document.RoundResult);
-        Assert.Equal(5, store.Audit.Count);
+        Assert.Equal(6, store.Audit.Count);
         Assert.Equal(HttpStatusCode.Conflict, (await Act(board, "board", "approve")).StatusCode);
     }
 }

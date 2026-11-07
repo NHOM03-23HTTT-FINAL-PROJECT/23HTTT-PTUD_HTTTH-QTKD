@@ -20,6 +20,7 @@ const ACTIONS: Record<string, string> = {
   REVIEW_ACCEPTED: 'Tiếp nhận rà soát',
   REVIEW_HANDED_OFF: 'Trình Ban Giám đốc',
   REVIEW_APPROVED: 'Chấp thuận / phê duyệt',
+  REVIEW_APPROVED_AND_FORWARDED: 'Chấp thuận Pháp chế và trình Ban Giám đốc',
   REVIEW_REVISION_REQUESTED: 'Yêu cầu chỉnh sửa',
   REVIEW_REJECTED: 'Từ chối hồ sơ',
   APPROVER_ASSIGNED: 'Phân công người duyệt',

@@ -42,6 +42,7 @@ public sealed class NotificationRepositorySqliteTests : IDisposable
         {
             NotificationId = Guid.NewGuid(), RecipientId = recipient, RecordType = type,
             RecordId = type == RecordType.Contract ? contract : Guid.NewGuid(), Content = content, IsRead = read,
+            SendStatus = SendStatus.Sent,
             CreatedAt = start.AddMinutes(minute),
         };
         db.Notifications.Add(n);

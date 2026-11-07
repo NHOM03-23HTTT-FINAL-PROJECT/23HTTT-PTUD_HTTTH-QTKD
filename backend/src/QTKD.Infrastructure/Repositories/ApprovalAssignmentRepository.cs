@@ -34,7 +34,7 @@ public sealed class ApprovalAssignmentRepository(QtkdDbContext db, IHttpContextA
         JOIN qtkd.role_permission p ON p.role = u.role AND p.permission_code = @permission
         JOIN qtkd.department d USING (department_id)
         WHERE u.role::text = ANY(@roles) AND u.status = 'Active' AND NOT u.must_change_password
-          AND u.user_id <> @owner
+          AND u.user_id <> @owner AND d.code = @department
           AND (@candidate::uuid IS NULL OR u.user_id = @candidate::uuid)
         ORDER BY u.full_name
         """;
@@ -42,7 +42,7 @@ public sealed class ApprovalAssignmentRepository(QtkdDbContext db, IHttpContextA
     // Inside the write transaction: a concurrent revocation of the role or permission waits for this one.
     private const string Lock = " FOR SHARE OF u, p";
     private const string LockedAssignerSql = AssignerSql + Lock;
-    private const string LockedCandidatesSql = CandidatesSql + Lock;
+    private const string LockedCandidatesSql = CandidatesSql + " FOR SHARE OF u, p, d";
 
     private bool InTransaction => db.Database.CurrentTransaction is not null;
 
@@ -50,7 +50,9 @@ public sealed class ApprovalAssignmentRepository(QtkdDbContext db, IHttpContextA
         (await db.Database.SqlQueryRaw<int>(InTransaction ? LockedAssignerSql : AssignerSql, new NpgsqlParameter("actor", actorId)).ToListAsync(ct)).Count > 0;
 
     public async Task<IReadOnlySet<string>> ManagedDepartmentsAsync(Guid actorId, CancellationToken ct) =>
-        (await db.Set<Department>().AsNoTracking().Where(d => d.ManagerId == actorId).Select(d => d.Code).ToListAsync(ct)).ToHashSet();
+        (InTransaction
+            ? await db.Database.SqlQueryRaw<string>("SELECT code AS \"Value\" FROM qtkd.department WHERE manager_id=@actor FOR SHARE", new NpgsqlParameter("actor", actorId)).ToListAsync(ct)
+            : await db.Set<Department>().AsNoTracking().Where(d => d.ManagerId == actorId).Select(d => d.Code).ToListAsync(ct)).ToHashSet();
 
     public async Task<IReadOnlyDictionary<string, string>> RoleDepartmentsAsync(CancellationToken ct) =>
         (await db.Set<RoleDefinition>().AsNoTracking().Select(r => new { r.Code, r.DepartmentCode }).ToListAsync(ct))
@@ -86,6 +88,7 @@ public sealed class ApprovalAssignmentRepository(QtkdDbContext db, IHttpContextA
                 new NpgsqlParameter("permission", query.Permission),
                 new NpgsqlParameter("roles", query.Roles.ToArray()),
                 new NpgsqlParameter("owner", query.OwnerId),
+                new NpgsqlParameter("department", query.DepartmentCode),
                 new NpgsqlParameter("candidate", NpgsqlDbType.Uuid) { Value = (object?)query.Candidate ?? DBNull.Value })
             .ToListAsync(ct);
         return rows.Select(r => new AssignmentCandidate(r.Id, r.Name, r.Title, r.Department)).ToList();
@@ -119,7 +122,7 @@ public sealed class ApprovalAssignmentRepository(QtkdDbContext db, IHttpContextA
         var assigned = next is ApprovalStepStatus.Pending or ApprovalStepStatus.Reviewing;
         var accepted = next == ApprovalStepStatus.Reviewing;
         return await db.Set<ApprovalStep>()
-            .Where(s => s.StepId == stepId && s.Decision == null)
+            .Where(s => s.StepId == stepId && s.Decision == null && s.AssigneeId == null && s.StepStatus == ApprovalStepStatus.NotStarted)
             .ExecuteUpdateAsync(u => u
                 .SetProperty(s => s.AssigneeId, assigneeId)
                 .SetProperty(s => s.StepStatus, next)

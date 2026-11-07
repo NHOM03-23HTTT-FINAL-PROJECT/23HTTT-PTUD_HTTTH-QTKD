@@ -18,6 +18,7 @@ public sealed class NotificationKindsTests
     public static TheoryData<string, string> Templates => new()
     {
         { NotificationKinds.Assigned("rà soát Pháp chế", "HĐ A"), NotificationKinds.ReviewAssigned },
+        { NotificationKinds.AssignmentRequired("Rà soát pháp lý", "HĐ A"), NotificationKinds.ReviewAssignmentRequired },
         { NotificationKinds.Revoked("rà soát Pháp chế", "HĐ A"), NotificationKinds.AssignmentRevoked },
         { NotificationKinds.Decision("HĐ A", "under-review", null), NotificationKinds.ReviewRequired },
         { NotificationKinds.Decision("HĐ A", "approved", "Đồng ý"), NotificationKinds.ApprovalResult },

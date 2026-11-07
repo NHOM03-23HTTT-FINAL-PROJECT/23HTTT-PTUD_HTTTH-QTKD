@@ -20,7 +20,8 @@ public sealed class ApprovalAssignmentService(IApprovalAssignmentRepository repo
             var loaded = await repository.LoadAsync(id, ct);
             if (loaded is null) continue;
             var steps = AssignmentRules.ManagedSteps(loaded.Document, managed, roleDepartments);
-            if (steps.Count > 0) items.Add(new(loaded.Document, steps));
+            var ready = steps.Where(key => AssignmentRules.CanAssign(loaded.Document, loaded.Document.Steps.Single(s => s.Key == key))).ToArray();
+            if (ready.Length > 0) items.Add(new(loaded.Document, ready));
         }
         return items;
     }
@@ -31,7 +32,9 @@ public sealed class ApprovalAssignmentService(IApprovalAssignmentRepository repo
         await RequireAssigner(actor, ct);
         var loaded = await repository.LoadAsync(id, ct) ?? throw new BusinessException("NOT_FOUND", 404);
         await RequireManages(actor, step, ct);
-        return await repository.FindCandidatesAsync(Query(loaded, step, null), ct);
+        if (!AssignmentRules.CanAssign(loaded.Document, loaded.Document.Steps.Single(s => s.Key == step)))
+            throw new BusinessException("ASSIGNMENT_IMMUTABLE", 409);
+        return await repository.FindCandidatesAsync(await Query(loaded, step, null, ct), ct);
     }
 
     public Task<ReviewDocument> Assign(Actor actor, Guid id, AssignReviewRequest request, CancellationToken ct)
@@ -51,9 +54,8 @@ public sealed class ApprovalAssignmentService(IApprovalAssignmentRepository repo
         if (!AssignmentRules.StepKeys.Contains(step.Key)) throw new BusinessException("FORBIDDEN", 403);
         await RequireManages(actor, step.Key, ct);
 
-        if (step.AssigneeId == request.AssigneeId) return document;
         if (!AssignmentRules.CanAssign(document, step)) throw new BusinessException("ASSIGNMENT_IMMUTABLE", 409);
-        if ((await repository.FindCandidatesAsync(Query(loaded, step.Key, request.AssigneeId), ct)).Count == 0)
+        if ((await repository.FindCandidatesAsync(await Query(loaded, step.Key, request.AssigneeId, ct), ct)).Count == 0)
             throw new BusinessException("INVALID_ASSIGNEE", 400);
 
         var activates = AssignmentRules.ActivatesOnAssign(document, step);
@@ -62,10 +64,7 @@ public sealed class ApprovalAssignmentService(IApprovalAssignmentRepository repo
 
         var label = AssignmentRules.StepLabel(step.Key);
         await repository.NotifyAsync(request.AssigneeId, id, NotificationKinds.Assigned(label, document.Title), ct);
-        if (step.AssigneeId is { } previous)
-            await repository.NotifyAsync(previous, id, NotificationKinds.Revoked(label, document.Title), ct);
-
-        await repository.AuditAsync(id, step.AssigneeId is null ? "APPROVER_ASSIGNED" : "APPROVER_REASSIGNED", actor.Id,
+        await repository.AuditAsync(id, "APPROVER_ASSIGNED", actor.Id,
             JsonSerializer.Serialize(new { stepId = step.Id, step = step.Key, assigneeId = step.AssigneeId }),
             JsonSerializer.Serialize(new { stepId = step.Id, step = step.Key, assigneeId = request.AssigneeId, activated = activates }), ct);
 
@@ -84,6 +83,7 @@ public sealed class ApprovalAssignmentService(IApprovalAssignmentRepository repo
             throw new BusinessException("FORBIDDEN", 403);
     }
 
-    private static CandidateQuery Query(AssignmentDocument loaded, string step, Guid? candidate) =>
-        new(AssignmentRules.StepRoles(step), ContractApprovalService.Permission(step), loaded.OwnerId, candidate);
+    private async Task<CandidateQuery> Query(AssignmentDocument loaded, string step, Guid? candidate, CancellationToken ct) =>
+        new(AssignmentRules.StepRoles(step), ContractApprovalService.Permission(step), loaded.OwnerId, candidate,
+            AssignmentRules.StepDepartment(step, await repository.RoleDepartmentsAsync(ct)));
 }

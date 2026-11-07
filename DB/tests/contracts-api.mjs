@@ -113,6 +113,8 @@ try {
       env: {
         ...process.env,
         ASPNETCORE_ENVIRONMENT: 'Testing',
+        // Keep queued states deterministic on PGlite's single backend. Worker recovery is tested separately.
+        Notifications__Delivery__Enabled: 'false',
         ConnectionStrings__Identity: `Host=127.0.0.1;Port=${dbPort};Database=postgres;Username=postgres;SSL Mode=Disable;Pooling=false;Timeout=5;Command Timeout=10`,
         Storage__Root: tempRoot,
         Jwt__SigningKey: signingKey,
@@ -167,6 +169,7 @@ try {
     'demo.board.chair',
     'demo.legal.unassigned',
     'demo.legal.manager',
+    'demo.legal',
   ]) {
     const userId =
       username === 'demo.legal.unassigned'
@@ -220,7 +223,7 @@ try {
   );
   assert(
     shownRound.steps.some(
-      (step) => step.assigneeId === null && step.state === 'unassigned' && step.key === 'legal',
+      (step) => step.assigneeId === null && step.state === 'waiting' && step.key === 'legal',
     ),
   );
   pass('main manager roles preserve scope and unassigned approval stages remain visible in contract details');
@@ -566,6 +569,68 @@ try {
     originalName,
   ]);
   pass('audit actor names remain historical after live account names change');
+  // New SYS-CTR-10 safeguards on the disposable database only.
+  const legalHead = tokenFor('demo.legal.manager');
+  const legalStaff = tokenFor('demo.legal');
+  const ready = (await call(`/approvals/contracts/${ids.assignLegalContract}?step=sales`, manager)).body;
+  const future = { id: unassignedContract.body.id, version: unassignedContract.body.version,
+    roundId: shownRound.id, steps: shownRound.steps };
+  const assignmentRequest = (document, step, assignee) => ({ roundId: document.roundId,
+    stepId: document.steps.find(s => s.key === step).id, viewedVersion: document.version, assigneeId: assignee });
+  const queue = await call('/approvals/assignments', legalHead);
+  assert.equal(queue.status, 200);
+  assert(queue.body.some(row => row.document.id === ready.id));
+  assert(!queue.body.some(row => row.document.id === future.id));
+  const tooEarly = await call(`/approvals/contracts/${future.id}/assignment`, legalHead, 'POST', assignmentRequest(future, 'legal', ids.legalStaff));
+  assert.equal(tooEarly.status, 409);
+  await assert.rejects(db.query("UPDATE qtkd.approval_step SET assignee_id=$1,step_status='Pending' WHERE step_id=$2", [ids.legalStaff, future.steps[1].id]), e => e.code === '23514');
+  pass('future assignment is hidden and rejected by both API and database');
+
+  const legalDepartment = data.userAccount.find(u => u.userId === ids.legalStaff).departmentId;
+  await db.query('UPDATE qtkd.user_account SET department_id=$1 WHERE user_id=$2', [ids.accounting, ids.legalStaff]);
+  const candidates = await call(`/approvals/contracts/${ready.id}/candidates?step=legal`, legalHead);
+  assert.equal(candidates.status, 200);
+  assert(!candidates.body.some(person => person.id === ids.legalStaff));
+  const wrongDept = await call(`/approvals/contracts/${ready.id}/assignment`, legalHead, 'POST', assignmentRequest(ready, 'legal', ids.legalStaff));
+  assert.equal(wrongDept.status, 400);
+  assert.equal(wrongDept.body.code, 'INVALID_ASSIGNEE');
+  await db.query('UPDATE qtkd.user_account SET department_id=$1 WHERE user_id=$2', [legalDepartment, ids.legalStaff]);
+  pass('candidate validation checks actual department as well as role and permissions');
+
+  const assigned = await call(`/approvals/contracts/${ready.id}/assignment`, legalHead, 'POST', assignmentRequest(ready, 'legal', ids.legalStaff));
+  assert.equal(assigned.status, 200, JSON.stringify(assigned.body));
+  assert.equal(assigned.body.steps[1].state, 'pending-accept');
+  for (const person of [ids.legalStaff, ids.legalManager]) {
+    const duplicate = await call(`/approvals/contracts/${ready.id}/assignment`, legalHead, 'POST', assignmentRequest(ready, 'legal', person));
+    assert.equal(duplicate.status, 409); assert.equal(duplicate.body.code, 'ASSIGNMENT_IMMUTABLE');
+  }
+  await assert.rejects(db.query('UPDATE qtkd.approval_step SET assignee_id=$1 WHERE step_id=$2', [ids.legalManager, ready.steps[1].id]), e => e.code === '23514');
+  const decisionRequest = { roundId: ready.roundId, stepId: ready.steps[1].id, viewedVersion: ready.version, step: 'legal', decision: 'approve', comment: 'Verified legal terms' };
+  assert.equal((await call(`/approvals/contracts/${ready.id}/decisions`, legalStaff, 'POST', decisionRequest, randomUUID())).status, 409);
+  assert.equal((await call(`/approvals/contracts/${ready.id}/accept`, legalStaff, 'POST', decisionRequest, randomUUID())).status, 200);
+  const idempotency = randomUUID();
+  const approved = await call(`/approvals/contracts/${ready.id}/decisions`, legalStaff, 'POST', decisionRequest, idempotency);
+  assert.equal(approved.status, 200, JSON.stringify(approved.body));
+  assert.equal(approved.body.document.steps[2].state, 'unassigned');
+  assert.equal((await call(`/approvals/contracts/${ready.id}/decisions`, legalStaff, 'POST', decisionRequest, idempotency)).status, 200);
+  const auditCount = await db.query("SELECT count(*)::int AS n FROM qtkd.audit_log WHERE entity_id=$1 AND action='REVIEW_APPROVED_AND_FORWARDED'", [ready.id]);
+  assert.equal(auditCount.rows[0].n, 1);
+  const history = (await call(`/contracts/${ready.code}`, manager)).body.rounds.at(-1).log;
+  assert(history.some(row => row.action === 'approve' && row.stepKey === 'legal'));
+  assert(history.some(row => row.action === 'handoff-board' && row.stepKey === 'legal'));
+  const notifications = await db.query("SELECT count(*)::int AS n FROM qtkd.notification WHERE record_id=$1 AND recipient_id=$2 AND content LIKE 'Cần phân công %' AND send_status='Pending'", [ready.id, ids.boardChair]);
+  assert.equal(notifications.rows[0].n, 1);
+  pass('assignment is immutable and legal acceptance plus combined approval is idempotent and queues the director notice');
+
+  let legacy = (await call(`/approvals/contracts/${ids.assignBoardContract}?step=sales`, manager)).body;
+  // Emulate an old round whose legal conclusion was saved before the former handoff button was pressed.
+  await db.query("UPDATE qtkd.approval_step SET step_status='Completed',decision='Approve',comment='Legacy legal conclusion',decided_by=assignee_id,decided_at=now() WHERE step_id=$1 AND decision IS NULL", [legacy.steps[1].id]);
+  legacy = (await call(`/approvals/contracts/${legacy.id}?step=sales`, manager)).body;
+  assert.equal(legacy.steps[2].state, 'unassigned');
+  const continued = await call(`/approvals/contracts/${legacy.id}/assignment`, board, 'POST', assignmentRequest(legacy, 'board', ids.boardChair));
+  assert.equal(continued.status, 200, JSON.stringify(continued.body));
+  assert.equal(continued.body.steps[2].state, 'pending-accept');
+  pass('older rounds with an approved legal conclusion continue without a separate handoff');
   if (process.env.QTKD_APPROVAL_BROWSER === 'true') {
     assert(process.env.QTKD_PLAYWRIGHT_MODULE, 'Set QTKD_PLAYWRIGHT_MODULE for the optional approval browser checks');
     const { approvalDetailBrowserCheck } = await import('./approval-detail-browser.mjs');
@@ -584,11 +649,12 @@ try {
       sales: { user: data.userAccount.find(u => u.userId === ids.salesStaff), role: 'NV_KD', token: sales, department: 'KD', permissions: ['contracts.view', 'contracts.create', 'approvals.track'] },
       manager: { user: data.userAccount.find(u => u.userId === ids.salesManager), role: 'TP_KD', token: manager, department: 'KD', permissions: ['contracts.view', 'approvals.approve', 'approvals.track', 'approvals.assign'] },
       legal: { user: data.userAccount.find(u => u.userId === ids.legalManager), role: 'TP_PC', token: tokenFor('demo.legal.manager'), department: 'PC', permissions: ['contracts.view', 'approvals.review-legal', 'approvals.assign'] },
+      legalReviewer: { user: data.userAccount.find(u => u.userId === ids.legalStaff), role: 'NV_PC', token: tokenFor('demo.legal'), department: 'PC', permissions: ['contracts.view', 'approvals.review-legal', 'approvals.track'] },
       board: { user: data.userAccount.find(u => u.userId === ids.boardChair), role: 'TGD', token: board, department: 'BGD', permissions: ['contracts.view', 'approvals.approve', 'approvals.assign'] },
     };
     await approvalDetailBrowserCheck({ repo, apiPort, browserPort: approvalUiPort, actors, createSubmitted, call, serialHttp,
       screenshotRoot: process.env.QTKD_APPROVAL_SCREENSHOTS ?? tempRoot });
-    pass('browser: canonical detail supports acceptance, legal review, handoff and final approval with real workflow APIs');
+    pass('browser: canonical detail supports acceptance, immutable assignment, combined legal approval and final approval with real workflow APIs');
   }
   if (process.env.QTKD_PLAYWRIGHT_MODULE && process.env.QTKD_APPROVAL_BROWSER !== 'true') {
     const browserFixture = await call(
